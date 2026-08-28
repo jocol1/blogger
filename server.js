@@ -21,7 +21,11 @@ fs.mkdirSync(uploadDir, { recursive: true });
 const dbFile = path.join(dataDir, 'store.json');
 const store = fs.existsSync(dbFile) ? JSON.parse(fs.readFileSync(dbFile, 'utf8')) : { posts: [], notes: [] };
 let firestore = null;
-if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+  const serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'));
+  initializeApp({ credential: cert(serviceAccount) });
+  firestore = getFirestore();
+} else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
   let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
   if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) privateKey = privateKey.slice(1, -1);
   privateKey = privateKey.replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\r\n/g, '\n');
