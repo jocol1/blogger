@@ -4,7 +4,7 @@
   "private": true,
   "description": "Private blog for guides, files and encrypted secrets",
   "main": "server.js",
-  "scripts": { "start": "node server.js", "dev": "node --watch server.js" },
+  "scripts": { "start": "node server.js", "dev": "node --watch-path=server.js server.js" },
   "engines": { "node": ">=20" },
   "dependencies": {
     "bcryptjs": "^2.4.3",
