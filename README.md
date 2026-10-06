@@ -56,7 +56,7 @@ Các collection riêng: `donation_requests`, `donation_tokens`, `donation_sepay_
 
 Firebase Admin ở server là bên duy nhất được đọc/ghi các collection này. Firestore Security Rules phải **không cấp quyền trực tiếp** cho client, kể cả collection sự kiện công khai; client đọc qua API lọc trường. Kiểm tra dự án không có quy tắc rộng như `allow read, write: if true` hoặc cấp mọi collection cho mọi tài khoản đăng nhập. Thêm rule `false` riêng không ghi đè một rule rộng đang cho phép.
 
-Token tra cứu là chuỗi ngẫu nhiên 256 bit, server chỉ lưu SHA-256. Trình duyệt giữ token của lượt hiện tại trong sessionStorage để phục hồi sau tải lại. Feed công khai chỉ có ID sự kiện, tên hiển thị, số tiền, thời gian và lời chúc; không có payload ngân hàng hoặc token.
+Token tra cứu là chuỗi ngẫu nhiên 256 bit, server chỉ lưu SHA-256. Trình duyệt giữ token của lượt hiện tại trong localStorage (và sessionStorage để tương thích các tab cũ), nhờ đó trạng thái được phục hồi sau tải lại hoặc khi mở tab mới trên cùng trình duyệt. Feed công khai chỉ có ID sự kiện, tên hiển thị, số tiền, thời gian và lời chúc; không có payload ngân hàng hoặc token.
 
 Client poll mỗi 3 giây; người mới mở trang nhận mốc hiện tại, mất mạng thì tiếp tục từ mốc cuối. Sự kiện có số thứ tự tăng trong cùng transaction với ghi nhận tiền nên không mất lượt khi các webhook đến đồng thời. Mỗi hiệu ứng chạy 7 giây, không phát lại khi poll trùng.
 

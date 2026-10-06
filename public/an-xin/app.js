@@ -12,6 +12,27 @@
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
   const defaultSpeech = 'Ai đi ngang qua… cho xin chút lộc với ạ!';
+  const paymentStorageKey = 'donation-payment';
+
+  function savePayment(value) {
+    const serialized = JSON.stringify(value);
+    try { localStorage.setItem(paymentStorageKey, serialized); } catch { /* Private browsing may disable storage. */ }
+    try { sessionStorage.setItem(paymentStorageKey, serialized); } catch { /* Keep compatibility with existing tabs. */ }
+  }
+  function loadPayment() {
+    for (const storage of [localStorage, sessionStorage]) {
+      try {
+        const serialized = storage.getItem(paymentStorageKey);
+        if (serialized) return JSON.parse(serialized);
+      } catch { /* Try the other browser storage. */ }
+    }
+    return null;
+  }
+  function forgetPayment() {
+    for (const storage of [localStorage, sessionStorage]) {
+      try { storage.removeItem(paymentStorageKey); } catch { /* Optional storage. */ }
+    }
+  }
 
   async function api(url, options = {}) {
     const response = await fetch(url, { ...options, cache: 'no-store', signal: AbortSignal.timeout(12000) });
@@ -73,7 +94,7 @@
       if (active) setTimeout(pollEvents, 3000);
     }
   }
-  async function pollStatus() {
+  async function checkStatus() {
     const current = payment;
     if (current) {
       try {
@@ -91,6 +112,9 @@
         }
       }
     }
+  }
+  async function pollStatus() {
+    await checkStatus();
     if (active) setTimeout(pollStatus, 3000);
   }
   function displayPayment(value) {
@@ -108,7 +132,7 @@
     $('payment').hidden = false;
     $('donation-form').hidden = true;
     $('copy-status').textContent = '';
-    try { sessionStorage.setItem('donation-payment', JSON.stringify(value)); } catch { /* Private browsing may disable storage. */ }
+    savePayment(value);
   }
   choices.forEach(button => button.addEventListener('click', () => {
     $('amount').value = button.dataset.amount;
@@ -150,7 +174,7 @@
   });
   $('new-donation').addEventListener('click', () => {
     payment = null;
-    try { sessionStorage.removeItem('donation-payment'); } catch { /* Optional storage. */ }
+    forgetPayment();
     $('payment').hidden = true;
     $('donation-form').hidden = false;
     $('form-error').hidden = true;
@@ -182,7 +206,7 @@
       $('availability').hidden = true;
       $('donation-fields').disabled = false;
       try {
-        const cached = JSON.parse(sessionStorage.getItem('donation-payment'));
+        const cached = loadPayment();
         if (cached && /^[a-f0-9]{64}$/.test(cached.token) && /^DH\d{7}$/.test(cached.code) && cached.account === config.account && cached.bank === config.bank && Number.isSafeInteger(cached.amount) && cached.amount > 0) {
           // Rebuild the URL from trusted current configuration instead of using a cached URL.
           const params = new URLSearchParams({ amount: String(cached.amount), addInfo: cached.code, accountName: config.accountName });
@@ -197,5 +221,7 @@
       connection('Chưa kết nối');
     }
   }
+  window.addEventListener('pageshow', () => { if (active) checkStatus(); });
+  document.addEventListener('visibilitychange', () => { if (active && document.visibilityState === 'visible') checkStatus(); });
   init();
 })();

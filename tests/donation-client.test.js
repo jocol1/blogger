@@ -6,10 +6,12 @@ const source = fs.readFileSync(require.resolve('../public/an-xin/app.js'), 'utf8
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 // Minimal DOM harness to test asynchronous queue/error behavior, not layout.
-function fixture(handler) {
+function fixture(handler, initialPayment) {
   const nodes = new Map();
   const timers = [];
   const storage = new Map();
+  const session = new Map();
+  if (initialPayment) storage.set('donation-payment', JSON.stringify(initialPayment));
   function element() {
     const classes = new Set();
     return {
@@ -25,15 +27,16 @@ function fixture(handler) {
   get('amount').value = '20000';
   get('donation-fields').disabled = true;
   const choices = [10000, 20000, 50000, 100000].map(amount => Object.assign(element(), { dataset: { amount: String(amount) } }));
+  const storageApi = map => ({ getItem: key => map.get(key) || null, setItem: (key, value) => map.set(key, value), removeItem: key => map.delete(key) });
   const context = {
-    document: { getElementById: get, querySelectorAll: selector => selector === '[data-amount]' ? choices : [], createElement: element, createTextNode: text => ({ textContent: text }) },
-    window: {}, navigator: {}, URLSearchParams, AbortSignal,
-    sessionStorage: { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key) },
+    document: { visibilityState: 'visible', handlers: {}, getElementById: get, querySelectorAll: selector => selector === '[data-amount]' ? choices : [], createElement: element, createTextNode: text => ({ textContent: text }), addEventListener(event, handler) { this.handlers[event] = handler; } },
+    window: { handlers: {}, addEventListener(event, handler) { this.handlers[event] = handler; } }, navigator: {}, URLSearchParams, AbortSignal,
+    localStorage: storageApi(storage), sessionStorage: storageApi(session),
     setTimeout: (fn, delay) => { timers.push({ fn, delay }); },
     fetch: async (url, options) => { const result = await handler(url, options); return { ok: result.ok !== false, json: async () => result.body }; },
   };
   vm.runInNewContext(source, context);
-  return { get, choices, timers, storage, async run(delay) { const index = timers.findIndex(timer => timer.delay === delay); assert.notEqual(index, -1, `missing ${delay}ms timer`); const [timer] = timers.splice(index, 1); await timer.fn(); await settle(); } };
+  return { get, choices, timers, storage, session, context, async run(delay) { const index = timers.findIndex(timer => timer.delay === delay); assert.notEqual(index, -1, `missing ${delay}ms timer`); const [timer] = timers.splice(index, 1); await timer.fn(); await settle(); } };
 }
 
 test('client queues donations for seven seconds and ignores replayed event IDs', async () => {
@@ -93,4 +96,17 @@ test('missing configuration keeps the form disabled and does not poll transactio
   assert.equal(ui.get('donation-fields').disabled, true);
   assert.match(ui.get('availability').textContent, /chưa sẵn sàng/);
   assert.deepEqual(calls, ['/api/donations/config']);
+});
+
+test('a new tab restores the latest QR and immediately shows its paid status', async () => {
+  const cached = { bank: 'MB', account: '0000000000', accountName: 'TEST', amount: 20000, code: 'DH0123456', token: 'a'.repeat(64), qrUrl: 'https://old.example/qr.png' };
+  const ui = fixture(async url => {
+    if (url.endsWith('/config')) return { body: { ready: true, bank: 'MB', account: '0000000000', accountName: 'TEST' } };
+    if (url === '/api/donations/status') return { body: { status: 'paid', paidAmount: 20000, paymentCount: 1 } };
+    return { body: { cursor: 0, events: [], hasMore: false } };
+  }, cached);
+  await settle();
+  assert.equal(ui.get('payment').hidden, false);
+  assert.equal(ui.get('payment-code').textContent, 'DH0123456');
+  assert.match(ui.get('payment-status').textContent, /Đã nhận 20\.000đ/);
 });
