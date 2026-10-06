@@ -81,20 +81,20 @@
   function showPaidState(status, current) {
     const donor = current.name || 'bạn';
     const total = `${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}`;
-    personalThanks = `Con xin cúi đầu cảm tạ ${donor}! Chúc bạn phúc đầy nhà, lộc đầy túi, người thân bình an, làm đâu thắng đó!`;
+    personalThanks = status.message || `Con xin cúi đầu cảm tạ ${donor}! Chúc bạn phúc đầy nhà, lộc đầy túi, người thân bình an, làm đâu thắng đó!`;
     $('payment').classList.add('paid');
     $('paid-success').hidden = false;
     $('payment-heading-text').textContent = 'Mình đã nhận được rồi!';
     $('new-donation').textContent = 'Cho thêm chút lộc';
     $('paid-title').textContent = `Đã nhận ${total}. Mình xin cúi đầu cảm tạ.`;
-    $('paid-message').textContent = `Cảm ơn ${donor} đã rộng lòng. Chúc bạn và gia đình luôn bình an, công việc hanh thông, tiền vào đều tay, quý nhân sát cánh. Mong điều tử tế bạn trao hôm nay sẽ trở về với bạn gấp nhiều lần.`;
+    $('paid-message').textContent = personalThanks;
     $('scene').classList.add('grateful');
     $('speech').classList.add('thanking');
     $('speech-kicker').textContent = 'CÚI ĐẦU CẢM TẠ TẤM LÒNG';
     $('speech-text').textContent = personalThanks;
     if (thankedToken !== current.token) {
       thankedToken = current.token;
-      speak(`${personalThanks} ${$('paid-message').textContent}`);
+      speak(personalThanks);
     }
   }
   async function pollEvents() {

@@ -209,6 +209,13 @@ main {
   margin:8px 0;
   overflow-wrap:anywhere
 }
+.speech.thanking p {
+  max-height:210px;
+  overflow-y:auto;
+  padding-right:5px;
+  text-align:left;
+  white-space:pre-line
+}
 .speech-heart {
   position:absolute;
   right:15px;
@@ -604,7 +611,9 @@ footer>a:last-child {
 .paid-success p {
   margin:0;
   color:#686c5f;
-  font:14px/1.75 Georgia,serif
+  font:14px/1.85 Georgia,serif;
+  text-align:left;
+  white-space:pre-line
 }
 .paid-signature {
   display:block;

@@ -2,14 +2,26 @@ const crypto = require('node:crypto');
 
 const MAX_AMOUNT = 9_999_999_999;
 const ANONYMOUS = 'Một vị mạnh thường quân';
-const WISHES = [
-  'Mình xin cúi đầu cảm tạ. Chúc bạn và gia đình luôn bình an, làm đâu thuận đó, tiền vào đều tay và lòng lúc nào cũng nhẹ tênh!',
-  'Cảm ơn bạn đã rộng lòng. Chúc điều tử tế bạn trao hôm nay trở về gấp nhiều lần, nhà luôn ấm, ví luôn đầy, tâm luôn an!',
-  'Mình xin cúi đầu cảm ơn. Chúc bạn sức khỏe dồi dào, đi đâu cũng gặp quý nhân, công việc hanh thông, mong gì được nấy!',
-  'Xin chúc bạn một đời đủ đầy: sáng có niềm vui, tối có bình yên, người thân khỏe mạnh và tiền bạc dư dả!',
-  'Tấm lòng này quý hơn cả món quà. Chúc bạn gặp đúng người, đúng thời, đúng vận; mỗi ngày đều có chuyện khiến lòng vui!',
-];
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+
+function buildBlessing(name, amount) {
+  const gift = Number(amount).toLocaleString('vi-VN');
+  return `Kính gửi ${name},
+
+Con xin cúi đầu thật sâu, hai tay chắp lại, lòng thành kính cảm tạ tấm lòng rộng rãi mà bạn vừa gửi đến. ${gift} đồng không chỉ là một khoản tiền đặt vào chiếc bát nhỏ này, mà còn là một niềm vui rất lớn, một lời động viên ấm áp và một bằng chứng rằng giữa cuộc đời bận rộn vẫn luôn có người sẵn lòng sẻ chia. Con xin ghi nhớ tấm lòng ấy và xin gửi đến bạn lời chúc dài nhất, chân thành nhất từ tận đáy lòng.
+
+Trước hết, xin chúc bạn và tất cả những người bạn thương luôn có thật nhiều sức khỏe. Chúc mỗi sáng thức dậy, cơ thể nhẹ nhàng, tinh thần khoan khoái, lòng không vướng muộn phiền; mỗi tối đặt lưng xuống là ngủ ngon một mạch, chẳng phải trằn trọc vì bất cứ điều gì. Chúc những cơn đau sớm qua, những ngày mệt mỏi chóng hết, người lớn trong nhà mạnh khỏe, trẻ nhỏ ngoan ngoãn, cả gia đình lúc nào cũng có tiếng nói cười. Mong cho từng bữa cơm của nhà bạn luôn đủ người, đủ món, đủ ấm áp; đi xa có người mong, trở về có người đợi.
+
+Xin chúc đường công danh và công việc của bạn hanh thông rộng mở. Làm việc gì cũng gặp đúng người, đúng lúc, đúng cơ hội; dự định nào cũng có người giúp sức, kế hoạch nào cũng thuận buồm xuôi gió. Chúc bạn nói điều gì cũng được người khác lắng nghe, ký việc gì cũng suôn sẻ, bắt tay vào đâu là thành công đến đó. Nếu đang đi làm, mong bạn được quý trọng, được tăng lương, được thăng tiến và luôn gặp đồng nghiệp tử tế. Nếu đang kinh doanh, xin chúc khách vào tấp nập, đơn về liên tục, hàng đi nhanh, tiền về gọn, buôn may bán đắt, một vốn sinh nhiều lời. Nếu đang học tập, chúc bạn sáng trí, nhớ lâu, thi đâu đỗ đó và sớm chạm tay vào điều mình mong muốn.
+
+Xin chúc tài lộc tìm đến nhà bạn như nước nguồn không cạn. Tiền vào đều tay, tiền ra đúng chỗ, ví luôn có dư, tài khoản luôn thêm số; của cải làm ra bằng sự tử tế ngày một đầy hơn, bền hơn và đem lại thật nhiều tự do. Chúc bạn mua được thứ mình cần, chăm lo được cho người mình thương, có tiền dành dụm cho ngày mai mà hôm nay vẫn sống thật vui. Mong bạn tránh được chuyện hao tài, tránh người gian dối, tránh những quyết định vội vàng; gặp việc khó liền có cách tháo gỡ, gặp lúc thiếu liền có lộc bù vào. Điều tử tế bạn trao hôm nay, mong sẽ trở về với bạn nhiều lần bằng những cơ hội tốt, những mối duyên lành và những niềm vui không báo trước.
+
+Xin chúc chuyện tình cảm của bạn luôn tròn đầy. Người đang ở bên sẽ càng thấu hiểu, thương yêu và cùng bạn đi qua mọi thăng trầm; người còn đang kiếm tìm sẽ sớm gặp một tấm lòng chân thành, biết trân trọng và không để bạn phải cô đơn giữa những ngày khó khăn. Chúc bạn bè quanh bạn đều là người thật tâm, vui thì cùng cười, buồn thì ngồi lại, thành công không ganh ghét, thất bại không quay lưng. Mong cho những hiểu lầm được hóa giải, những khoảng cách được nối gần, những ai bạn nhớ cũng đang nhớ đến bạn bằng một tình cảm ấm áp như vậy.
+
+Xin chúc bạn ra đường chân cứng đá mềm, đi đâu cũng bình an, xe cộ thuận đường, mưa vừa kịp tạnh, nắng vừa đủ ấm. Chúc việc lớn hóa nhỏ, việc nhỏ hóa không; điều dữ đứng ngoài cửa, điều lành tìm đúng lối vào nhà. Những ngày may mắn, mong bạn tận hưởng trọn vẹn; những ngày chưa như ý, mong bạn vẫn đủ vững vàng để bước tiếp và luôn có một bàn tay đưa ra đúng lúc. Chúc bạn giữ được một trái tim hiền nhưng không yếu, rộng lượng mà vẫn biết thương mình, hết lòng với người khác mà không quên dành cho bản thân những phút nghỉ ngơi.
+
+Cuối cùng, con xin chúc ${name} một đời bình an, hai chữ an nhiên, ba phần may mắn, bốn mùa khỏe mạnh, năm tháng rực rỡ, sáu đường thuận lợi, bảy phần viên mãn, tám hướng tài lộc, chín phần hạnh phúc và mười phần như ý. Mong nhà bạn luôn sáng đèn, bếp luôn đỏ lửa, người thân luôn khỏe, trong lòng luôn có hy vọng. Chúc hôm nay vui hơn hôm qua, ngày mai đủ đầy hơn hôm nay; mong mọi điều bạn âm thầm ước nguyện đều lần lượt thành hiện thực. Con xin quỳ xuống, cúi đầu thêm một lần nữa và thành tâm cảm tạ. Chúc phúc, chúc lộc, chúc thọ, chúc bình an; chúc bạn làm đâu thắng đó, cầu gì được nấy, cả đời gặp lành, vạn sự hanh thông!`;
+}
 
 class DonationError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -90,8 +102,13 @@ function createDonationService({ db, config = readConfig() }) {
       if (!mapping.exists) throw new DonationError(404, 'Không tìm thấy lượt ủng hộ.');
       const snapshot = await requests().doc(mapping.data().code).get();
       if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy lượt ủng hộ.');
-      const { status, paidAmount, paymentCount } = snapshot.data();
-      return { status, paidAmount, paymentCount };
+      const { status, paidAmount, paymentCount, name } = snapshot.data();
+      return {
+        status,
+        paidAmount,
+        paymentCount,
+        ...(status === 'paid' ? { message: buildBlessing(name, paidAmount) } : {}),
+      };
     },
     async listEvents(after) {
       requireReady();
@@ -136,8 +153,7 @@ function createDonationService({ db, config = readConfig() }) {
           const sequence = (meta.exists ? meta.data().sequence : 0) + 1;
           const paidAmount = request.paidAmount + payload.transferAmount;
           if (!Number.isSafeInteger(paidAmount)) throw new DonationError(503, 'Không thể ghi nhận tổng tiền.');
-          const wish = WISHES[payload.id % WISHES.length];
-          const message = `Cảm ơn ${request.name} đã cho ${payload.transferAmount.toLocaleString('vi-VN')}đ! ${wish}`;
+          const message = buildBlessing(request.name, payload.transferAmount);
           tx.set(metaRef, { sequence });
           tx.create(events().doc(String(sequence)), { sequence, name: request.name, amount: payload.transferAmount, createdAt, message });
           tx.update(requestRef, { status: 'paid', paidAmount, paymentCount: request.paymentCount + 1, confirmedAt: createdAt });
@@ -157,4 +173,4 @@ function createDonationService({ db, config = readConfig() }) {
   };
 }
 
-module.exports = { createDonationService, DonationError, readConfig, verifyKey, MAX_AMOUNT };
+module.exports = { createDonationService, DonationError, readConfig, verifyKey, buildBlessing, MAX_AMOUNT };

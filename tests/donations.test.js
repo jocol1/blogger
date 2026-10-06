@@ -43,11 +43,16 @@ test('actual amount wins; multiple different transfers using one code remain sep
   const donation = await service.create({ amount: 10_000, name: 'Minh' });
   assert.equal((await service.receive(payload(donation.code, 1, { transferAmount: 50_000 }))).result, 'matched_paid');
   await service.receive(payload(donation.code, 2));
-  assert.deepEqual(await service.status(donation.token), { status: 'paid', paidAmount: 70_000, paymentCount: 2 });
+  const status = await service.status(donation.token);
+  assert.equal(status.status, 'paid');
+  assert.equal(status.paidAmount, 70_000);
+  assert.equal(status.paymentCount, 2);
+  assert.match(status.message, /Kính gửi Minh/);
+  assert.ok(status.message.split(/\s+/).length >= 500, 'the private thank-you should be about one A4 page');
   const feed = await service.listEvents('0');
   assert.deepEqual(feed.events.map(event => event.amount), [50_000, 20_000]);
-  assert.match(feed.events[0].message, /Cảm ơn Minh đã cho 50\.000đ!/);
-  assert.ok(feed.events[0].message.length > 120, 'the public thank-you should include a substantial blessing');
+  assert.match(feed.events[0].message, /50\.000 đồng/);
+  assert.ok(feed.events[0].message.split(/\s+/).length >= 500, 'the public thank-you should be about one A4 page');
 });
 
 test('concurrent duplicate webhooks produce exactly one receipt, credit and event', async () => {
@@ -56,7 +61,9 @@ test('concurrent duplicate webhooks produce exactly one receipt, credit and even
   const results = await Promise.all(Array.from({ length: 12 }, () => service.receive(payload(donation.code))));
   assert.equal(results.filter(item => item.result === 'matched_paid').length, 1);
   assert.equal(results.filter(item => item.result === 'duplicate').length, 11);
-  assert.deepEqual(await service.status(donation.token), { status: 'paid', paidAmount: 20_000, paymentCount: 1 });
+  const { message, ...status } = await service.status(donation.token);
+  assert.deepEqual(status, { status: 'paid', paidAmount: 20_000, paymentCount: 1 });
+  assert.ok(message.length > 0);
   assert.equal((await service.listEvents('0')).events.length, 1);
   assert.equal([...db.rows.keys()].filter(key => key.startsWith('donation_sepay_events/')).length, 1);
 });
