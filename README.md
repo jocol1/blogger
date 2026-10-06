@@ -43,7 +43,7 @@ Thiếu Firestore hoặc bất kỳ biến nhận tiền nào, trang hiển th�
 1. Kết nối tài khoản MB nhận tiền trên SePay. Triển khai ứng dụng Node với HTTPS công khai.
 2. Tạo webhook, chọn sự kiện **Có tiền vào**, đúng tài khoản nhận tiền và URL `https://<domain>/api/webhooks/sepay`.
 3. Chọn xác thực **API Key**, dùng cùng giá trị `SEPAY_WEBHOOK_API_KEY`; header gửi tới server phải là `Authorization: Apikey <key>`.
-4. Nếu đặt bộ lọc mã thanh toán, dùng tiền tố `AX` với 10 chữ số. Server cũng tìm mã trong `content` nếu `code` trống. Nội dung chuyển khoản phải giữ nguyên mã, ví dụ `AX0123456789`.
+4. Nếu đặt bộ lọc mã thanh toán, dùng tiền tố `DH` với 7 chữ số. Server cũng tìm mã trong `content` nếu `code` trống. Nội dung chuyển khoản chỉ cần giữ nguyên mã, ví dụ `DH0123456`.
 5. Mở `/an-xin`, tạo QR và kiểm tra ngân hàng, tài khoản, số tiền, mã trước khi bật sử dụng thật.
 
 Endpoint trả HTTP 200 và `{"success":true}` sau khi Firestore commit. Webhook trùng được trả thành công nhưng không cộng tiền lần nữa. Giao dịch tiền ra, sai tài khoản, sai số tiền hoặc mã không khớp chỉ được lưu audit, không phát cảm ơn; kết quả nằm trong trường `result`. Lỗi xác thực trả 401; JSON/ID không hợp lệ trả 400; lỗi lưu hoặc thiếu cấu hình trả 503 để SePay có thể thử lại. Không xóa audit để tránh mất khả năng chống trùng.
@@ -75,8 +75,8 @@ node tests/preview.js
 $testPayload = @{
   id = 10001
   accountNumber = '0000000000'
-  code = '<ma-AX-vua-tao-tren-preview>'
-  content = '<ma-AX-vua-tao-tren-preview>'
+  code = '<ma-DH-vua-tao-tren-preview>'
+  content = '<ma-DH-vua-tao-tren-preview>'
   transferType = 'in'
   transferAmount = 20000
 } | ConvertTo-Json

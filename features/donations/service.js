@@ -41,7 +41,7 @@ function validateInput(input) {
 }
 
 function extractCode(payload) {
-  const matches = `${payload.code || ''} ${payload.content || ''}`.toUpperCase().match(/\bAX\d{10}(?![A-Z0-9])/g) || [];
+  const matches = `${payload.code || ''} ${payload.content || ''}`.toUpperCase().match(/\bDH\d{7}(?![A-Z0-9])/g) || [];
   const codes = [...new Set(matches)];
   return codes.length === 1 ? codes[0] : null;
 }
@@ -71,7 +71,7 @@ function createDonationService({ db, config = readConfig() }) {
       const { name, amount } = validateInput(input);
       const token = crypto.randomBytes(32).toString('hex');
       for (let attempt = 0; attempt < 5; attempt++) {
-        const code = `AX${crypto.randomInt(10_000_000_000).toString().padStart(10, '0')}`;
+        const code = `DH${crypto.randomInt(10_000_000).toString().padStart(7, '0')}`;
         const created = await db.runTransaction(async tx => {
           const ref = requests().doc(code);
           if ((await tx.get(ref)).exists) return false;

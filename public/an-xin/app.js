@@ -82,12 +82,12 @@
           $('payment-status').classList.toggle('paid', status.status === 'paid');
           $('payment-status').textContent = status.status === 'paid'
             ? `Đã nhận ${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}. Cảm ơn tấm lòng của bạn!`
-            : 'Đang chờ SePay xác nhận tiền vào…';
+            : 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
         }
       } catch (error) {
         if (payment === current) {
           $('payment-status').classList.remove('paid');
-          $('payment-status').textContent = `${error.message} Nếu đã chuyển, bạn hãy chờ xác nhận, đừng chuyển lại.`;
+          $('payment-status').textContent = `${error.message} Nếu đã chuyển, đừng chuyển lại; trang sẽ tự cập nhật khi kết nối lại.`;
         }
       }
     }
@@ -104,7 +104,7 @@
     $('qr-image').hidden = false;
     $('qr-image').src = value.qrUrl;
     $('payment-status').classList.remove('paid');
-    $('payment-status').textContent = 'Đang chờ SePay xác nhận tiền vào…';
+    $('payment-status').textContent = 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
     $('payment').hidden = false;
     $('donation-form').hidden = true;
     $('copy-status').textContent = '';
@@ -183,7 +183,7 @@
       $('donation-fields').disabled = false;
       try {
         const cached = JSON.parse(sessionStorage.getItem('donation-payment'));
-        if (cached && /^[a-f0-9]{64}$/.test(cached.token) && /^AX\d{10}$/.test(cached.code) && cached.account === config.account && cached.bank === config.bank && Number.isSafeInteger(cached.amount) && cached.amount > 0) {
+        if (cached && /^[a-f0-9]{64}$/.test(cached.token) && /^DH\d{7}$/.test(cached.code) && cached.account === config.account && cached.bank === config.bank && Number.isSafeInteger(cached.amount) && cached.amount > 0) {
           // Rebuild the URL from trusted current configuration instead of using a cached URL.
           const params = new URLSearchParams({ amount: String(cached.amount), addInfo: cached.code, accountName: config.accountName });
           displayPayment({ ...cached, accountName: config.accountName, qrUrl: `https://img.vietqr.io/image/${encodeURIComponent(config.bank)}-${encodeURIComponent(config.account)}-compact2.png?${params}` });

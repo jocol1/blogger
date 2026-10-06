@@ -72,17 +72,17 @@ test('client preserves its cursor across a connection failure', async () => {
 test('QR failure preserves manual transfer details and client never infers a paid status from submit', async () => {
   const ui = fixture(async url => {
     if (url.endsWith('/config')) return { body: { ready: true } };
-    if (url === '/api/donations') return { body: { bank: 'MB', account: '0000000000', accountName: 'TEST', amount: 20000, code: 'AX0123456789', token: 'a'.repeat(64), qrUrl: 'https://img.vietqr.io/test.png' } };
+    if (url === '/api/donations') return { body: { bank: 'MB', account: '0000000000', accountName: 'TEST', amount: 20000, code: 'DH0123456', token: 'a'.repeat(64), qrUrl: 'https://img.vietqr.io/test.png' } };
     return { body: { cursor: 0, events: [], hasMore: false } };
   });
   await settle();
   await ui.get('donation-form').handlers.submit({ preventDefault() {} });
-  assert.match(ui.get('payment-status').textContent, /Đang chờ/);
+  assert.match(ui.get('payment-status').textContent, /đúng nội dung DH/);
   ui.get('qr-image').handlers.error();
   assert.equal(ui.get('qr-image').hidden, true);
   assert.equal(ui.get('qr-error').hidden, false);
   assert.equal(ui.get('account-number').textContent, '0000000000');
-  assert.equal(ui.get('payment-code').textContent, 'AX0123456789');
+  assert.equal(ui.get('payment-code').textContent, 'DH0123456');
   assert.ok(ui.storage.has('donation-payment'));
 });
 

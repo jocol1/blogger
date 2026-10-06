@@ -13,7 +13,7 @@ test('QR includes the recipient, unique code and amount; anonymous names default
   const { db, service } = setup();
   const first = await service.create({ amount: 10_000 });
   const second = await service.create({ amount: 10_000, name: '  Minh  ' });
-  assert.match(first.code, /^AX\d{10}$/);
+  assert.match(first.code, /^DH\d{7}$/);
   assert.notEqual(first.code, second.code);
   const url = new URL(first.qrUrl);
   assert.equal(url.pathname, '/image/MB-0000000000-compact2.png');
@@ -72,9 +72,9 @@ test('wrong account, outgoing, unknown, missing/ambiguous codes and invalid amou
   const cases = [
     [{ accountNumber: '111111' }, 'wrong_account'],
     [{ transferType: 'out' }, 'ignored_out'],
-    [{ code: 'AX0000000001', content: '' }, 'unmatched'],
+    [{ code: 'DH0000001', content: '' }, 'unmatched'],
     [{ code: null, content: 'cam on' }, 'unmatched'],
-    [{ content: 'AX9999999999' }, 'unmatched'],
+    [{ content: 'DH9999999' }, 'unmatched'],
     [{ transferAmount: 0 }, 'invalid_amount'],
     [{ transferAmount: 1.5 }, 'invalid_amount'],
   ];
