@@ -76,10 +76,11 @@
         </form>
         <p id="form-error" class="error" role="alert" hidden></p>
         <section id="payment" class="payment" aria-label="Thông tin chuyển khoản" hidden>
-          <div class="payment-heading"><strong>Quét một chiếc QR, gửi một chút vui.</strong><button id="new-donation" class="text-button" type="button">Đổi thông tin</button></div>
+          <div class="payment-heading"><strong id="payment-heading-text">Quét một chiếc QR, gửi một chút vui.</strong><button id="new-donation" class="text-button" type="button">Đổi thông tin</button></div>
           <div class="qr-wrap"><img id="qr-image" alt="QR chuyển khoản ủng hộ" width="260" height="320" referrerpolicy="no-referrer"><p id="qr-error" hidden>Chưa tải được ảnh QR. Bạn vẫn có thể chuyển khoản bằng thông tin bên dưới.</p></div>
           <dl class="bank-details"><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Chủ tài khoản</dt><dd id="account-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span><button class="copy-button" data-copy="account-number" type="button" aria-label="Sao chép số tài khoản">Chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div class="payment-code"><dt>Nội dung CK</dt><dd><span id="payment-code"></span><button class="copy-button" data-copy="payment-code" type="button" aria-label="Sao chép nội dung chuyển khoản">Chép</button></dd></div></dl>
           <p class="transfer-note">Chỉ cần giữ nguyên mã DH trong nội dung chuyển khoản để mình nhận ra bạn nhé.</p><p id="payment-status" class="payment-status" role="status">QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.</p><p id="copy-status" class="copy-status" role="status"></p>
+          <div id="paid-success" class="paid-success" role="status" aria-live="polite" hidden><span class="paid-kicker">ĐÃ NHẬN TẤM LÒNG</span><div class="gratitude-seal" aria-hidden="true">♡</div><h3 id="paid-title">Mình xin cúi đầu cảm tạ.</h3><p id="paid-message"></p><span class="paid-signature">— người ngồi bên chiếc bát nhỏ</span></div>
         </section>
         <div class="payment-footnote"><span aria-hidden="true">↔</span> Chuyển khoản ngân hàng · Tự động cập nhật</div>
       </section>

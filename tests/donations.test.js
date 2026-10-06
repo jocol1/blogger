@@ -15,6 +15,8 @@ test('QR includes the recipient, unique code and amount; anonymous names default
   const second = await service.create({ amount: 10_000, name: '  Minh  ' });
   assert.match(first.code, /^DH\d{7}$/);
   assert.notEqual(first.code, second.code);
+  assert.equal(first.name, 'Một vị mạnh thường quân');
+  assert.equal(second.name, 'Minh');
   const url = new URL(first.qrUrl);
   assert.equal(url.pathname, '/image/MB-0000000000-compact2.png');
   assert.equal(url.searchParams.get('amount'), '10000');
@@ -45,6 +47,7 @@ test('actual amount wins; multiple different transfers using one code remain sep
   const feed = await service.listEvents('0');
   assert.deepEqual(feed.events.map(event => event.amount), [50_000, 20_000]);
   assert.match(feed.events[0].message, /Cảm ơn Minh đã cho 50\.000đ!/);
+  assert.ok(feed.events[0].message.length > 120, 'the public thank-you should include a substantial blessing');
 });
 
 test('concurrent duplicate webhooks produce exactly one receipt, credit and event', async () => {

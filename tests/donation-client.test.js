@@ -108,5 +108,9 @@ test('a new tab restores the latest QR and immediately shows its paid status', a
   await settle();
   assert.equal(ui.get('payment').hidden, false);
   assert.equal(ui.get('payment-code').textContent, 'DH0123456');
-  assert.match(ui.get('payment-status').textContent, /Đã nhận 20\.000đ/);
+  assert.equal(ui.get('payment').classList.contains('paid'), true);
+  assert.equal(ui.get('paid-success').hidden, false);
+  assert.match(ui.get('paid-title').textContent, /Đã nhận 20\.000đ/);
+  assert.match(ui.get('paid-message').textContent, /bình an/);
+  assert.equal(ui.get('scene').classList.contains('grateful'), true);
 });

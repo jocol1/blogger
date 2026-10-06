@@ -3,11 +3,11 @@ const crypto = require('node:crypto');
 const MAX_AMOUNT = 9_999_999_999;
 const ANONYMOUS = 'Một vị mạnh thường quân';
 const WISHES = [
-  'Chúc bạn hôm nay gặp toàn chuyện vui!',
-  'Chúc bạn tiền vào như nước, nụ cười đầy túi!',
-  'Chúc bạn ăn ngon, ngủ ngon, deadline tự chạy!',
-  'Chúc bạn ra đường gặp may, về nhà gặp món ngon!',
-  'Chúc mọi điều dễ thương đều tìm đến bạn!',
+  'Mình xin cúi đầu cảm tạ. Chúc bạn và gia đình luôn bình an, làm đâu thuận đó, tiền vào đều tay và lòng lúc nào cũng nhẹ tênh!',
+  'Cảm ơn bạn đã rộng lòng. Chúc điều tử tế bạn trao hôm nay trở về gấp nhiều lần, nhà luôn ấm, ví luôn đầy, tâm luôn an!',
+  'Mình xin cúi đầu cảm ơn. Chúc bạn sức khỏe dồi dào, đi đâu cũng gặp quý nhân, công việc hanh thông, mong gì được nấy!',
+  'Xin chúc bạn một đời đủ đầy: sáng có niềm vui, tối có bình yên, người thân khỏe mạnh và tiền bạc dư dả!',
+  'Tấm lòng này quý hơn cả món quà. Chúc bạn gặp đúng người, đúng thời, đúng vận; mỗi ngày đều có chuyện khiến lòng vui!',
 ];
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 
@@ -79,7 +79,7 @@ function createDonationService({ db, config = readConfig() }) {
           tx.create(tokens().doc(hash(token)), { code });
           return true;
         });
-        if (created) return { code, token, amount, qrUrl: qrUrl(config, code, amount), bank: config.bank, account: config.account, accountName: config.accountName };
+        if (created) return { code, token, name, amount, qrUrl: qrUrl(config, code, amount), bank: config.bank, account: config.account, accountName: config.accountName };
       }
       throw new DonationError(503, 'Chưa tạo được mã chuyển khoản. Vui lòng thử lại.');
     },

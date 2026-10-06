@@ -8,6 +8,8 @@
   let playing = false;
   let sound = false;
   let active = false;
+  let personalThanks = '';
+  let thankedToken = null;
   const queue = [];
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
@@ -67,14 +69,33 @@
     speak(event.message);
     setTimeout(() => {
       $('scene').classList.remove('celebrating');
-      $('speech').classList.remove('thanking');
-      $('speech-kicker').textContent = 'LỜI THỈNH CẦU NHỎ XÍU';
-      $('speech-text').textContent = defaultSpeech;
+      $('speech').classList.toggle('thanking', Boolean(personalThanks));
+      $('speech-kicker').textContent = personalThanks ? 'CÚI ĐẦU CẢM TẠ TẤM LÒNG' : 'LỜI THỈNH CẦU NHỎ XÍU';
+      $('speech-text').textContent = personalThanks || defaultSpeech;
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       playing = false;
       // Give CSS animations a new frame before the next donation.
       setTimeout(playNext, 80);
     }, 7000);
+  }
+  function showPaidState(status, current) {
+    const donor = current.name || 'bạn';
+    const total = `${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}`;
+    personalThanks = `Con xin cúi đầu cảm tạ ${donor}! Chúc bạn phúc đầy nhà, lộc đầy túi, người thân bình an, làm đâu thắng đó!`;
+    $('payment').classList.add('paid');
+    $('paid-success').hidden = false;
+    $('payment-heading-text').textContent = 'Mình đã nhận được rồi!';
+    $('new-donation').textContent = 'Cho thêm chút lộc';
+    $('paid-title').textContent = `Đã nhận ${total}. Mình xin cúi đầu cảm tạ.`;
+    $('paid-message').textContent = `Cảm ơn ${donor} đã rộng lòng. Chúc bạn và gia đình luôn bình an, công việc hanh thông, tiền vào đều tay, quý nhân sát cánh. Mong điều tử tế bạn trao hôm nay sẽ trở về với bạn gấp nhiều lần.`;
+    $('scene').classList.add('grateful');
+    $('speech').classList.add('thanking');
+    $('speech-kicker').textContent = 'CÚI ĐẦU CẢM TẠ TẤM LÒNG';
+    $('speech-text').textContent = personalThanks;
+    if (thankedToken !== current.token) {
+      thankedToken = current.token;
+      speak(`${personalThanks} ${$('paid-message').textContent}`);
+    }
   }
   async function pollEvents() {
     try {
@@ -100,10 +121,12 @@
       try {
         const status = await api('/api/donations/status', { headers: { 'X-Donation-Token': current.token } });
         if (payment === current) {
-          $('payment-status').classList.toggle('paid', status.status === 'paid');
-          $('payment-status').textContent = status.status === 'paid'
-            ? `Đã nhận ${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}. Cảm ơn tấm lòng của bạn!`
-            : 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
+          if (status.status === 'paid') showPaidState(status, current);
+          else {
+            $('payment').classList.remove('paid');
+            $('payment-status').classList.remove('paid');
+            $('payment-status').textContent = 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
+          }
         }
       } catch (error) {
         if (payment === current) {
@@ -119,6 +142,16 @@
   }
   function displayPayment(value) {
     payment = value;
+    personalThanks = '';
+    thankedToken = null;
+    $('scene').classList.remove('grateful');
+    $('speech').classList.remove('thanking');
+    $('speech-kicker').textContent = 'LỜI THỈNH CẦU NHỎ XÍU';
+    $('speech-text').textContent = defaultSpeech;
+    $('payment').classList.remove('paid');
+    $('paid-success').hidden = true;
+    $('payment-heading-text').textContent = 'Quét một chiếc QR, gửi một chút vui.';
+    $('new-donation').textContent = 'Đổi thông tin';
     $('bank-name').textContent = value.bank;
     $('account-name').textContent = value.accountName;
     $('account-number').textContent = value.account;
@@ -174,6 +207,12 @@
   });
   $('new-donation').addEventListener('click', () => {
     payment = null;
+    personalThanks = '';
+    thankedToken = null;
+    $('scene').classList.remove('grateful');
+    $('speech').classList.remove('thanking');
+    $('speech-kicker').textContent = 'LỜI THỈNH CẦU NHỎ XÍU';
+    $('speech-text').textContent = defaultSpeech;
     forgetPayment();
     $('payment').hidden = true;
     $('donation-form').hidden = false;

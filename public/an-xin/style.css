@@ -542,6 +542,76 @@ footer>a:last-child {
   background:#e9efdf;
   color:#55713f
 }
+.payment.paid .qr-wrap,.payment.paid .bank-details,.payment.paid .transfer-note,.payment.paid .payment-status,.payment.paid .copy-status {
+  display:none
+}
+.payment.paid .payment-heading strong {
+  color:var(--green)
+}
+.payment.paid .text-button {
+  border:1px solid #dfcbb3;
+  border-radius:20px;
+  padding:6px 10px;
+  text-decoration:none
+}
+.paid-success {
+  position:relative;
+  margin-top:18px;
+  padding:28px 24px 24px;
+  overflow:hidden;
+  border:1px solid #d9d9c6;
+  border-radius:8px;
+  background:linear-gradient(145deg,#f8f4df,#fffaf0);
+  text-align:center
+}
+.paid-success:before,.paid-success:after {
+  content:'✦';
+  position:absolute;
+  color:#cf9565;
+  font-size:20px
+}
+.paid-success:before {
+  top:18px;
+  left:18px
+}
+.paid-success:after {
+  right:18px;
+  bottom:18px
+}
+.paid-kicker {
+  color:#9b7653;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:1.6px
+}
+.gratitude-seal {
+  width:58px;
+  height:58px;
+  margin:13px auto 10px;
+  display:grid;
+  place-items:center;
+  border:1px solid #cf9565;
+  border-radius:50%;
+  color:var(--orange);
+  font:35px/1 Georgia,serif;
+  animation:seal-in .8s cubic-bezier(.2,.8,.2,1) both
+}
+.paid-success h3 {
+  margin:8px 0 10px;
+  color:#42513d;
+  font:600 22px/1.25 Georgia,serif
+}
+.paid-success p {
+  margin:0;
+  color:#686c5f;
+  font:14px/1.75 Georgia,serif
+}
+.paid-signature {
+  display:block;
+  margin-top:15px;
+  color:#a38164;
+  font:italic 11px Georgia,serif
+}
 .copy-status {
   font-size:10px;
   color:var(--green);
@@ -562,6 +632,24 @@ footer>a:last-child {
 }
 .celebrating .celebration-spark {
   animation:sparkle 1.3s ease-in-out 5
+}
+.grateful #upper-body {
+  animation:kneel-thanks 1.25s cubic-bezier(.2,.8,.2,1) forwards
+}
+.grateful .left-arm,.grateful .right-arm {
+  transform-box:fill-box;
+  transform-origin:center;
+  transition:transform .8s ease
+}
+.grateful .left-arm {
+  transform:translate(12px,8px) rotate(12deg)
+}
+.grateful .right-arm {
+  transform:translate(-12px,8px) rotate(-12deg)
+}
+.grateful .celebration-spark {
+  opacity:1;
+  animation:sparkle 1.3s ease-in-out infinite
 }
 .speech.thanking {
   border-color:#d7b483;
@@ -586,6 +674,27 @@ footer>a:last-child {
   }
   45% {
     transform:translateY(8px) rotate(9deg)
+  }
+}
+@keyframes kneel-thanks {
+  0% {
+    transform:translateY(0) rotate(0)
+  }
+  55% {
+    transform:translateY(24px) rotate(17deg) scaleY(.95)
+  }
+  100% {
+    transform:translateY(20px) rotate(13deg) scaleY(.96)
+  }
+}
+@keyframes seal-in {
+  from {
+    opacity:0;
+    transform:scale(.35) rotate(-18deg)
+  }
+  to {
+    opacity:1;
+    transform:scale(1) rotate(0)
   }
 }
 @keyframes coin-drop {
@@ -767,5 +876,8 @@ footer>a:last-child {
   }
   .celebrating .celebration-spark {
     opacity:1
+  }
+  .grateful #upper-body {
+    transform:translateY(20px) rotate(13deg) scaleY(.96)
   }
 }
