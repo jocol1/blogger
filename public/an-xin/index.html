@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#f7f4ed">
+  <meta name="description" content="Một góc nhỏ xin chút lộc. Gửi một chút yêu thương, nhận lại một lời chúc dễ thương.">
+  <title>Ăn xin online · locly.lol</title>
+  <link rel="stylesheet" href="/assets/an-xin/style.css">
+  <script src="/assets/an-xin/app.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="/">locly<span>.lol</span></a>
+    <nav aria-label="Điều hướng"><a href="/">Kho lưu trữ <span aria-hidden="true">↗</span></a><span class="nav-divider"></span><a href="/an-xin" aria-current="page">Góc xin lộc</a></nav>
+    <button id="sound" class="sound-button" type="button" aria-pressed="false"><span aria-hidden="true">♪</span> <span id="sound-label">Bật giọng đọc</span></button>
+  </header>
+  <main>
+    <div class="intro"><span class="eyebrow"><span class="tiny-star">✳</span> MỘT CHÚT VÔ TRI, MỘT CHÚT NIỀM VUI</span><h1>Cho xin một chút <em>lộc.</em></h1><p>Ví hơi mỏng, nhưng lời chúc thì đầy. Mời bạn ghé chiếc chiếu nhỏ của mình.</p></div>
+    <div class="donation-layout">
+      <section class="scene-card" aria-label="Nhân vật ăn xin hoạt hình">
+        <div class="scene-top"><span class="scene-label">GÓC VỈA HÈ ONLINE</span><span id="connection" class="connection"><i></i> Đang kết nối</span></div>
+        <div id="speech" class="speech" role="status" aria-live="polite"><span id="speech-kicker" class="speech-kicker">LỜI THỈNH CẦU NHỎ XÍU</span><p id="speech-text">Ai đi ngang qua…<br>cho xin chút lộc với ạ!</p><span class="speech-heart" aria-hidden="true">♡</span></div>
+        <div id="scene" class="scene">
+          <svg class="character-art" viewBox="0 0 640 440" role="img" aria-labelledby="character-title">
+            <title id="character-title">Một người hoạt hình vui vẻ ngồi trên chiếu, bên cạnh chiếc bát nhận lộc</title>
+            <defs><pattern id="mat-lines" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 6h12M6 0v12" stroke="#cebfa0" stroke-width="1"/></pattern></defs>
+            <g class="scenery" fill="none" stroke="#c8c3b6" stroke-width="2"><path d="M50 264h64m-44 10h30m444-45h47m-70 15h59M97 334h45m368 6h73"/><path d="M99 204v-15m-7 7h15m431-46v-15m-7 7h15"/><path d="M482 99c10-16 22-8 16 0-5 7-16 12-16 12s-15-10-13-18c2-9 13-7 13 6Z" stroke="#d68a68"/></g>
+            <ellipse cx="324" cy="371" rx="220" ry="23" fill="#e5dfd1"/>
+            <path d="m165 326 306 2 57 47H109Z" fill="#e6d6b7" stroke="#b9a785" stroke-width="2"/>
+            <path d="m165 326 306 2 57 47H109Z" fill="url(#mat-lines)"/>
+            <g stroke="#403c34" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M306 300c-42-16-99 3-104 26s63 39 115 16c33 29 112 12 104-13-6-20-58-43-88-29" fill="#748373"/>
+              <path d="M293 331c-20 12-29 13-41 9m89-8c16 9 29 11 42 7" fill="none"/>
+              <path d="M259 337c-19-5-45-1-47 8-2 12 39 14 67 5m82-11c19-4 44-2 45 9 1 11-36 10-54 1" fill="#e9b98a"/>
+              <g id="upper-body">
+                <path d="M278 207c-29 13-43 62-30 100 21 14 104 16 125-1 10-34-3-82-34-99" fill="#df986b"/>
+                <path d="m314 219-5 24-20-25m23 26 15-26m-17 29v63" fill="none" stroke="#a86246"/>
+                <path d="m263 261 23 3-4 23-24-3Z" fill="#eedab8" stroke="#a86246" stroke-width="2"/>
+                <path d="m265 264 12 17m-14-3 17-12" stroke="#a86246" stroke-width="1.5"/>
+                <g class="left-arm"><path d="M270 224c-15-4-25 18-29 34-6 23-13 43 0 49 14 7 25-16 32-31" fill="#df986b"/><path d="M250 280c13-4 25 2 33 10 10 9 5 19-6 17l-27-6" fill="#e9b98a"/></g>
+                <g class="right-arm"><path d="M352 224c16-4 24 19 29 35 7 21 13 40 0 47-14 7-26-13-33-27" fill="#df986b"/><path d="M373 281c-13-5-24 3-32 11-9 10-3 17 7 16l27-7" fill="#e9b98a"/></g>
+                <path d="M291 196v17c11 13 29 14 40 0v-21" fill="#e9b98a"/>
+                <g class="head"><path d="M264 153c-16-8-19 15-7 22l12 3m90-24c16-7 18 17 4 22l-9 1" fill="#e9b98a"/>
+                  <path d="M264 137c1-31 88-36 94 1l-1 41c-5 24-21 38-45 38-25 0-44-17-48-40Z" fill="#edc39a"/>
+                  <path d="M265 155c-5-26-1-40 12-49 20-17 39-11 49-20-1 14 7 16 18 20 16 6 19 28 12 48l-8-26c-28 13-48 2-60 12l-13-5Z" fill="#46433c"/>
+                  <path d="M282 158c4-5 9-5 13-1m35 0c5-5 10-4 13 1" fill="none"/>
+                  <path class="eyes" d="M287 169v4m48-4v4" stroke-width="5"/>
+                  <path d="m309 168-3 13h8" fill="none" stroke="#bd8c68" stroke-width="2"/>
+                  <path d="M298 188q14 16 29-1" fill="#fff7e9"/>
+                  <ellipse cx="281" cy="182" rx="8" ry="4" fill="#db9576" stroke="none"/><ellipse cx="342" cy="182" rx="8" ry="4" fill="#db9576" stroke="none"/>
+                  <path d="m303 209 3-4m6 6v-5m6 3-1-4" stroke-width="2"/>
+                </g>
+              </g>
+              <g transform="rotate(-8 173 300)"><path d="M111 265h111v66H111Z" fill="#f5e7ca" stroke="#b4a080" stroke-width="2"/><path d="M115 262v8m103-8v8" stroke="#9d8663" stroke-width="2"/><text x="166" y="290" text-anchor="middle" fill="#6a5741" stroke="none" font-size="14" font-family="Arial,sans-serif" font-weight="700">XIN CHÚT LỘC</text><text x="166" y="313" text-anchor="middle" fill="#a07450" stroke="none" font-size="13" font-family="Arial,sans-serif">cảm ơn ạ ♡</text></g>
+              <g class="bowl"><ellipse cx="433" cy="329" rx="46" ry="12" fill="#b88355"/><path d="M388 330q5 44 45 44t45-44q-45 17-90 0Z" fill="#c99868"/><path d="M402 346q9 15 22 17" fill="none" stroke="#e4bf96"/></g>
+              <g class="falling-coin" stroke="#af7c28" stroke-width="2"><circle cx="432" cy="252" r="12" fill="#efc661"/><path d="M432 245v14m-4-10h6m-6 6h6"/></g>
+            </g>
+            <g class="celebration-spark" fill="#c65d3a"><path d="m209 165 4 10 10 4-10 4-4 10-4-10-10-4 10-4Z"/><path d="m429 137 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z"/><circle cx="455" cy="198" r="4"/></g>
+          </svg>
+        </div>
+        <div class="scene-footer"><span class="handwritten">Của ít lòng nhiều, bao nhiêu cũng quý.</span><span aria-hidden="true">↗ ♡</span></div>
+      </section>
+      <section class="giving-card" aria-labelledby="giving-title">
+        <div class="card-heading"><span class="eyebrow">GỬI MỘT CHÚT YÊU THƯƠNG</span><span class="small-bowl" aria-hidden="true">◡</span></div>
+        <h2 id="giving-title">Mời mình một bữa?</h2><p class="card-description">Một chút của bạn, cả ngày vui của mình.</p>
+        <p id="availability" class="notice" role="status">Đang kiểm tra kết nối nhận lộc…</p>
+        <form id="donation-form">
+          <fieldset id="donation-fields" disabled>
+            <label for="donor-name">Tên bạn <span>· không bắt buộc</span></label><input id="donor-name" name="name" maxlength="60" placeholder="Một vị mạnh thường quân" autocomplete="nickname">
+            <label>Một chút lộc là…</label><div class="amount-choices" role="group" aria-label="Chọn số tiền"><button type="button" data-amount="10000" aria-pressed="false">10k<span>cốc trà đá</span></button><button type="button" data-amount="20000" class="selected" aria-pressed="true">20k<span>ổ bánh mì</span></button><button type="button" data-amount="50000" aria-pressed="false">50k<span>bữa cơm no</span></button><button type="button" data-amount="100000" aria-pressed="false">100k<span>ấm cả ngày</span></button></div>
+            <label for="amount" class="amount-label">Hoặc số tiền bạn muốn gửi</label><div class="amount-input"><input id="amount" name="amount" type="number" inputmode="numeric" min="1" max="9999999999" step="1" value="20000" required><span>VNĐ</span></div>
+            <button id="create-qr" class="primary-button" type="submit">Gửi chút lộc <span aria-hidden="true">↗</span></button>
+          </fieldset>
+          <p class="privacy-note">Tên hiển thị và số tiền sẽ xuất hiện công khai cùng lời cảm ơn. Để trống tên nếu bạn muốn ẩn danh.</p>
+        </form>
+        <p id="form-error" class="error" role="alert" hidden></p>
+        <section id="payment" class="payment" aria-label="Thông tin chuyển khoản" hidden>
+          <div class="payment-heading"><strong>Quét một chiếc QR, gửi một chút vui.</strong><button id="new-donation" class="text-button" type="button">Đổi thông tin</button></div>
+          <div class="qr-wrap"><img id="qr-image" alt="QR chuyển khoản ủng hộ" width="260" height="320" referrerpolicy="no-referrer"><p id="qr-error" hidden>Chưa tải được ảnh QR. Bạn vẫn có thể chuyển khoản bằng thông tin bên dưới.</p></div>
+          <dl class="bank-details"><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Chủ tài khoản</dt><dd id="account-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span><button class="copy-button" data-copy="account-number" type="button" aria-label="Sao chép số tài khoản">Chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div class="payment-code"><dt>Nội dung CK</dt><dd><span id="payment-code"></span><button class="copy-button" data-copy="payment-code" type="button" aria-label="Sao chép nội dung chuyển khoản">Chép</button></dd></div></dl>
+          <p class="transfer-note">Giữ nguyên mã trong nội dung chuyển khoản để mình nhận ra bạn nhé.</p><p id="payment-status" class="payment-status" role="status">Đang chờ SePay xác nhận tiền vào…</p><p id="copy-status" class="copy-status" role="status"></p>
+        </section>
+        <div class="payment-footnote"><span aria-hidden="true">↔</span> Chuyển khoản ngân hàng · Xác nhận qua SePay</div>
+      </section>
+    </div>
+    <section class="kindness-note"><span class="note-symbol" aria-hidden="true">✳</span><div><h3>Một lời chúc gửi lại bạn.</h3><p>Mỗi lần nhận lộc, mình sẽ cúi chào và gửi lời chúc đến người vừa ủng hộ. Ai đang ngồi ở đây cũng được chung vui.</p></div><span class="note-tag">TỰ NGUYỆN · TÙY TÂM</span></section>
+  </main>
+  <footer><a class="brand" href="/">locly<span>.lol</span></a><p>Một góc nhỏ trên internet. Một tấm lòng thật to.</p><a href="/">Về kho lưu trữ ↗</a></footer>
+</body>
+</html>
