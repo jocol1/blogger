@@ -1,18 +1,18 @@
 const crypto = require('node:crypto');
 
 const MAX_AMOUNT = 9_999_999_999;
-const ANONYMOUS = 'Người thanh toán ẩn danh';
+const ANONYMOUS = 'Người gửi tiền ẩn danh';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 
 function buildBlessing(name, amount) {
   const gift = Number(amount).toLocaleString('vi-VN');
   return `Kính gửi ${name},
 
-Thông báo từ bộ phận gạch nợ: ${gift} đồng đã về an toàn. Hóa đơn tưởng tượng vừa được đóng dấu “XONG RỒI NHA”, chiếc máy tính bỏ túi được phép nghỉ ngơi, còn nhân vật trực quầy thì bớt nhìn điện thoại mỗi ba phút một lần. Cảm ơn bạn đã thanh toán gọn gàng. Đây là kiểu “ting ting” khiến cả hai bên đều đỡ phải nhắn câu “bạn chuyển chưa?” — một phát minh của văn minh nhân loại.
+${gift} đồng đã về an toàn rồi nè! Chiếc hộp tiền tưởng tượng vừa phát sáng, nhân vật trực quầy được quyền cười tươi thêm một lúc, còn thông báo “ting ting” thì được nâng niu như tin nhắn crush trả lời. Cảm ơn bạn đã gửi một khoản rất dễ thương. Một chút thôi cũng đủ làm ngày hôm nay vui hơn hẳn.
 
-Chúc bạn từ nay đi ăn được bạn bè nhớ phần, đi làm gặp file đã lưu, gửi tin nhắn không bị seen rồi im, và mỗi lần mở app ngân hàng đều là tin vui chứ không phải bài kiểm tra tâm lý. Chúc ai đang nợ bạn cũng có ngày giác ngộ giống bạn hôm nay; nhớ khoản, trả đúng hẹn, chuyển xong còn biết gửi sticker xin lỗi cho lịch sự. Chúc cuộc đời bớt các khoản lặt vặt, bớt “để mai tính”, nhiều mã giảm giá, nhiều cơ hội ngon và nhiều người bạn có câu thần chú “để tao trả phần này”.
+Chúc bạn ra đường gặp toàn đèn xanh, gọi đồ ăn luôn có mã giảm giá, đi làm gặp file đã tự lưu, nhắn tin được trả lời đúng lúc và mở app ngân hàng thấy toàn chuyện vừa ý. Chúc ly nước bạn gọi luôn ngon hơn tưởng tượng, bạn bè luôn nhớ rủ bạn vào những kèo hay, và mọi việc đang lấn cấn tự nhiên có lối ra. Nếu hôm nay có gì chưa trơn tru, mong khoản tiền này sẽ đổi vận cho bạn một tí: việc nhẹ hơn, tin vui nhiều hơn, ví đầy hơn, ngủ sâu hơn.
 
-Khoản thanh toán đã được ghi nhận, không cần quỳ, không cần cúng, không cần đọc sớ. Chỉ cần bạn vui, người nhận vui, thế là hệ thống vũ trụ chấm 10 điểm cho sự sòng phẳng. Cảm ơn ${name} — người đã biến một hóa đơn bé xíu thành một câu chuyện có hậu.`;
+Tiền đã được ghi nhận. Cảm ơn ${name} đã ghé qua và làm chiếc hộp tiền này vui lên một cách rất có duyên. Chúc bạn nhận lại thật nhiều điều tử tế, theo kiểu bất ngờ mà vẫn đúng ý mình.`;
 }
 
 class DonationError extends Error {
@@ -91,9 +91,9 @@ function createDonationService({ db, config = readConfig() }) {
       requireReady();
       if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) throw new DonationError(401, 'Token tra cứu không hợp lệ.');
       const mapping = await tokens().doc(hash(token)).get();
-      if (!mapping.exists) throw new DonationError(404, 'Không tìm thấy lượt thanh toán.');
+      if (!mapping.exists) throw new DonationError(404, 'Không tìm thấy lượt gửi tiền.');
       const snapshot = await requests().doc(mapping.data().code).get();
-      if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy lượt thanh toán.');
+      if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy lượt gửi tiền.');
       const { status, paidAmount, paymentCount, name } = snapshot.data();
       return {
         status,

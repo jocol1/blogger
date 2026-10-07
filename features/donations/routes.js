@@ -23,8 +23,8 @@ function createDonationRouter(options) {
   };
   const asyncRoute = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
   router.use('/assets/an-xin', express.static(assets, { index: false }));
-  router.get('/an-xin', (req, res) => res.redirect(302, '/tra-tien'));
-  router.get('/tra-tien', (req, res) => {
+  router.get(['/an-xin', '/tra-tien'], (req, res) => res.redirect(302, '/xin-tien'));
+  router.get('/xin-tien', (req, res) => {
     res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' https://img.vietqr.io; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     res.sendFile(path.join(assets, 'index.html'));
   });

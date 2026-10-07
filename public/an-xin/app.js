@@ -13,7 +13,7 @@
   const queue = [];
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
-  const defaultSpeech = 'Tới hạn rồi nè… mình xử lý gọn cho vui nhé!';
+  const defaultSpeech = 'Ai có dư… gửi mình một chút nhé!';
   const paymentStorageKey = 'donation-payment';
 
   function savePayment(value) {
@@ -63,14 +63,14 @@
     playing = true;
     const event = queue.shift();
     $('speech').classList.add('thanking');
-    $('speech-kicker').textContent = 'KHOẢN MỚI VỪA ĐƯỢC GẠCH';
+    $('speech-kicker').textContent = 'MỘT KHOẢN VỪA VỀ RỒI';
     $('speech-text').textContent = event.message;
     $('scene').classList.add('celebrating');
     speak(event.message);
     setTimeout(() => {
       $('scene').classList.remove('celebrating');
       $('speech').classList.toggle('thanking', Boolean(personalThanks));
-      $('speech-kicker').textContent = personalThanks ? 'THANH TOÁN ĐÃ VỀ, AI CŨNG VUI' : 'HÓA ĐƠN ĐANG CHỜ XỬ LÝ';
+      $('speech-kicker').textContent = personalThanks ? 'TIỀN ĐÃ VỀ, VUI QUÁ TRỜI' : 'HỘP NHẬN TIỀN ĐANG TRỐNG';
       $('speech-text').textContent = personalThanks || defaultSpeech;
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       playing = false;
@@ -81,16 +81,16 @@
   function showPaidState(status, current) {
     const donor = current.name || 'bạn';
     const total = `${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}`;
-    personalThanks = status.message || `Khoản thanh toán của ${donor} đã được ghi nhận. Cảm ơn bạn đã xử lý gọn gàng nhé!`;
+    personalThanks = status.message || `Tiền của ${donor} đã được ghi nhận. Cảm ơn bạn đã gửi một khoản rất dễ thương nhé!`;
     $('payment').classList.add('paid');
     $('paid-success').hidden = false;
-    $('payment-heading-text').textContent = 'Khoản thanh toán đã về rồi!';
+    $('payment-heading-text').textContent = 'Đã nhận tiền rồi, cảm ơn bạn!';
     $('new-donation').textContent = 'Tạo QR khác';
-    $('paid-title').textContent = `Đã nhận ${total}. Hóa đơn đã được gạch.`;
+    $('paid-title').textContent = `Đã nhận ${total}. Hộp tiền vui hẳn lên.`;
     $('paid-message').textContent = personalThanks;
     $('scene').classList.add('grateful');
     $('speech').classList.add('thanking');
-    $('speech-kicker').textContent = 'THANH TOÁN ĐÃ VỀ, AI CŨNG VUI';
+    $('speech-kicker').textContent = 'TIỀN ĐÃ VỀ, VUI QUÁ TRỜI';
     $('speech-text').textContent = personalThanks;
     if (thankedToken !== current.token) {
       thankedToken = current.token;
@@ -146,11 +146,11 @@
     thankedToken = null;
     $('scene').classList.remove('grateful');
     $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'HÓA ĐƠN ĐANG CHỜ XỬ LÝ';
+    $('speech-kicker').textContent = 'HỘP NHẬN TIỀN ĐANG TRỐNG';
     $('speech-text').textContent = defaultSpeech;
     $('payment').classList.remove('paid');
     $('paid-success').hidden = true;
-    $('payment-heading-text').textContent = 'Quét QR này, xử lý khoản thanh toán cho gọn.';
+    $('payment-heading-text').textContent = 'Quét QR này, gửi mình một chút vui.';
     $('new-donation').textContent = 'Đổi thông tin';
     $('bank-name').textContent = value.bank;
     $('account-name').textContent = value.accountName;
@@ -194,7 +194,7 @@
     event.preventDefault();
     $('form-error').hidden = true;
     $('donation-fields').disabled = true;
-    $('create-qr').textContent = 'Đang tạo QR thanh toán…';
+    $('create-qr').textContent = 'Đang tạo QR gửi tiền…';
     try {
       displayPayment(await api('/api/donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: $('donor-name').value, amount: Number($('amount').value) }) }));
     } catch (error) {
@@ -202,7 +202,7 @@
       $('form-error').hidden = false;
     } finally {
       $('donation-fields').disabled = false;
-      $('create-qr').textContent = 'Tạo QR thanh toán ↗';
+      $('create-qr').textContent = 'Tạo QR gửi tiền ↗';
     }
   });
   $('new-donation').addEventListener('click', () => {
@@ -211,7 +211,7 @@
     thankedToken = null;
     $('scene').classList.remove('grateful');
     $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'HÓA ĐƠN ĐANG CHỜ XỬ LÝ';
+    $('speech-kicker').textContent = 'HỘP NHẬN TIỀN ĐANG TRỐNG';
     $('speech-text').textContent = defaultSpeech;
     forgetPayment();
     $('payment').hidden = true;
@@ -221,12 +221,12 @@
   });
   $('share-payment').addEventListener('click', async () => {
     if (!payment) return;
-    const text = `Thanh toán ${money(payment.amount)}\nNgân hàng: ${payment.bank}\nSố tài khoản: ${payment.account}\nChủ tài khoản: ${payment.accountName}\nNội dung chuyển khoản: ${payment.code}`;
+    const text = `Gửi tiền ${money(payment.amount)}\nNgân hàng: ${payment.bank}\nSố tài khoản: ${payment.account}\nChủ tài khoản: ${payment.accountName}\nNội dung chuyển khoản: ${payment.code}`;
     try {
-      if (navigator.share) await navigator.share({ title: 'Thông tin thanh toán', text });
+      if (navigator.share) await navigator.share({ title: 'Thông tin gửi tiền', text });
       else {
         await navigator.clipboard.writeText(text);
-        $('copy-status').textContent = 'Đã sao chép thông tin thanh toán. Gửi cho người cần trả là xong.';
+        $('copy-status').textContent = 'Đã sao chép thông tin gửi tiền. Gửi cho người thương là xong.';
       }
     } catch (error) {
       if (error.name !== 'AbortError') $('copy-status').textContent = 'Chưa chia sẻ được. Bạn có thể chép số tài khoản và mã ở bên dưới.';
@@ -251,7 +251,7 @@
     try {
       const config = await api('/api/donations/config');
       if (!config.ready) {
-        $('availability').textContent = 'Quầy thanh toán đang được chuẩn bị. Trang chưa sẵn sàng nhận tiền, bạn ghé lại sau nhé!';
+        $('availability').textContent = 'Góc nhận tiền đang được chuẩn bị. Trang chưa sẵn sàng nhận tiền, bạn ghé lại sau nhé!';
         connection('Chưa mở nhận tiền');
         return;
       }
@@ -269,7 +269,7 @@
       pollEvents();
       pollStatus();
     } catch {
-      $('availability').textContent = 'Chưa kết nối được quầy thanh toán. Hãy tải lại trang sau một chút nhé.';
+      $('availability').textContent = 'Chưa kết nối được góc nhận tiền. Hãy tải lại trang sau một chút nhé.';
       connection('Chưa kết nối');
     }
   }
