@@ -10,8 +10,13 @@
   let active = false;
   let personalThanks = '';
   let thankedToken = null;
-  let bowlOffset = 0;
   let bowlMotionStarted = false;
+  let selectedGame = 'bowl';
+  let clockTime = 0;
+  let shownHeart = -1;
+  let needleFrozenUntil = 0;
+  let needleFrozenPosition = 50;
+  const reducedMotion = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
   const queue = [];
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
@@ -84,51 +89,127 @@
     return Math.floor(Math.max(0, Number(status.paidAmount) || 0) / 1000);
   }
   function bowlOffsetAt(time) {
+    if (reducedMotion) return -118;
     return Math.sin(time / 520) * 118;
+  }
+  function needlePositionAt(time) {
+    return reducedMotion ? 50 : 50 + Math.sin(time / 430) * 45;
+  }
+  function heartPositionAt(time) {
+    return reducedMotion ? 1 : Math.floor(time / 850) % 3;
+  }
+  function renderGameMotion(time) {
+    clockTime = time;
+    $('coin-bowl').setAttribute('transform', `translate(${bowlOffsetAt(time)} 0)`);
+    $('needle-marker').style.left = `${time < needleFrozenUntil ? needleFrozenPosition : needlePositionAt(time)}%`;
+    const heart = heartPositionAt(time);
+    if (heart !== shownHeart) {
+      shownHeart = heart;
+      document.querySelectorAll('[data-heart]').forEach(button => {
+        const isHeart = Number(button.dataset.heart) === heart;
+        button.textContent = isHeart ? '♥' : '♡';
+        button.classList.toggle('has-heart', isHeart);
+      });
+    }
   }
   function startBowlMotion() {
     if (bowlMotionStarted || typeof requestAnimationFrame !== 'function') return;
     bowlMotionStarted = true;
-    const bowl = $('coin-bowl');
     const move = time => {
-      bowlOffset = bowlOffsetAt(time);
-      bowl.setAttribute('transform', `translate(${bowlOffset} 0)`);
+      renderGameMotion(time);
       requestAnimationFrame(move);
     };
     requestAnimationFrame(move);
+  }
+  function selectGame(mode) {
+    selectedGame = mode;
+    document.querySelectorAll('[data-game]').forEach(button => {
+      const active = button.dataset.game === mode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    for (const game of ['bowl', 'needle', 'heart']) $(`game-${game}`).hidden = game !== mode;
+    $('coin-feedback').textContent = mode === 'bowl' ? 'Canh bát chạy qua làn rơi rồi bắn nhé.'
+      : mode === 'needle' ? 'Dừng kim trong vùng cam nhé.' : 'Chạm ô có tim trước khi nó chạy đi nhé.';
+  }
+  function spendCoin() {
+    if (!payment || !Number.isSafeInteger(payment.coinTotal) || !Number.isSafeInteger(payment.coinsThrown) || payment.coinsThrown >= payment.coinTotal) return false;
+    payment.coinsThrown++;
+    const available = payment.coinTotal - payment.coinsThrown;
+    $('coin-balance').textContent = String(available);
+    for (const id of ['throw-coin', 'stop-needle']) $(id).disabled = available < 1;
+    if ((typeof performance !== 'undefined' ? performance.now() : clockTime) < needleFrozenUntil) $('stop-needle').disabled = true;
+    document.querySelectorAll('[data-heart]').forEach(button => { button.disabled = available < 1; });
+    savePayment(payment);
+    return true;
+  }
+  function recordHit(game) {
+    if (!payment) return;
+    payment.gameHits ||= {};
+    payment.gameHits[game] = Math.max(0, Number(payment.gameHits[game]) || 0) + 1;
+    $('game-score').textContent = String(Object.values(payment.gameHits).reduce((sum, value) => sum + (Number.isSafeInteger(value) && value > 0 ? value : 0), 0));
+    savePayment(payment);
   }
   function updateCoinGame(status, current) {
     const total = coinTotal(status);
     const thrown = Math.min(total, Math.max(0, Number.isSafeInteger(current.coinsThrown) ? current.coinsThrown : 0));
     const available = total - thrown;
     current.coinsThrown = thrown;
+    const changed = $('coin-game').hidden || current.displayedCoinTotal !== total;
     $('coin-game').hidden = false;
     $('coin-balance').textContent = String(available);
-    $('throw-coin').disabled = available < 1;
-    $('coin-feedback').textContent = available > 0
-      ? `Bạn có ${available} xu. Canh bát lướt qua làn ném rồi bắn nhé.`
-      : total ? 'Bát có xu rồi. Nạp thêm để bắn tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
+    $('game-score').textContent = String(Object.values(current.gameHits || {}).reduce((sum, value) => sum + (Number.isSafeInteger(value) && value > 0 ? value : 0), 0));
+    for (const id of ['throw-coin', 'stop-needle']) $(id).disabled = available < 1;
+    if ((typeof performance !== 'undefined' ? performance.now() : clockTime) < needleFrozenUntil) $('stop-needle').disabled = true;
+    document.querySelectorAll('[data-heart]').forEach(button => { button.disabled = available < 1; });
+    if (changed) $('coin-feedback').textContent = available > 0
+      ? `Bạn có ${available} xu. Chọn một trò rồi chơi nhé.`
+      : total ? 'Bạn đã dùng hết xu. Có thêm tiền về thì lại chơi tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
+    current.displayedCoinTotal = total;
     savePayment(current);
   }
   function tossCoin() {
-    if (!payment || !Number.isSafeInteger(payment.coinTotal) || payment.coinsThrown >= payment.coinTotal) return;
-    payment.coinsThrown++;
+    if (selectedGame !== 'bowl' || !spendCoin()) return;
+    const current = payment;
     const available = payment.coinTotal - payment.coinsThrown;
-    $('coin-balance').textContent = String(available);
-    $('throw-coin').disabled = available < 1;
-    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
-    const willHit = Math.abs(433 + bowlOffsetAt(now + 760) - 310) < 52;
-    if (willHit) payment.coinHits = (Number.isSafeInteger(payment.coinHits) ? payment.coinHits : 0) + 1;
-    $('coin-feedback').textContent = willHit
-      ? (available ? `VÀO BÁT! Còn ${available} xu, canh nhịp rồi bắn tiếp nào.` : 'VÀO BÁT! Bạn đã bắn hết xu của lượt này rồi.')
-      : (available ? `Trượt mất rồi! Còn ${available} xu để gỡ lại.` : 'Trượt mất rồi, hết xu của lượt này rồi.');
-    savePayment(payment);
+    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
+    const willHit = Math.abs(433 + bowlOffsetAt(now + 625) - 307) < 47;
+    $('coin-feedback').textContent = `Xu đang bay… còn ${available} xu.`;
     const coin = document.createElement('span');
     coin.className = 'thrown-coin shot-coin';
     coin.textContent = '₫';
-    coin.style['--shot-distance'] = `${Math.max(170, $('coin-flight-layer').clientHeight * .5 || 220)}px`;
+    coin.style.setProperty('--shot-distance', `${Math.max(170, $('coin-flight-layer').clientHeight * .5 || 220)}px`);
     $('coin-flight-layer').append(coin);
+    setTimeout(() => {
+      if (payment !== current) return;
+      if (willHit) recordHit('bowl');
+      if (selectedGame === 'bowl') $('coin-feedback').textContent = willHit
+        ? `VÀO BÁT! Còn ${current.coinTotal - current.coinsThrown} xu.`
+        : `Trượt mất rồi! Còn ${current.coinTotal - current.coinsThrown} xu.`;
+    }, 625);
     setTimeout(() => coin.remove(), 900);
+  }
+  function stopNeedle() {
+    if (selectedGame !== 'needle' || $('stop-needle').disabled || !spendCoin()) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
+    needleFrozenPosition = needlePositionAt(now);
+    needleFrozenUntil = now + 700;
+    $('needle-marker').style.left = `${needleFrozenPosition}%`;
+    $('stop-needle').disabled = true;
+    const hit = Math.abs(needleFrozenPosition - 50) <= 12;
+    if (hit) recordHit('needle');
+    $('coin-feedback').textContent = `${hit ? 'Trúng vùng cam!' : 'Lệch kim rồi!'} Còn ${payment.coinTotal - payment.coinsThrown} xu.`;
+    const current = payment;
+    setTimeout(() => {
+      if (payment === current) $('stop-needle').disabled = current.coinsThrown >= current.coinTotal;
+    }, 700);
+  }
+  function catchHeart(position) {
+    if (selectedGame !== 'heart' || !spendCoin()) return;
+    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
+    const hit = position === heartPositionAt(now);
+    if (hit) recordHit('heart');
+    $('coin-feedback').textContent = `${hit ? 'Bắt được tim!' : 'Tim chạy mất rồi!'} Còn ${payment.coinTotal - payment.coinsThrown} xu.`;
   }
   function showPaidState(status, current) {
     const donor = current.name || 'bạn';
@@ -276,6 +357,9 @@
     $('donor-name').focus();
   });
   $('throw-coin').addEventListener('click', tossCoin);
+  $('stop-needle').addEventListener('click', stopNeedle);
+  document.querySelectorAll('[data-game]').forEach(button => button.addEventListener('click', () => selectGame(button.dataset.game)));
+  document.querySelectorAll('[data-heart]').forEach(button => button.addEventListener('click', () => catchHeart(Number(button.dataset.heart))));
   $('share-payment').addEventListener('click', async () => {
     if (!payment) return;
     const text = `Gửi tiền ${money(payment.amount)}\nNgân hàng: ${payment.bank}\nSố tài khoản: ${payment.account}\nChủ tài khoản: ${payment.accountName}\nNội dung chuyển khoản: ${payment.code}`;

@@ -685,6 +685,11 @@ footer>a:last-child {
   color:var(--orange);
   font-size:27px
 }
+.game-score {
+  display:block;
+  color:#80745f;
+  font-size:10px
+}
 .coin-game p {
   margin:5px 0 12px;
   color:#84735b;
@@ -709,6 +714,79 @@ footer>a:last-child {
 .coin-game button:disabled {
   background:#b8ac97;
   opacity:1
+}
+.game-tabs {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:5px;
+  margin:13px 0 10px
+}
+.coin-game .game-tab {
+  padding:8px 3px;
+  border:1px solid #dfcbb1;
+  background:#fffdf7;
+  color:#76624d;
+  font-size:10px;
+  line-height:1.25
+}
+.coin-game .game-tab.active {
+  border-color:#a95a2f;
+  background:#f8e5ce;
+  color:#8b421f
+}
+.game-panel {
+  min-height:85px
+}
+.needle-track {
+  position:relative;
+  height:18px;
+  margin:13px 0;
+  border:1px solid #d5c6a7;
+  border-radius:20px;
+  background:linear-gradient(90deg,#e5e7d9,#fffdf5,#e5e7d9)
+}
+.needle-target {
+  position:absolute;
+  left:38%;
+  width:24%;
+  height:100%;
+  border-radius:20px;
+  background:#e9a34a
+}
+.needle-marker {
+  position:absolute;
+  top:-6px;
+  left:50%;
+  width:4px;
+  height:28px;
+  border-radius:4px;
+  background:#473a32;
+  transform:translateX(-50%);
+  box-shadow:0 1px 2px #0003
+}
+.heart-grid {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:9px;
+  margin-top:10px
+}
+.coin-game .heart-grid button {
+  min-height:51px;
+  border:1px solid #ddbdb2;
+  background:#fffdf7;
+  color:#b88779;
+  font-size:26px;
+  line-height:1
+}
+.coin-game .heart-grid button.has-heart {
+  background:#f8dbd3;
+  color:#b64e4c
+}
+.coin-game small {
+  display:block;
+  margin-top:8px;
+  color:#958775;
+  font-size:9px
 }
 .copy-status {
   font-size:10px;
@@ -1018,5 +1096,9 @@ footer>a:last-child {
   }
   .grateful #upper-body {
     transform:translateY(20px) rotate(13deg) scaleY(.96)
+  }
+  .shot-coin {
+    top:74%;
+    opacity:1
   }
 }

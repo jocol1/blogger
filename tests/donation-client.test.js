@@ -9,13 +9,15 @@ const settle = () => new Promise(resolve => setImmediate(resolve));
 function fixture(handler, initialPayment) {
   const nodes = new Map();
   const timers = [];
+  const frames = [];
+  let now = 0;
   const storage = new Map();
   const session = new Map();
   if (initialPayment) storage.set('donation-payment', JSON.stringify(initialPayment));
   function element() {
     const classes = new Set();
     return {
-      textContent: '', hidden: false, disabled: false, value: '', dataset: {}, handlers: {}, attributes: {}, children: [], style: {},
+      textContent: '', hidden: false, disabled: false, value: '', dataset: {}, handlers: {}, attributes: {}, children: [], clientHeight: 440, style: { setProperty(name, value) { this[name] = value; } },
       classList: { add: name => classes.add(name), remove: name => classes.delete(name), toggle(name, force) { if (force) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name) },
       addEventListener(event, handler) { this.handlers[event] = handler; },
       setAttribute(name, value) { this.attributes[name] = value; },
@@ -29,16 +31,19 @@ function fixture(handler, initialPayment) {
   get('amount').value = '20000';
   get('donation-fields').disabled = true;
   const choices = [10000, 20000, 50000, 100000].map(amount => Object.assign(element(), { dataset: { amount: String(amount) } }));
+  const games = ['bowl', 'needle', 'heart'].map(game => Object.assign(element(), { dataset: { game } }));
+  const hearts = [0, 1, 2].map(position => Object.assign(element(), { dataset: { heart: String(position) } }));
   const storageApi = map => ({ getItem: key => map.get(key) || null, setItem: (key, value) => map.set(key, value), removeItem: key => map.delete(key) });
   const context = {
-    document: { visibilityState: 'visible', handlers: {}, getElementById: get, querySelectorAll: selector => selector === '[data-amount]' ? choices : [], createElement: element, createTextNode: text => ({ textContent: text }), addEventListener(event, handler) { this.handlers[event] = handler; } },
-    window: { handlers: {}, addEventListener(event, handler) { this.handlers[event] = handler; } }, navigator: {}, URLSearchParams, AbortSignal,
+    document: { visibilityState: 'visible', handlers: {}, getElementById: get, querySelectorAll: selector => selector === '[data-amount]' ? choices : selector === '[data-game]' ? games : selector === '[data-heart]' ? hearts : [], createElement: element, createTextNode: text => ({ textContent: text }), addEventListener(event, handler) { this.handlers[event] = handler; } },
+    window: { handlers: {}, addEventListener(event, handler) { this.handlers[event] = handler; }, matchMedia: () => ({ matches: false }) }, navigator: {}, URLSearchParams, AbortSignal,
+    performance: { now: () => now }, requestAnimationFrame: fn => { frames.push(fn); },
     localStorage: storageApi(storage), sessionStorage: storageApi(session),
     setTimeout: (fn, delay) => { timers.push({ fn, delay }); },
     fetch: async (url, options) => { const result = await handler(url, options); return { ok: result.ok !== false, json: async () => result.body }; },
   };
   vm.runInNewContext(source, context);
-  return { get, choices, timers, storage, session, context, async run(delay) { const index = timers.findIndex(timer => timer.delay === delay); assert.notEqual(index, -1, `missing ${delay}ms timer`); const [timer] = timers.splice(index, 1); await timer.fn(); await settle(); } };
+  return { get, choices, games, hearts, timers, storage, session, context, tick(time) { now = time; const frame = frames.shift(); assert.ok(frame, 'missing animation frame'); frame(time); }, async run(delay) { const index = timers.findIndex(timer => timer.delay === delay); assert.notEqual(index, -1, `missing ${delay}ms timer`); const [timer] = timers.splice(index, 1); await timer.fn(); await settle(); } };
 }
 
 test('client queues donations for seven seconds and ignores replayed event IDs', async () => {
@@ -131,5 +136,38 @@ test('each confirmed 1.000đ grants one coin that can be thrown into the bowl', 
   ui.get('throw-coin').handlers.click();
   assert.equal(ui.get('coin-balance').textContent, '1');
   assert.equal(ui.get('coin-flight-layer').children.length, 1);
-  assert.match(ui.get('coin-feedback').textContent, /Còn 1 xu/);
+  assert.match(ui.get('coin-feedback').textContent, /còn 1 xu/i);
+});
+
+test('three games share only confirmed coins and preserve spending on reload', async () => {
+  const cached = { bank: 'MB', account: '0000000000', accountName: 'TEST', amount: 5000, code: 'DH0123456', token: 'a'.repeat(64) };
+  const handler = async url => {
+    if (url.endsWith('/config')) return { body: { ready: true, bank: 'MB', account: '0000000000', accountName: 'TEST' } };
+    if (url === '/api/donations/status') return { body: { status: 'paid', paidAmount: 2500, paymentCount: 1 } };
+    return { body: { cursor: 0, events: [], hasMore: false } };
+  };
+  const ui = fixture(handler, cached);
+  await settle();
+  ui.tick(0);
+  ui.games[1].handlers.click();
+  assert.equal(ui.get('game-needle').hidden, false);
+  ui.get('stop-needle').handlers.click();
+  assert.equal(ui.get('coin-balance').textContent, '1');
+  assert.equal(ui.get('game-score').textContent, '1');
+  assert.equal(ui.get('stop-needle').disabled, true);
+  await ui.run(700);
+  assert.equal(ui.get('stop-needle').disabled, false);
+  ui.tick(850);
+  ui.games[2].handlers.click();
+  ui.hearts[1].handlers.click();
+  assert.equal(ui.get('coin-balance').textContent, '0');
+  assert.equal(ui.get('game-score').textContent, '2');
+  assert.equal(ui.get('throw-coin').disabled, true);
+  ui.hearts[1].handlers.click();
+  assert.equal(JSON.parse(ui.storage.get('donation-payment')).coinsThrown, 2);
+  const restored = fixture(handler, JSON.parse(ui.storage.get('donation-payment')));
+  await settle();
+  assert.equal(restored.get('coin-balance').textContent, '0');
+  assert.equal(restored.get('game-score').textContent, '2');
+  assert.equal(restored.get('stop-needle').disabled, true);
 });

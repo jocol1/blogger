@@ -25,6 +25,8 @@ Khi `PAYMENT_PAGE_ONLY=true` (mặc định), trang chủ chuyển thẳng đế
 
 Trang xin tiền vui vẻ tạo QR, nhân vật SVG có hoạt ảnh xác nhận khi SePay ghi nhận tiền vào. Tên tự nhập (tối đa 60 ký tự, mặc định ẩn danh) và số tiền thực nhận được hiển thị cho mọi người đang xem. Giọng đọc mặc định tắt; trình duyệt cần có giọng tiếng Việt để đọc thông báo.
 
+Sau khi xác nhận, mỗi 1.000đ thực nhận của một mã QR cấp 1 xu để chơi ba trò: bắn xu vào bát, dừng kim và bắt tim. Mỗi lượt dùng 1 xu; số xu đã dùng và điểm trúng lưu trên trình duyệt cho mã QR hiện tại. Xu và điểm không đổi ra tiền hay quà.
+
 ### Cấu hình nhận tiền
 
 Giữ cấu hình Firebase Admin hiện có và thêm các biến sau vào môi trường server:
