@@ -21,6 +21,8 @@ Note riêng được mã hóa bằng mật khẩu của note; hệ thống chỉ
 
 ## Góc xin lộc — `/an-xin`
 
+Khi `PUBLIC_DONATION_ONLY=true` (mặc định), trang chủ chuyển thẳng đến `/an-xin` và các trang blog cũ tạm trả về 404. Dữ liệu và mã blog vẫn được giữ nguyên; đặt `PUBLIC_DONATION_ONLY=false` rồi deploy lại để mở lại.
+
 Trang nhận ủng hộ tự nguyện, nhân vật SVG có hoạt ảnh cúi chào và xu rơi khi SePay xác nhận tiền vào. Tên tự nhập (tối đa 60 ký tự, mặc định ẩn danh) và số tiền thực nhận được hiển thị cho mọi người đang xem. Giọng đọc mặc định tắt; trình duyệt cần có giọng tiếng Việt để đọc lời chúc.
 
 ### Cấu hình nhận tiền

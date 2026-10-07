@@ -77,6 +77,12 @@ const editorialCss = `body{background:#f7f7f5;color:#181818}.editorial-header{he
 
 // The donation router has its own bounded JSON parsers and never uses the blog's JSON store.
 app.use(createDonationRouter({ db: firestore }));
+// Keep the former blog in place, but make only the public donation page reachable while this switch is on.
+// Set PUBLIC_DONATION_ONLY=false to restore the previous routes without restoring data or code from backup.
+if (process.env.PUBLIC_DONATION_ONLY !== 'false') {
+  app.get('/', (req, res) => res.redirect(302, '/an-xin'));
+  app.use((req, res) => res.status(404).type('text/plain').send('Trang này đang tạm ẩn. Vào /an-xin nhé.'));
+}
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 app.set('trust proxy', 1);
