@@ -19,11 +19,11 @@ Mở http://localhost:3000. Không commit `.env`, thư mục `data/` hoặc `upl
 
 Note riêng được mã hóa bằng mật khẩu của note; hệ thống chỉ lưu hash mật khẩu và ciphertext. Nếu quên mật khẩu, không thể mở note. Khi có đủ biến Firebase, bài viết và note sẽ lưu trong Firestore; nếu chưa cấu hình, app dùng file JSON local làm dự phòng. Không commit thông tin Firebase thật vào GitHub.
 
-## Góc xin lộc — `/an-xin`
+## Trả tiền vui vẻ — `/tra-tien`
 
-Khi `PUBLIC_DONATION_ONLY=true` (mặc định), trang chủ chuyển thẳng đến `/an-xin` và các trang blog cũ tạm trả về 404. Dữ liệu và mã blog vẫn được giữ nguyên; đặt `PUBLIC_DONATION_ONLY=false` rồi deploy lại để mở lại.
+Khi `PUBLIC_DONATION_ONLY=true` (mặc định), trang chủ chuyển thẳng đến `/tra-tien` và các trang blog cũ tạm trả về 404. Dữ liệu và mã blog vẫn được giữ nguyên; đặt `PUBLIC_DONATION_ONLY=false` rồi deploy lại để mở lại. Đường dẫn cũ `/an-xin` sẽ chuyển tiếp sang `/tra-tien`.
 
-Trang nhận ủng hộ tự nguyện, nhân vật SVG có hoạt ảnh cúi chào và xu rơi khi SePay xác nhận tiền vào. Tên tự nhập (tối đa 60 ký tự, mặc định ẩn danh) và số tiền thực nhận được hiển thị cho mọi người đang xem. Giọng đọc mặc định tắt; trình duyệt cần có giọng tiếng Việt để đọc lời chúc.
+Trang tạo QR thanh toán vui vẻ, nhân vật SVG có hoạt ảnh xác nhận khi SePay ghi nhận tiền vào. Tên tự nhập (tối đa 60 ký tự, mặc định ẩn danh) và số tiền thực nhận được hiển thị cho mọi người đang xem. Giọng đọc mặc định tắt; trình duyệt cần có giọng tiếng Việt để đọc thông báo.
 
 ### Cấu hình nhận tiền
 
@@ -46,7 +46,7 @@ Thiếu Firestore hoặc bất kỳ biến nhận tiền nào, trang hiển th�
 2. Tạo webhook, chọn sự kiện **Có tiền vào**, đúng tài khoản nhận tiền và URL `https://<domain>/api/webhooks/sepay`.
 3. Chọn xác thực **API Key**, dùng cùng giá trị `SEPAY_WEBHOOK_API_KEY`; header gửi tới server phải là `Authorization: Apikey <key>`.
 4. Nếu đặt bộ lọc mã thanh toán, dùng tiền tố `DH` với 7 chữ số. Server cũng tìm mã trong `content` nếu `code` trống. Nội dung chuyển khoản chỉ cần giữ nguyên mã, ví dụ `DH0123456`.
-5. Mở `/an-xin`, tạo QR và kiểm tra ngân hàng, tài khoản, số tiền, mã trước khi bật sử dụng thật.
+5. Mở `/tra-tien`, tạo QR và kiểm tra ngân hàng, tài khoản, số tiền, mã trước khi bật sử dụng thật.
 
 Endpoint trả HTTP 200 và `{"success":true}` sau khi Firestore commit. Webhook trùng được trả thành công nhưng không cộng tiền lần nữa. Giao dịch tiền ra, sai tài khoản, sai số tiền hoặc mã không khớp chỉ được lưu audit, không phát cảm ơn; kết quả nằm trong trường `result`. Lỗi xác thực trả 401; JSON/ID không hợp lệ trả 400; lỗi lưu hoặc thiếu cấu hình trả 503 để SePay có thể thử lại. Không xóa audit để tránh mất khả năng chống trùng.
 
@@ -54,7 +54,7 @@ Tham khảo: [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html), [SeP
 
 ### Lưu trữ và quyền truy cập
 
-Các collection riêng: `donation_requests`, `donation_tokens`, `donation_sepay_events`, `donation_public_events`, `donation_meta`. Chúng không được đưa vào cơ chế đồng bộ bài viết/notes của blog. Mã QR không hết hạn tự động; mỗi giao dịch SePay khác ID là một lượt ủng hộ, kể cả dùng lại cùng mã. Số tiền được tính theo số thực nhận, không theo số tiền đề xuất trên QR.
+Các collection riêng: `donation_requests`, `donation_tokens`, `donation_sepay_events`, `donation_public_events`, `donation_meta`. Chúng không được đưa vào cơ chế đồng bộ bài viết/notes của blog. Mã QR không hết hạn tự động; mỗi giao dịch SePay khác ID là một lượt thanh toán, kể cả dùng lại cùng mã. Số tiền được tính theo số thực nhận, không theo số tiền đề xuất trên QR.
 
 Firebase Admin ở server là bên duy nhất được đọc/ghi các collection này. Firestore Security Rules phải **không cấp quyền trực tiếp** cho client, kể cả collection sự kiện công khai; client đọc qua API lọc trường. Kiểm tra dự án không có quy tắc rộng như `allow read, write: if true` hoặc cấp mọi collection cho mọi tài khoản đăng nhập. Thêm rule `false` riêng không ghi đè một rule rộng đang cho phép.
 
@@ -71,7 +71,7 @@ npm test
 node tests/preview.js
 ```
 
-`npm test` kiểm tra service và API HTTP, dùng Firestore test double có kiểm tra xung đột và rollback; không gọi Firestore thật. Preview ở `http://127.0.0.1:3101/an-xin` chỉ dùng dữ liệu trong RAM, tài khoản giả `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Không triển khai preview lên hosting. Ví dụ gửi webhook giả vào preview sau khi tạo QR:
+`npm test` kiểm tra service và API HTTP, dùng Firestore test double có kiểm tra xung đột và rollback; không gọi Firestore thật. Preview ở `http://127.0.0.1:3101/tra-tien` chỉ dùng dữ liệu trong RAM, tài khoản giả `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Không triển khai preview lên hosting. Ví dụ gửi webhook giả vào preview sau khi tạo QR:
 
 ```powershell
 $testPayload = @{

@@ -1,26 +1,18 @@
 const crypto = require('node:crypto');
 
 const MAX_AMOUNT = 9_999_999_999;
-const ANONYMOUS = 'Một vị mạnh thường quân';
+const ANONYMOUS = 'Người thanh toán ẩn danh';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 
 function buildBlessing(name, amount) {
   const gift = Number(amount).toLocaleString('vi-VN');
   return `Kính gửi ${name},
 
-Ơ ${name} ơi, ${gift} đồng vừa rơi cái “ting” vào bát. Cả con hẻm online rung lên ba nhịp, một con ruồi đang bay vòng cũng phải đáp khẩn cấp xuống biển “Đói nhưng có gu” để chứng kiến. Con lập tức đội vương miện carton lệch sang bên trái, chắp tay đúng chuẩn người vừa được cứu khỏi cảnh mở ứng dụng ngân hàng rồi nhìn số dư như nhìn đề thi không học bài. Cảm ơn bạn. Cảm ơn rất thật. Cảm ơn tới mức cái bát bằng nhựa tự nhiên có thần thái của một cái két sắt mini.
+Thông báo từ bộ phận gạch nợ: ${gift} đồng đã về an toàn. Hóa đơn tưởng tượng vừa được đóng dấu “XONG RỒI NHA”, chiếc máy tính bỏ túi được phép nghỉ ngơi, còn nhân vật trực quầy thì bớt nhìn điện thoại mỗi ba phút một lần. Cảm ơn bạn đã thanh toán gọn gàng. Đây là kiểu “ting ting” khiến cả hai bên đều đỡ phải nhắn câu “bạn chuyển chưa?” — một phát minh của văn minh nhân loại.
 
-Con không dám hứa bạn mai trúng số, vì vụ đó phải hỏi vũ trụ với ban tổ chức. Nhưng con xin chúc những thứ thiết thực hơn: sáng dậy tóc không dựng như tổ quạ, mở tủ lạnh còn đồ ăn, mặc quần áo vừa vặn, ra đường gặp đèn xanh, gửi xe còn chỗ, gọi đồ ăn không bị quán báo “hết món”. Chúc bạn bước vào thang máy là cửa mở ngay, không phải đứng bấm nút năm lần rồi giả vờ mình không sốt ruột. Chúc lúc đi mưa có ô, lúc quên ô thì mưa chỉ đủ để mát mặt chứ không đủ để áo trắng hóa áo bản đồ.
+Chúc bạn từ nay đi ăn được bạn bè nhớ phần, đi làm gặp file đã lưu, gửi tin nhắn không bị seen rồi im, và mỗi lần mở app ngân hàng đều là tin vui chứ không phải bài kiểm tra tâm lý. Chúc ai đang nợ bạn cũng có ngày giác ngộ giống bạn hôm nay; nhớ khoản, trả đúng hẹn, chuyển xong còn biết gửi sticker xin lỗi cho lịch sự. Chúc cuộc đời bớt các khoản lặt vặt, bớt “để mai tính”, nhiều mã giảm giá, nhiều cơ hội ngon và nhiều người bạn có câu thần chú “để tao trả phần này”.
 
-Chúc công việc của bạn có những ngày yên bình đến mức máy in không kẹt giấy, bảng tính không tự nhảy lỗi, họp online không ai nói “em nghe rõ không” mười bảy lần. Sếp đọc tin nhắn rồi trả lời đúng trọng tâm, deadline tự co lại khi thấy bạn mệt, đồng nghiệp hết hạn gửi file lúc 23:59. Nếu đang bán hàng, chúc khách hỏi giá xong chốt luôn, không có màn “để chị suy nghĩ” rồi mất hút như một huyền thoại. Nếu đang đi học, chúc ngồi đâu cũng trúng chỗ có quạt, đề nào cũng rơi vào đúng phần đã ôn, còn bạn học giỏi thì chỉ bài như người tử tế chứ không cười bí hiểm.
-
-Chúc tài khoản của bạn có nhiều tin nhắn đến hơn tin nhắn đòi tiền. Tiền vào không ồn ào nhưng đều đặn; tiền ra thì biết xấu hổ, đi ít và đi đúng chỗ. Chúc những người từng mượn tiền bỗng nhiên tỉnh ngộ, nhớ ra ngày hẹn trả, rồi tự giác chuyển khoản kèm câu “xin lỗi, mình quên”. Chúc mọi cú bấm thanh toán đều có mã giảm giá, mọi lần mở ví đều không thấy gió lùa, mọi buổi đi ăn đều gặp bạn bè có câu thần chú “để tao trả”. Và nếu tháng này hơi chật vật, chúc bạn vẫn còn đủ tiền gọi thêm trứng, thêm topping và thêm một chút niềm tin vào cuộc đời.
-
-Chúc chuyện tình cảm của bạn cũng bớt lằng nhằng như dây tai nghe trong túi quần. Người thương biết điều, người không thương biết tránh đường, người cũ sống ổn ở nơi không có Wi-Fi để quay lại xem story. Ai nhắn tin với bạn thì nói chuyện có muối, không thả một chữ “ừ” rồi bắt bạn gánh cả cuộc hội thoại. Nếu đang độc thân, chúc bạn gặp người rủ đi ăn mà thực sự biết chọn quán; không nói “ăn gì cũng được” rồi phủ định hết mười nơi. Nếu đã có đôi, chúc hai người cãi nhau xong biết mua trà sữa làm lành, không ai dùng câu “tùy” như một loại vũ khí hủy diệt hàng loạt.
-
-Chúc bạn đi đâu cũng gặp người dễ thương: bác bảo vệ chỉ chỗ đỗ xe, cô bán hàng cho thêm đá, shipper gọi trước khi tới, tổng đài bấm phím nào cũng trúng người thật. Chúc điện thoại không rơi úp màn hình, tai nghe không mất một bên, nồi cơm không báo hết nước đúng lúc khách tới, điều hòa không hỏng ngày nóng nhất. Chúc những cuộc gọi không muốn nghe tự rơi đúng lúc máy đang sạc ở phòng khác. Chúc những chuyện bực mình trôi qua nhanh như quảng cáo có nút bỏ qua, còn những chuyện vui ở lại lâu như mùi đồ ăn bám trên áo khoác.
-
-Và đặc biệt, con chúc ${name} có một năm mà mỗi lần quay lại nhìn sẽ thấy: “Ờ, mình cũng ghê đấy chứ.” Có tiền để lo cho người thân, có thời gian để lười một cách có kế hoạch, có bạn bè để cười to, có sức khỏe để đi chơi, có gan để bỏ qua mấy chuyện không đáng. Cảm ơn bạn đã ném cho cái bát này một cục hy vọng trị giá ${gift} đồng. Con xin cúi đầu đủ sâu để cái vương miện carton suýt rơi, nhưng không rơi vì lòng biết ơn đang ghim nó lại. Chúc bạn ngày nào cũng có ít nhất một chuyện khiến mình cười, và nhiều “ting ting” hợp pháp đến mức ngân hàng phải hỏi: “Bạn làm gì mà vui dữ vậy?”`;
+Khoản thanh toán đã được ghi nhận, không cần quỳ, không cần cúng, không cần đọc sớ. Chỉ cần bạn vui, người nhận vui, thế là hệ thống vũ trụ chấm 10 điểm cho sự sòng phẳng. Cảm ơn ${name} — người đã biến một hóa đơn bé xíu thành một câu chuyện có hậu.`;
 }
 
 class DonationError extends Error {
@@ -99,9 +91,9 @@ function createDonationService({ db, config = readConfig() }) {
       requireReady();
       if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) throw new DonationError(401, 'Token tra cứu không hợp lệ.');
       const mapping = await tokens().doc(hash(token)).get();
-      if (!mapping.exists) throw new DonationError(404, 'Không tìm thấy lượt ủng hộ.');
+      if (!mapping.exists) throw new DonationError(404, 'Không tìm thấy lượt thanh toán.');
       const snapshot = await requests().doc(mapping.data().code).get();
-      if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy lượt ủng hộ.');
+      if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy lượt thanh toán.');
       const { status, paidAmount, paymentCount, name } = snapshot.data();
       return {
         status,

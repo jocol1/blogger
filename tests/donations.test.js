@@ -15,14 +15,14 @@ test('QR includes the recipient, unique code and amount; anonymous names default
   const second = await service.create({ amount: 10_000, name: '  Minh  ' });
   assert.match(first.code, /^DH\d{7}$/);
   assert.notEqual(first.code, second.code);
-  assert.equal(first.name, 'Một vị mạnh thường quân');
+  assert.equal(first.name, 'Người thanh toán ẩn danh');
   assert.equal(second.name, 'Minh');
   const url = new URL(first.qrUrl);
   assert.equal(url.pathname, '/image/MB-0000000000-compact2.png');
   assert.equal(url.searchParams.get('amount'), '10000');
   assert.equal(url.searchParams.get('addInfo'), first.code);
   assert.equal(url.searchParams.get('accountName'), config.accountName);
-  assert.equal(db.rows.get(`donation_requests/${first.code}`).name, 'Một vị mạnh thường quân');
+  assert.equal(db.rows.get(`donation_requests/${first.code}`).name, 'Người thanh toán ẩn danh');
   assert.equal(db.rows.get(`donation_requests/${second.code}`).name, 'Minh');
   assert.ok(!JSON.stringify([...db.rows]).includes(first.token), 'raw lookup token is not stored');
   assert.deepEqual(await service.status(first.token), { status: 'pending', paidAmount: 0, paymentCount: 0 });
@@ -48,11 +48,12 @@ test('actual amount wins; multiple different transfers using one code remain sep
   assert.equal(status.paidAmount, 70_000);
   assert.equal(status.paymentCount, 2);
   assert.match(status.message, /Kính gửi Minh/);
-  assert.ok(status.message.split(/\s+/).length >= 500, 'the private thank-you should be about one A4 page');
+  assert.match(status.message, /gạch nợ/);
+  assert.ok(status.message.split(/\s+/).length >= 100, 'the payment confirmation should stay substantive');
   const feed = await service.listEvents('0');
   assert.deepEqual(feed.events.map(event => event.amount), [50_000, 20_000]);
   assert.match(feed.events[0].message, /50\.000 đồng/);
-  assert.ok(feed.events[0].message.split(/\s+/).length >= 500, 'the public thank-you should be about one A4 page');
+  assert.ok(feed.events[0].message.split(/\s+/).length >= 100, 'the public payment confirmation should stay substantive');
 });
 
 test('concurrent duplicate webhooks produce exactly one receipt, credit and event', async () => {
@@ -157,10 +158,13 @@ async function serverFor(t, options) {
 test('HTTP integration: page, create/status, authentication, JSON errors, retries and rate limit', async t => {
   const { db } = setup();
   const request = await serverFor(t, { db, config });
-  const page = await request('/an-xin');
+  const oldPage = await request('/an-xin', { redirect: 'manual' });
+  assert.equal(oldPage.status, 302);
+  assert.equal(oldPage.headers.get('location'), '/tra-tien');
+  const page = await request('/tra-tien');
   assert.equal(page.status, 200);
   assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
-  assert.match(await page.text(), /Cho xin một chút/);
+  assert.match(await page.text(), /Trả tiền cho/);
   const post = data => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
   let response = await request('/api/donations', post({ amount: 20_000, name: 'Test' }));
   assert.equal(response.status, 201);
