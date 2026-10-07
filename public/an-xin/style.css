@@ -215,9 +215,6 @@ main {
   overflow-wrap:anywhere
 }
 .speech.thanking p {
-  max-height:210px;
-  overflow-y:auto;
-  padding-right:5px;
   text-align:left;
   white-space:pre-line
 }
