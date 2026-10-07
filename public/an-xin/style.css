@@ -69,6 +69,11 @@ nav {
 nav a[aria-current] {
   color:var(--orange)
 }
+.nav-motto {
+  color:#939685;
+  font-size:11px;
+  font-style:italic
+}
 .nav-divider {
   height:13px;
   width:1px;
@@ -633,6 +638,15 @@ footer>a:last-child {
 .falling-coin,.celebration-spark {
   opacity:0
 }
+.fly {
+  transform-box:fill-box;
+  transform-origin:center;
+  animation:fly-buzz 2.2s ease-in-out infinite
+}
+.fly-two {
+  animation-delay:-1.1s;
+  animation-duration:1.7s
+}
 .celebrating #upper-body {
   animation:bow 1.7s ease-in-out 3
 }
@@ -641,6 +655,9 @@ footer>a:last-child {
 }
 .celebrating .celebration-spark {
   animation:sparkle 1.3s ease-in-out 5
+}
+.celebrating .paper-crown {
+  animation:crown-wobble .5s ease-in-out 6
 }
 .grateful #upper-body {
   animation:kneel-thanks 1.25s cubic-bezier(.2,.8,.2,1) forwards
@@ -695,6 +712,14 @@ footer>a:last-child {
   100% {
     transform:translateY(20px) rotate(13deg) scaleY(.96)
   }
+}
+@keyframes fly-buzz {
+  0%,100% { transform:translate(0,0) rotate(-8deg) }
+  50% { transform:translate(12px,-10px) rotate(18deg) }
+}
+@keyframes crown-wobble {
+  0%,100% { transform:rotate(0) }
+  50% { transform:rotate(8deg) translateY(-3px) }
 }
 @keyframes seal-in {
   from {

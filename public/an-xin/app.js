@@ -13,7 +13,7 @@
   const queue = [];
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
-  const defaultSpeech = 'Ai đi ngang qua… cho xin chút lộc với ạ!';
+  const defaultSpeech = 'Ai lướt qua… cứu cái ví mỏng này với ạ!';
   const paymentStorageKey = 'donation-payment';
 
   function savePayment(value) {
@@ -70,7 +70,7 @@
     setTimeout(() => {
       $('scene').classList.remove('celebrating');
       $('speech').classList.toggle('thanking', Boolean(personalThanks));
-      $('speech-kicker').textContent = personalThanks ? 'CÚI ĐẦU CẢM TẠ TẤM LÒNG' : 'LỜI THỈNH CẦU NHỎ XÍU';
+      $('speech-kicker').textContent = personalThanks ? 'BÁT VỪA RUNG, LÒNG VỪA NỞ HOA' : 'BÁT RỖNG XIN PHÉP KÊU CỨU';
       $('speech-text').textContent = personalThanks || defaultSpeech;
       if ('speechSynthesis' in window) window.speechSynthesis.cancel();
       playing = false;
@@ -90,7 +90,7 @@
     $('paid-message').textContent = personalThanks;
     $('scene').classList.add('grateful');
     $('speech').classList.add('thanking');
-    $('speech-kicker').textContent = 'CÚI ĐẦU CẢM TẠ TẤM LÒNG';
+    $('speech-kicker').textContent = 'BÁT VỪA RUNG, LÒNG VỪA NỞ HOA';
     $('speech-text').textContent = personalThanks;
     if (thankedToken !== current.token) {
       thankedToken = current.token;
@@ -146,7 +146,7 @@
     thankedToken = null;
     $('scene').classList.remove('grateful');
     $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'LỜI THỈNH CẦU NHỎ XÍU';
+    $('speech-kicker').textContent = 'BÁT RỖNG XIN PHÉP KÊU CỨU';
     $('speech-text').textContent = defaultSpeech;
     $('payment').classList.remove('paid');
     $('paid-success').hidden = true;
@@ -211,7 +211,7 @@
     thankedToken = null;
     $('scene').classList.remove('grateful');
     $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'LỜI THỈNH CẦU NHỎ XÍU';
+    $('speech-kicker').textContent = 'BÁT RỖNG XIN PHÉP KÊU CỨU';
     $('speech-text').textContent = defaultSpeech;
     forgetPayment();
     $('payment').hidden = true;
