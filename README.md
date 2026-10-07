@@ -1,92 +1,114 @@
-# Blogger Vault
+# Blogger Vault / Tiệm game trà sữa
 
-Blog cá nhân để viết hướng dẫn Markdown, tải file và tạo note riêng có mật khẩu.
+Ứng dụng Express dùng Firebase Admin và Firestore. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), trang công khai là `/xin-tien`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
 
 ## Chạy local
 
 ```powershell
 npm install
 Copy-Item .env.example .env
-```
-
-Mở `.env`, đặt `ADMIN_PASSWORD` và `SESSION_SECRET`. Sau đó:
-
-```powershell
 npm start
 ```
 
-Mở http://localhost:3000. Không commit `.env`, thư mục `data/` hoặc `uploads/` lên GitHub.
+Mở `http://localhost:3000/xin-tien`. Không commit `.env`, thư mục `data/`, `uploads/` hoặc thông tin Firebase thật.
 
-Note riêng được mã hóa bằng mật khẩu của note; hệ thống chỉ lưu hash mật khẩu và ciphertext. Nếu quên mật khẩu, không thể mở note. Khi có đủ biến Firebase, bài viết và note sẽ lưu trong Firestore; nếu chưa cấu hình, app dùng file JSON local làm dự phòng. Không commit thông tin Firebase thật vào GitHub.
+## Luật chơi
 
-## Xin tiền vui vẻ — `/xin-tien`
+- Mỗi 1.000đ thực nhận cộng 1 xu. Phần lẻ dưới 1.000đ được giữ trong ví và cộng dồn với lần nạp sau.
+- Mỗi ván trừ 1 xu. Thắng nhận tổng 2, 3 hoặc 5 xu theo mức Thường, Khó và Siêu khó.
+- Có năm trò: Bắn xu vào bát, Dừng kim, Bắt tim, Nhớ chuỗi và Chạm đúng thứ tự.
+- Kết quả và số dư do server xử lý. Trình duyệt chỉ gửi thao tác chơi.
+- Đủ 100 xu có thể gửi yêu cầu đổi một ly trà sữa. Người quản trị duyệt, đánh dấu đã tặng hoặc từ chối kèm lý do; từ chối hoàn đúng 100 xu.
 
-Khi `PAYMENT_PAGE_ONLY=true` (mặc định), trang chủ chuyển thẳng đến `/xin-tien` và các trang blog cũ tạm trả về 404. Dữ liệu và mã blog vẫn được giữ nguyên; đặt `PAYMENT_PAGE_ONLY=false` rồi deploy lại để mở lại. Các đường dẫn cũ `/an-xin` và `/tra-tien` sẽ chuyển tiếp sang `/xin-tien`.
+Trình duyệt giữ một mã ví ngẫu nhiên trong `localStorage`. Các tab cùng trình duyệt dùng chung ví. Người chơi nên bấm **Sao lưu mã ví** vì xóa dữ liệu trình duyệt khi chưa sao lưu sẽ làm mất quyền truy cập. Mã ví được gửi bằng header `X-Wallet-Token`, không nằm trong URL.
 
-Trang xin tiền vui vẻ tạo QR, nhân vật SVG có hoạt ảnh xác nhận khi SePay ghi nhận tiền vào. Tên tự nhập (tối đa 60 ký tự, mặc định ẩn danh) và số tiền thực nhận được hiển thị cho mọi người đang xem. Giọng đọc mặc định tắt; trình duyệt cần có giọng tiếng Việt để đọc thông báo.
+Chỉ các QR được tạo từ phiên bản ví mới mới cộng xu. Các mã cũ không có `walletId` được lưu audit khi webhook đến nhưng không cộng vào ví.
 
-Sau khi xác nhận, mỗi 1.000đ thực nhận của một mã QR cấp 1 xu để chơi ba trò: bắn xu vào bát, dừng kim và bắt tim. Mỗi lượt dùng 1 xu; số xu đã dùng và điểm trúng lưu trên trình duyệt cho mã QR hiện tại. Xu và điểm không đổi ra tiền hay quà.
+## Cấu hình
 
-### Cấu hình nhận tiền
-
-Giữ cấu hình Firebase Admin hiện có và thêm các biến sau vào môi trường server:
+Giữ cấu hình Firebase Admin hiện có và đặt các biến sau trên server:
 
 ```dotenv
+ADMIN_PASSWORD=<mat-khau-quan-tri>
+SESSION_SECRET=<chuoi-ngau-nhien-dai>
 DONATION_BANK_CODE=MB
 DONATION_BANK_ACCOUNT=6999912092003
 DONATION_BANK_ACCOUNT_NAME="LY TAN LOC"
-SEPAY_WEBHOOK_API_KEY=<khoa-ngau-nhien-rieng>
+SEPAY_WEBHOOK_API_KEY=<khoa-webhook-rieng>
+PAYMENT_PAGE_ONLY=true
 ```
 
-Sinh khóa bằng `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, rồi lưu vào biến môi trường server và cấu hình webhook SePay. Không commit khóa hoặc gửi khóa tới client. Firebase phải là dự án có Firestore hoạt động; service account cần quyền đọc/ghi Firestore. Chỉ chọn **một** cách cấu hình Firebase trong `.env.example`; xóa các giá trị mẫu không sử dụng.
+Sinh khóa ngẫu nhiên bằng:
 
-Thiếu Firestore hoặc bất kỳ biến nhận tiền nào, trang hiển thị chưa sẵn sàng và không tạo QR. Nếu Firestore gặp lỗi, API trả 503, không chuyển sang lưu JSON cục bộ. QR do VietQR cung cấp; nếu ảnh không tải được, trang vẫn hiện thông tin chuyển khoản để sao chép.
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
-### Thiết lập SePay
+Firebase phải kết nối được tới Firestore. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
 
-1. Kết nối tài khoản MB nhận tiền trên SePay. Triển khai ứng dụng Node với HTTPS công khai.
-2. Tạo webhook, chọn sự kiện **Có tiền vào**, đúng tài khoản nhận tiền và URL `https://<domain>/api/webhooks/sepay`.
-3. Chọn xác thực **API Key**, dùng cùng giá trị `SEPAY_WEBHOOK_API_KEY`; header gửi tới server phải là `Authorization: Apikey <key>`.
-4. Nếu đặt bộ lọc mã thanh toán, dùng tiền tố `DH` với 7 chữ số. Server cũng tìm mã trong `content` nếu `code` trống. Nội dung chuyển khoản chỉ cần giữ nguyên mã, ví dụ `DH0123456`.
-5. Mở `/xin-tien`, tạo QR và kiểm tra ngân hàng, tài khoản, số tiền, mã trước khi bật sử dụng thật.
+Trang quản trị ở `/xin-tien/admin`, dùng `ADMIN_PASSWORD`. Phiên đăng nhập nằm ở server, cookie `httpOnly`, thao tác thay đổi trạng thái có CSRF token và đăng nhập bị giới hạn số lần thử. Trang này hiển thị thông tin liên hệ cùng lịch sử xu gần đây của ví.
 
-Endpoint trả HTTP 200 và `{"success":true}` sau khi Firestore commit. Webhook trùng được trả thành công nhưng không cộng tiền lần nữa. Giao dịch tiền ra, sai tài khoản, sai số tiền hoặc mã không khớp chỉ được lưu audit, không phát cảm ơn; kết quả nằm trong trường `result`. Lỗi xác thực trả 401; JSON/ID không hợp lệ trả 400; lỗi lưu hoặc thiếu cấu hình trả 503 để SePay có thể thử lại. Không xóa audit để tránh mất khả năng chống trùng.
+## Thiết lập webhook SePay
 
-Tham khảo: [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html), [SePay Test Mode](https://docs.sepay.vn/test-mode.html).
+1. Kết nối tài khoản MB nhận tiền trên SePay và triển khai ứng dụng bằng HTTPS.
+2. Tạo webhook tới `https://<domain>/api/webhooks/sepay`.
+3. Chọn giao dịch **Tiền vào** và định dạng **JSON**.
+4. Chọn xác thực **API Key**, nhập đúng `SEPAY_WEBHOOK_API_KEY`. SePay sẽ gửi `Authorization: Apikey <key>`.
+5. Nếu dùng bộ lọc nội dung, cho phép mã `DH` theo sau bởi 7 chữ số, ví dụ `DH0123456`.
+6. Bật tự động gửi lại khi server trả lỗi để SePay thử lại nếu Firestore tạm gián đoạn.
 
-### Lưu trữ và quyền truy cập
+Server kiểm tra khóa bằng phép so sánh an toàn, đúng tài khoản nhận, giao dịch tiền vào, số tiền hợp lệ và mã trong `code` hoặc `content`. Số xu dùng số tiền thực nhận. Cùng một mã có thể nhận nhiều giao dịch có ID khác nhau; cùng ID SePay chỉ được ghi nhận một lần. Webhook chỉ trả `{"success":true}` sau khi transaction Firestore hoàn tất.
 
-Các collection riêng: `donation_requests`, `donation_tokens`, `donation_sepay_events`, `donation_public_events`, `donation_meta`. Chúng không được đưa vào cơ chế đồng bộ bài viết/notes của blog. Mã QR không hết hạn tự động; mỗi giao dịch SePay khác ID là một lượt gửi tiền, kể cả dùng lại cùng mã. Số tiền được tính theo số thực nhận, không theo số tiền đề xuất trên QR.
+Tham khảo [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html) và [SePay Test Mode](https://docs.sepay.vn/test-mode.html).
 
-Firebase Admin ở server là bên duy nhất được đọc/ghi các collection này. Firestore Security Rules phải **không cấp quyền trực tiếp** cho client, kể cả collection sự kiện công khai; client đọc qua API lọc trường. Kiểm tra dự án không có quy tắc rộng như `allow read, write: if true` hoặc cấp mọi collection cho mọi tài khoản đăng nhập. Thêm rule `false` riêng không ghi đè một rule rộng đang cho phép.
+## Dữ liệu và API
 
-Token tra cứu là chuỗi ngẫu nhiên 256 bit, server chỉ lưu SHA-256. Trình duyệt giữ token của lượt hiện tại trong localStorage (và sessionStorage để tương thích các tab cũ), nhờ đó trạng thái được phục hồi sau tải lại hoặc khi mở tab mới trên cùng trình duyệt. Feed công khai chỉ có ID sự kiện, tên hiển thị, số tiền, thời gian và lời chúc; không có payload ngân hàng hoặc token.
+Các collection riêng của tính năng này:
 
-Client poll mỗi 3 giây; người mới mở trang nhận mốc hiện tại, mất mạng thì tiếp tục từ mốc cuối. Sự kiện có số thứ tự tăng trong cùng transaction với ghi nhận tiền nên không mất lượt khi các webhook đến đồng thời. Mỗi hiệu ứng chạy 7 giây, không phát lại khi poll trùng.
+- `game_wallets`, `game_wallet_tokens`
+- `game_sessions`
+- `game_redemptions`, `game_meta`
+- `donation_requests`, `donation_tokens`, `donation_idempotency`, `donation_sepay_events`
 
-Giới hạn tạo QR: 10 lượt/IP/10 phút trên mỗi tiến trình. Bản hiện tại phù hợp một instance Node sau một reverse proxy đáng tin cậy (app đang dùng `trust proxy = 1`). Khi chạy nhiều instance, cần giới hạn chung tại reverse proxy/API gateway; tránh để client kết nối trực tiếp và giả mạo `X-Forwarded-For`. Các transaction Firestore vẫn chống ghi trùng giữa nhiều instance.
+Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
-### Kiểm thử
+Các API chính:
+
+- `POST /api/game/wallets`, `GET /api/game/wallet`
+- `GET /api/game/current`
+- `POST /api/game/sessions`, `POST /api/game/sessions/:id/action`
+- `POST /api/game/redemptions`, `GET /api/game/redemption`
+- `POST /api/donations`, `GET /api/donations/status`
+- `POST /api/webhooks/sepay`
+
+Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
+
+## Kiểm thử
 
 ```powershell
 npm test
 node tests/preview.js
 ```
 
-`npm test` kiểm tra service và API HTTP, dùng Firestore test double có kiểm tra xung đột và rollback; không gọi Firestore thật. Preview ở `http://127.0.0.1:3101/xin-tien` chỉ dùng dữ liệu trong RAM, tài khoản giả `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Không triển khai preview lên hosting. Ví dụ gửi webhook giả vào preview sau khi tạo QR:
+`npm test` dùng Firestore test double và kiểm tra 15 tổ hợp trò chơi–độ khó ở cả kết quả thắng và thua, chống webhook trùng/đồng thời, tiền lẻ, quyền ví, kết quả giả từ client, đổi quà, hoàn xu và rollback lỗi lưu dữ liệu.
+
+Preview ở `http://127.0.0.1:3101/xin-tien` dùng RAM, tài khoản giả `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Sau khi tạo QR trên preview, có thể gửi webhook giả:
 
 ```powershell
 $testPayload = @{
   id = 10001
   accountNumber = '0000000000'
-  code = '<ma-DH-vua-tao-tren-preview>'
-  content = '<ma-DH-vua-tao-tren-preview>'
+  code = '<ma-DH-tren-preview>'
+  content = '<ma-DH-tren-preview>'
   transferType = 'in'
-  transferAmount = 20000
+  transferAmount = 100000
 } | ConvertTo-Json
-Invoke-RestMethod -Method Post -Uri 'http://127.0.0.1:3101/api/webhooks/sepay' -Headers @{ Authorization = 'Apikey local-preview-only' } -ContentType 'application/json' -Body $testPayload
+
+Invoke-RestMethod -Method Post `
+  -Uri 'http://127.0.0.1:3101/api/webhooks/sepay' `
+  -Headers @{ Authorization = 'Apikey local-preview-only' } `
+  -ContentType 'application/json' `
+  -Body $testPayload
 ```
 
-Mở hai cửa sổ trước khi gửi webhook: cả hai phải hiện lời cảm ơn, còn cửa sổ tạo QR đổi sang đã nhận tiền. Gửi lại cùng ID phải không phát lại; gửi ID mới phải tạo lượt mới. Có thể mô phỏng đứt kết nối bằng POST `/__test/offline` với JSON `{"offline":true}`, gửi webhook trong lúc đứt, rồi POST `{"offline":false}` để kiểm tra bắt kịp sự kiện. Route thử nghiệm này chỉ có trong preview.
-
-Trước khi dùng thật, triển khai **môi trường thử riêng với dự án Firestore và khóa webhook riêng**, bật SePay Test Mode, đặt tài khoản thử vào biến môi trường và cho SePay gửi giao dịch giả tới HTTPS đó. Không trộn Test Mode với database nhận tiền thật vì cùng webhook payload không cung cấp cơ chế phân biệt test/live cho ứng dụng. Xác minh commit Firestore, webhook retry, hai người xem và giọng đọc trên thiết bị đích. Sau đó cấu hình môi trường thật theo tài khoản đã chốt; các bài test cục bộ không thay thế bước xác minh SePay/Firestore này.
+Trước khi dùng tiền thật, nên xác minh toàn bộ luồng trên một dự án Firestore thử và SePay Test Mode riêng: tạo ví → tạo QR → nhận webhook → chơi → đổi quà → duyệt/từ chối ở trang quản trị.

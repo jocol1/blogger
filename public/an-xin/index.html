@@ -3,93 +3,54 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#f7f4ed">
-  <meta name="description" content="Xin tiền vui vẻ bằng QR và nhận lời cảm ơn ngay khi tiền về.">
-  <title>Xin tiền vui vẻ · locly.lol</title>
+  <meta name="theme-color" content="#17142b">
+  <meta name="description" content="Nạp xu, chơi mini game và tích đủ 100 xu để đổi một ly trà sữa.">
+  <title>Tiệm game trà sữa · locly.lol</title>
   <link rel="stylesheet" href="/assets/an-xin/style.css">
   <script src="/assets/an-xin/app.js" defer></script>
 </head>
 <body>
-  <header class="site-header">
-    <a class="brand" href="/xin-tien">locly<span>.lol</span></a>
-    <nav aria-label="Điều hướng"><a href="/xin-tien" aria-current="page">Góc xin tiền vui vẻ</a><span class="nav-divider"></span><span class="nav-motto">xin một chút, vui một ngày</span></nav>
-    <button id="sound" class="sound-button" type="button" aria-pressed="false"><span aria-hidden="true">♪</span> <span id="sound-label">Bật giọng đọc</span></button>
-  </header>
+  <header class="topbar"><a class="brand" href="/xin-tien">locly<span>.game</span></a><div class="wallet-pill"><span>SỐ DƯ</span><strong><b id="wallet-balance">0</b> xu</strong></div></header>
   <main>
-    <div class="intro"><span class="eyebrow"><span class="tiny-star">✳</span> VÍ HƠI MỎNG, LỜI NÓI THÌ THẬT</span><h1>Xin tiền cho <em>vui.</em></h1><p>Tạo QR gọn gàng, ai thương thì gửi một khoản nhỏ.</p></div>
-    <div class="donation-layout">
-      <section class="scene-card" aria-label="Nhân vật xin tiền hoạt hình">
-        <div class="scene-top"><span class="scene-label">GÓC NHẬN TIỀN ONLINE</span><span id="connection" class="connection"><i></i> Đang kết nối</span></div>
-        <div id="speech" class="speech" role="status" aria-live="polite"><span id="speech-kicker" class="speech-kicker">HỘP NHẬN TIỀN ĐANG TRỐNG</span><p id="speech-text">Ai có dư…<br>gửi mình một chút nhé!</p><span class="speech-heart" aria-hidden="true">♡</span></div>
-        <div id="scene" class="scene">
-          <svg class="character-art" viewBox="0 0 640 440" role="img" aria-labelledby="character-title">
-            <title id="character-title">Nhân vật hoạt hình vui nhộn ngồi cạnh hộp nhận tiền</title>
-            <defs><pattern id="mat-lines" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 6h12M6 0v12" stroke="#cebfa0" stroke-width="1"/></pattern></defs>
-            <g class="scenery" fill="none" stroke="#c8c3b6" stroke-width="2"><path d="M50 264h64m-44 10h30m444-45h47m-70 15h59M97 334h45m368 6h73"/><path d="M99 204v-15m-7 7h15m431-46v-15m-7 7h15"/><path d="M482 99c10-16 22-8 16 0-5 7-16 12-16 12s-15-10-13-18c2-9 13-7 13 6Z" stroke="#d68a68"/></g>
-            <ellipse cx="324" cy="371" rx="220" ry="23" fill="#e5dfd1"/>
-            <path d="m165 326 306 2 57 47H109Z" fill="#e6d6b7" stroke="#b9a785" stroke-width="2"/>
-            <path d="m165 326 306 2 57 47H109Z" fill="url(#mat-lines)"/>
-            <g stroke="#403c34" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M306 300c-42-16-99 3-104 26s63 39 115 16c33 29 112 12 104-13-6-20-58-43-88-29" fill="#748373"/>
-              <path d="M293 331c-20 12-29 13-41 9m89-8c16 9 29 11 42 7" fill="none"/>
-              <path d="M259 337c-19-5-45-1-47 8-2 12 39 14 67 5m82-11c19-4 44-2 45 9 1 11-36 10-54 1" fill="#e9b98a"/>
-              <g id="upper-body">
-                <path d="M278 207c-29 13-43 62-30 100 21 14 104 16 125-1 10-34-3-82-34-99" fill="#df986b"/>
-                <path d="m282 271 16 3-4 21-16-3Zm49-7 17-3 4 19-17 4Z" fill="#f2d17d" stroke="#875e45" stroke-width="2"/>
-                <path d="m314 219-5 24-20-25m23 26 15-26m-17 29v63" fill="none" stroke="#a86246"/>
-                <path d="m263 261 23 3-4 23-24-3Z" fill="#eedab8" stroke="#a86246" stroke-width="2"/>
-                <path d="m265 264 12 17m-14-3 17-12" stroke="#a86246" stroke-width="1.5"/>
-                <g class="left-arm"><path d="M270 224c-15-4-25 18-29 34-6 23-13 43 0 49 14 7 25-16 32-31" fill="#df986b"/><path d="M250 280c13-4 25 2 33 10 10 9 5 19-6 17l-27-6" fill="#e9b98a"/></g>
-                <g class="right-arm"><path d="M352 224c16-4 24 19 29 35 7 21 13 40 0 47-14 7-26-13-33-27" fill="#df986b"/><path d="M373 281c-13-5-24 3-32 11-9 10-3 17 7 16l27-7" fill="#e9b98a"/></g>
-                <path d="M291 196v17c11 13 29 14 40 0v-21" fill="#e9b98a"/>
-                <g class="head"><path d="M264 153c-16-8-19 15-7 22l12 3m90-24c16-7 18 17 4 22l-9 1" fill="#e9b98a"/>
-                  <path d="M264 137c1-31 88-36 94 1l-1 41c-5 24-21 38-45 38-25 0-44-17-48-40Z" fill="#edc39a"/>
-                  <path class="cashier-cap" d="M274 118q36-27 75 0l-13 12q-25-10-49 0Z" fill="#718773" stroke="#425541" stroke-width="3"/>
-                  <path d="M265 155c-5-26-1-40 12-49 20-17 39-11 49-20-1 14 7 16 18 20 16 6 19 28 12 48l-8-26c-28 13-48 2-60 12l-13-5Z" fill="#46433c"/>
-                  <path d="M282 158c4-5 9-5 13-1m35 0c5-5 10-4 13 1" fill="none"/>
-                  <path class="eyes" d="M287 169v4m48-4v4" stroke-width="5"/>
-                  <path d="m309 168-3 13h8" fill="none" stroke="#bd8c68" stroke-width="2"/>
-                  <path d="M298 188q14 16 29-1" fill="#fff7e9"/><path d="m311 190 2 8" stroke="#80614d" stroke-width="2"/>
-                  <ellipse cx="281" cy="182" rx="8" ry="4" fill="#db9576" stroke="none"/><ellipse cx="342" cy="182" rx="8" ry="4" fill="#db9576" stroke="none"/>
-                  <path d="m303 209 3-4m6 6v-5m6 3-1-4" stroke-width="2"/>
-                </g>
-              </g>
-              <g transform="rotate(-8 173 300)"><path d="M111 265h111v66H111Z" fill="#f5e7ca" stroke="#b4a080" stroke-width="2"/><path d="M115 262v8m103-8v8" stroke="#9d8663" stroke-width="2"/><text x="166" y="287" text-anchor="middle" fill="#6a5741" stroke="none" font-size="13" font-family="Arial,sans-serif" font-weight="700">AI THƯƠNG THÌ GỬI</text><text x="166" y="309" text-anchor="middle" fill="#a07450" stroke="none" font-size="11" font-family="Arial,sans-serif">mình cảm ơn nhiều ♡</text></g>
-              <g id="coin-bowl" class="bowl"><ellipse cx="433" cy="329" rx="46" ry="12" fill="#b88355"/><path d="M388 330q5 44 45 44t45-44q-45 17-90 0Z" fill="#c99868"/><path d="M402 346q9 15 22 17" fill="none" stroke="#e4bf96"/><text x="433" y="354" text-anchor="middle" fill="#714c34" stroke="none" font-size="9" font-family="Arial,sans-serif" font-weight="700">CẢM ƠN</text></g>
-              <g class="falling-coin" stroke="#af7c28" stroke-width="2"><circle cx="432" cy="252" r="12" fill="#efc661"/><path d="M432 245v14m-4-10h6m-6 6h6"/></g>
-            </g>
-            <g class="celebration-spark" fill="#c65d3a"><path d="m209 165 4 10 10 4-10 4-4 10-4-10-10-4 10-4Z"/><path d="m429 137 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z"/><circle cx="455" cy="198" r="4"/></g>
-          </svg>
-          <div id="coin-flight-layer" class="coin-flight-layer" aria-hidden="true"></div>
-        </div>
-        <div class="scene-footer"><span class="handwritten">Xin một chút, cảm ơn thật nhiều.</span><span aria-hidden="true">✓ ♡</span></div>
-      </section>
-      <section class="giving-card" aria-labelledby="giving-title">
-        <div class="card-heading"><span class="eyebrow">GỬI MÌNH MỘT KHOẢN</span><span class="small-bowl" aria-hidden="true">♡</span></div>
-        <h2 id="giving-title">Cho mình xin một chút nhé.</h2><p class="card-description">Tạo QR gọn gàng; ai thương thì quét, ai không thì vẫn quý.</p>
-        <p id="availability" class="notice" role="status">Đang kiểm tra kết nối nhận tiền…</p>
-        <form id="donation-form">
-          <fieldset id="donation-fields" disabled>
-            <label for="donor-name">Tên người gửi tiền <span>· không bắt buộc</span></label><input id="donor-name" name="name" maxlength="60" placeholder="Người gửi tiền ẩn danh" autocomplete="nickname">
-            <label>Một chút tiền là…</label><div class="amount-choices" role="group" aria-label="Chọn số tiền"><button type="button" data-amount="10000" aria-pressed="false">10k<span>cốc trà đá</span></button><button type="button" data-amount="20000" class="selected" aria-pressed="true">20k<span>bữa sáng</span></button><button type="button" data-amount="50000" aria-pressed="false">50k<span>một kèo vui</span></button><button type="button" data-amount="100000" aria-pressed="false">100k<span>ấm cả ngày</span></button></div>
-            <label for="amount" class="amount-label">Hoặc nhập số tiền bạn muốn gửi</label><div class="amount-input"><input id="amount" name="amount" type="number" inputmode="numeric" min="1" max="9999999999" step="1" value="20000" required><span>VNĐ</span></div>
-            <button id="create-qr" class="primary-button" type="submit">Tạo QR gửi tiền <span aria-hidden="true">↗</span></button>
-          </fieldset>
-          <p class="privacy-note">Tên và số tiền sẽ hiện cùng lời cảm ơn. Để trống tên nếu bạn muốn gửi ẩn danh.</p>
-        </form>
-        <p id="form-error" class="error" role="alert" hidden></p>
-        <section id="payment" class="payment" aria-label="Thông tin chuyển khoản" hidden>
-          <div class="payment-heading"><strong id="payment-heading-text">Quét QR này, gửi mình một chút vui.</strong><span class="payment-actions"><button id="share-payment" class="text-button" type="button">Chia sẻ</button><button id="new-donation" class="text-button" type="button">Đổi thông tin</button></span></div>
-          <div class="qr-wrap"><img id="qr-image" alt="QR chuyển khoản gửi tiền" width="260" height="320" referrerpolicy="no-referrer"><p id="qr-error" hidden>Chưa tải được ảnh QR. Bạn vẫn có thể gửi tiền bằng thông tin bên dưới.</p></div>
-          <dl class="bank-details"><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Chủ tài khoản</dt><dd id="account-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span><button class="copy-button" data-copy="account-number" type="button" aria-label="Sao chép số tài khoản">Chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div class="payment-code"><dt>Nội dung CK</dt><dd><span id="payment-code"></span><button class="copy-button" data-copy="payment-code" type="button" aria-label="Sao chép nội dung chuyển khoản">Chép</button></dd></div></dl>
-          <p class="transfer-note">Giữ nguyên mã DH trong nội dung chuyển khoản để hệ thống nhận đúng khoản nhé.</p><p id="payment-status" class="payment-status" role="status">QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.</p><p id="copy-status" class="copy-status" role="status"></p>
-          <div id="paid-success" class="paid-success" hidden><span class="paid-kicker">ĐÃ NHẬN ĐƯỢC TIỀN</span><div class="gratitude-seal" aria-hidden="true">♡</div><h3 id="paid-title">Đã nhận tiền rồi, cảm ơn bạn!</h3><section id="coin-game" class="coin-game" aria-label="Các trò chơi bằng xu" hidden><span class="coin-rule">1.000Đ THỰC NHẬN = 1 XU · MỖI LƯỢT TỐN 1 XU</span><strong><span id="coin-balance">0</span> xu để chơi</strong><span class="game-score">Trúng <span id="game-score">0</span> lượt</span><div class="game-tabs" role="group" aria-label="Chọn trò chơi"><button class="game-tab active" type="button" data-game="bowl" aria-pressed="true">Bắn vào bát</button><button class="game-tab" type="button" data-game="needle" aria-pressed="false">Dừng kim</button><button class="game-tab" type="button" data-game="heart" aria-pressed="false">Bắt tim</button></div><div id="game-bowl" class="game-panel"><p>Canh bát chạy tới làn rơi rồi bắn xu.</p><button id="throw-coin" class="game-action" type="button">Bắn 1 xu <span aria-hidden="true">↗</span></button></div><div id="game-needle" class="game-panel" hidden><p>Cho kim dừng trong vùng màu cam.</p><div class="needle-track" aria-hidden="true"><span class="needle-target"></span><span id="needle-marker" class="needle-marker"></span></div><button id="stop-needle" class="game-action" type="button">Dừng kim · 1 xu</button></div><div id="game-heart" class="game-panel" hidden><p>Chạm đúng ô đang có tim trước khi nó chạy đi.</p><div class="heart-grid" role="group" aria-label="Chọn ô có tim"><button type="button" data-heart="0" aria-label="Ô trái">♡</button><button type="button" data-heart="1" aria-label="Ô giữa">♡</button><button type="button" data-heart="2" aria-label="Ô phải">♡</button></div></div><p id="coin-feedback" role="status" aria-live="polite">Chọn trò bạn thích rồi chơi nhé.</p><small>Xu của mã QR này chỉ để vui, không đổi ra tiền hay quà.</small></section><p id="paid-message"></p><span class="paid-signature">— người trực hộp tiền rất vui</span></div>
-        </section>
-        <div class="payment-footnote"><span aria-hidden="true">↔</span> Chuyển khoản ngân hàng · Tự động cập nhật</div>
-      </section>
-    </div>
-    <section class="kindness-note"><span class="note-symbol" aria-hidden="true">✳</span><div><h3>Một lời cảm ơn gửi lại bạn.</h3><p>Mỗi khoản về sẽ được xác nhận tự động và kèm một lời chúc vui vẻ.</p></div><span class="note-tag">DỄ THƯƠNG · VUI VẺ</span></section>
+    <section class="hero"><div><span class="kicker">TIỆM GAME TRÀ SỮA</span><h1>Nạp xu.<br>Chơi khó. <em>Ăn lớn.</em></h1><p>1.000đ = 1 xu · Mỗi ván tốn 1 xu · Đủ 100 xu đổi một ly trà sữa.</p></div><div class="cup" aria-hidden="true"><span>● ● ●</span><b>🧋</b></div></section>
+
+    <p id="availability" class="notice" role="status">Đang kết nối ví…</p>
+    <section class="dashboard">
+      <article class="panel wallet-panel">
+        <div class="panel-title"><span>01</span><h2>Ví xu</h2></div>
+        <div class="balance"><strong id="balance-large">0</strong><span>xu</span></div>
+        <div class="progress"><i id="reward-progress"></i></div><p id="reward-progress-text">Còn 100 xu nữa để đổi trà sữa.</p>
+        <div class="wallet-actions"><button id="backup-wallet" type="button">Sao lưu mã ví</button><button id="show-import" type="button">Nhập mã ví</button></div>
+        <form id="import-form" class="inline-form" hidden><input id="import-token" minlength="64" maxlength="64" placeholder="Dán mã ví 64 ký tự" required><button>Khôi phục</button></form>
+        <p class="fine-print">Mã ví là chìa khóa duy nhất. Nếu xóa dữ liệu trình duyệt mà chưa sao lưu, bạn sẽ mất quyền truy cập ví.</p>
+      </article>
+
+      <article class="panel topup-panel">
+        <div class="panel-title"><span>02</span><h2>Nạp xu</h2></div>
+        <form id="topup-form"><label>Tên hiển thị <small>không bắt buộc</small></label><input id="player-name" maxlength="60" placeholder="Người chơi ẩn danh"><label>Số tiền muốn nạp</label><div class="quick-money"><button type="button" data-amount="10000">10k</button><button type="button" data-amount="20000" class="active">20k</button><button type="button" data-amount="50000">50k</button><button type="button" data-amount="100000">100k</button></div><div class="money-input"><input id="topup-amount" type="number" min="1000" max="9999999999" step="1000" value="20000" required><span>VNĐ</span></div><button class="primary" id="create-qr" type="submit">Tạo QR nạp xu ↗</button></form>
+        <section id="payment" hidden><div id="qr-box" class="qr"><img id="qr-image" alt="QR nạp xu" width="240" height="300"><p id="qr-error" hidden>Không tải được QR. Dùng thông tin bên dưới.</p></div><dl><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span><button data-copy="account-number" type="button">Chép</button></dd></div><div><dt>Chủ tài khoản</dt><dd id="account-name"></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div><dt>Nội dung CK</dt><dd><span id="payment-code"></span><button data-copy="payment-code" type="button">Chép</button></dd></div></dl><p id="payment-status" class="status">Đang chờ tiền về…</p><button id="new-topup" type="button">Tạo QR khác</button></section>
+        <p id="topup-error" class="error" hidden></p>
+      </article>
+    </section>
+
+    <section class="games-section">
+      <div class="section-head"><div><span class="kicker">05 MINI GAME</span><h2>Chọn trò để kiếm thêm xu</h2></div><div class="legend"><span>Thường <b>+2</b></span><span>Khó <b>+3</b></span><span>Siêu khó <b>+5</b></span></div></div>
+      <div class="difficulty" role="group" aria-label="Độ khó"><button type="button" data-difficulty="easy" class="active">Thường · ăn 2</button><button type="button" data-difficulty="medium">Khó · ăn 3</button><button type="button" data-difficulty="hard">Siêu khó · ăn 5</button></div>
+      <div class="game-grid">
+        <button class="game-card active" type="button" data-game="bowl"><span>01</span><b>🥣</b><strong>Bắn vào bát</strong><small>Canh bát đang chạy</small></button>
+        <button class="game-card" type="button" data-game="needle"><span>02</span><b>🎯</b><strong>Dừng kim</strong><small>Dừng đúng vùng thắng</small></button>
+        <button class="game-card" type="button" data-game="heart"><span>03</span><b>♥</b><strong>Bắt tim</strong><small>Chạm trước khi tim chạy</small></button>
+        <button class="game-card" type="button" data-game="memory"><span>04</span><b>🧠</b><strong>Nhớ chuỗi</strong><small>Nhớ đúng biểu tượng</small></button>
+        <button class="game-card" type="button" data-game="order"><span>05</span><b>⚡</b><strong>Chạm thứ tự</strong><small>Nhanh tay theo số</small></button>
+      </div>
+      <article class="arena"><div class="arena-head"><div><span id="arena-game">BẮN XU VÀO BÁT</span><strong id="arena-level">Thường · Thắng nhận 2 xu</strong></div><time id="game-timer">—</time></div><div id="game-stage" class="game-stage"><p>Chọn trò và độ khó, sau đó bắt đầu. Mỗi ván tốn 1 xu.</p></div><button id="start-game" class="play-button" type="button">Bắt đầu · 1 xu</button><p id="game-result" class="game-result" role="status"></p></article>
+    </section>
+
+    <section class="bottom-grid">
+      <article class="panel reward-panel"><div class="panel-title"><span>03</span><h2>Đổi trà sữa</h2></div><div class="reward-price"><b>🧋</b><strong>100 xu</strong></div><form id="redeem-form"><label>Tên người nhận</label><input id="redeem-name" maxlength="80" required><label>Số điện thoại hoặc Zalo</label><input id="redeem-contact" maxlength="120" required><button id="redeem-button" class="primary" type="submit" disabled>Đổi 1 ly trà sữa</button></form><p id="redemption-status" class="status">Chưa đủ xu để đổi quà.</p></article>
+      <article class="panel history-panel"><div class="panel-title"><span>04</span><h2>Lịch sử xu</h2></div><div id="history"><p class="muted">Chưa có giao dịch.</p></div></article>
+    </section>
   </main>
-  <footer><a class="brand" href="/xin-tien">locly<span>.lol</span></a><p>Một góc nhỏ trên internet. Một lời xin tiền tử tế.</p><a href="/xin-tien">Tạo QR khác ↗</a></footer>
+  <footer><span>locly.game</span><a href="/xin-tien/admin">Quản trị đổi quà</a></footer>
 </body>
 </html>

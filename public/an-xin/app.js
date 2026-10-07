@@ -1,421 +1,261 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
-  const money = amount => `${amount.toLocaleString('vi-VN')}đ`;
-  const choices = [...document.querySelectorAll('[data-amount]')];
+  const walletKey = 'locly-game-wallet';
+  const paymentKey = 'locly-game-payment';
+  const topupAttemptKey = 'locly-game-topup-attempt';
+  const money = value => `${Number(value).toLocaleString('vi-VN')}đ`;
+  const requestId = () => crypto.randomUUID?.() || `${Date.now().toString(16)}-${crypto.getRandomValues(new Uint32Array(4)).join('-')}`;
+  const gameNames = { bowl: 'BẮN XU VÀO BÁT', needle: 'DỪNG KIM', heart: 'BẮT TIM', memory: 'NHỚ CHUỖI', order: 'CHẠM ĐÚNG THỨ TỰ' };
+  const difficultyNames = { easy: 'Thường', medium: 'Khó', hard: 'Siêu khó' };
+  const payouts = { easy: 2, medium: 3, hard: 5 };
+  const symbols = ['●', '▲', '■', '★'];
+  let walletToken = localStorage.getItem(walletKey);
+  let wallet = null;
+  let config = null;
   let payment = null;
-  let cursor;
-  let playing = false;
-  let sound = false;
-  let active = false;
-  let personalThanks = '';
-  let thankedToken = null;
-  let bowlMotionStarted = false;
   let selectedGame = 'bowl';
-  let clockTime = 0;
-  let shownHeart = -1;
-  let needleFrozenUntil = 0;
-  let needleFrozenPosition = 50;
-  const reducedMotion = Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
-  const queue = [];
-  // Sequence cursors already prevent replay; IDs also protect the animation queue.
-  const seen = new Set();
-  const defaultSpeech = 'Ai có dư… gửi mình một chút nhé!';
-  const paymentStorageKey = 'donation-payment';
+  let difficulty = 'easy';
+  let activeGame = null;
+  let clockOffset = 0;
+  let actionPending = false;
+  let frame = 0;
+  let memoryAnswers = [];
+  let orderAnswers = [];
 
-  function savePayment(value) {
-    const serialized = JSON.stringify(value);
-    try { localStorage.setItem(paymentStorageKey, serialized); } catch { /* Private browsing may disable storage. */ }
-    try { sessionStorage.setItem(paymentStorageKey, serialized); } catch { /* Keep compatibility with existing tabs. */ }
-  }
-  function loadPayment() {
-    for (const storage of [localStorage, sessionStorage]) {
-      try {
-        const serialized = storage.getItem(paymentStorageKey);
-        if (serialized) return JSON.parse(serialized);
-      } catch { /* Try the other browser storage. */ }
-    }
-    return null;
-  }
-  function forgetPayment() {
-    for (const storage of [localStorage, sessionStorage]) {
-      try { storage.removeItem(paymentStorageKey); } catch { /* Optional storage. */ }
-    }
-  }
-
-  async function api(url, options = {}) {
-    const response = await fetch(url, { ...options, cache: 'no-store', signal: AbortSignal.timeout(12000) });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error || 'Kết nối đang gián đoạn. Vui lòng thử lại.');
+  async function api(url, options = {}, withWallet = true) {
+    const headers = { ...(options.headers || {}) };
+    if (withWallet && walletToken) headers['X-Wallet-Token'] = walletToken;
+    const response = await fetch(url, { ...options, headers, cache: 'no-store', signal: AbortSignal.timeout(12000) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || 'Kết nối đang gián đoạn.');
     return body;
   }
-  function connection(text, live = false) {
-    const element = $('connection');
-    element.replaceChildren(document.createElement('i'), document.createTextNode(text));
-    element.classList.toggle('live', live);
-  }
-  function speak(message) {
-    if (!sound || !('speechSynthesis' in window)) return;
-    const voice = window.speechSynthesis.getVoices().find(item => /^vi(?:-|_)/i.test(item.lang) || item.lang === 'vi');
-    if (!voice) return;
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = 'vi-VN';
-    utterance.voice = voice;
-    utterance.rate = 1.05;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }
-  function playNext() {
-    if (playing || !queue.length) return;
-    playing = true;
-    const event = queue.shift();
-    $('speech').classList.add('thanking');
-    $('speech-kicker').textContent = 'MỘT KHOẢN VỪA VỀ RỒI';
-    $('speech-text').textContent = event.message;
-    $('scene').classList.add('celebrating');
-    speak(event.message);
-    setTimeout(() => {
-      $('scene').classList.remove('celebrating');
-      $('speech').classList.toggle('thanking', Boolean(personalThanks));
-      $('speech-kicker').textContent = personalThanks ? 'TIỀN ĐÃ VỀ, VUI QUÁ TRỜI' : 'HỘP NHẬN TIỀN ĐANG TRỐNG';
-      $('speech-text').textContent = personalThanks || defaultSpeech;
-      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-      playing = false;
-      // Give CSS animations a new frame before the next donation.
-      setTimeout(playNext, 80);
-    }, 7000);
-  }
-  function coinTotal(status) {
-    return Math.floor(Math.max(0, Number(status.paidAmount) || 0) / 1000);
-  }
-  function bowlOffsetAt(time) {
-    if (reducedMotion) return -118;
-    return Math.sin(time / 520) * 118;
-  }
-  function needlePositionAt(time) {
-    return reducedMotion ? 50 : 50 + Math.sin(time / 430) * 45;
-  }
-  function heartPositionAt(time) {
-    return reducedMotion ? 1 : Math.floor(time / 850) % 3;
-  }
-  function renderGameMotion(time) {
-    clockTime = time;
-    $('coin-bowl').setAttribute('transform', `translate(${bowlOffsetAt(time)} 0)`);
-    $('needle-marker').style.left = `${time < needleFrozenUntil ? needleFrozenPosition : needlePositionAt(time)}%`;
-    const heart = heartPositionAt(time);
-    if (heart !== shownHeart) {
-      shownHeart = heart;
-      document.querySelectorAll('[data-heart]').forEach(button => {
-        const isHeart = Number(button.dataset.heart) === heart;
-        button.textContent = isHeart ? '♥' : '♡';
-        button.classList.toggle('has-heart', isHeart);
-      });
-    }
-  }
-  function startBowlMotion() {
-    if (bowlMotionStarted || typeof requestAnimationFrame !== 'function') return;
-    bowlMotionStarted = true;
-    const move = time => {
-      renderGameMotion(time);
-      requestAnimationFrame(move);
-    };
-    requestAnimationFrame(move);
-  }
-  function selectGame(mode) {
-    selectedGame = mode;
-    document.querySelectorAll('[data-game]').forEach(button => {
-      const active = button.dataset.game === mode;
-      button.classList.toggle('active', active);
-      button.setAttribute('aria-pressed', String(active));
-    });
-    for (const game of ['bowl', 'needle', 'heart']) $(`game-${game}`).hidden = game !== mode;
-    $('coin-feedback').textContent = mode === 'bowl' ? 'Canh bát chạy qua làn rơi rồi bắn nhé.'
-      : mode === 'needle' ? 'Dừng kim trong vùng cam nhé.' : 'Chạm ô có tim trước khi nó chạy đi nhé.';
-  }
-  function spendCoin() {
-    if (!payment || !Number.isSafeInteger(payment.coinTotal) || !Number.isSafeInteger(payment.coinsThrown) || payment.coinsThrown >= payment.coinTotal) return false;
-    payment.coinsThrown++;
-    const available = payment.coinTotal - payment.coinsThrown;
-    $('coin-balance').textContent = String(available);
-    for (const id of ['throw-coin', 'stop-needle']) $(id).disabled = available < 1;
-    if ((typeof performance !== 'undefined' ? performance.now() : clockTime) < needleFrozenUntil) $('stop-needle').disabled = true;
-    document.querySelectorAll('[data-heart]').forEach(button => { button.disabled = available < 1; });
-    savePayment(payment);
-    return true;
-  }
-  function recordHit(game) {
-    if (!payment) return;
-    payment.gameHits ||= {};
-    payment.gameHits[game] = Math.max(0, Number(payment.gameHits[game]) || 0) + 1;
-    $('game-score').textContent = String(Object.values(payment.gameHits).reduce((sum, value) => sum + (Number.isSafeInteger(value) && value > 0 ? value : 0), 0));
-    savePayment(payment);
-  }
-  function updateCoinGame(status, current) {
-    const total = coinTotal(status);
-    const thrown = Math.min(total, Math.max(0, Number.isSafeInteger(current.coinsThrown) ? current.coinsThrown : 0));
-    const available = total - thrown;
-    current.coinsThrown = thrown;
-    const changed = $('coin-game').hidden || current.displayedCoinTotal !== total;
-    $('coin-game').hidden = false;
-    $('coin-balance').textContent = String(available);
-    $('game-score').textContent = String(Object.values(current.gameHits || {}).reduce((sum, value) => sum + (Number.isSafeInteger(value) && value > 0 ? value : 0), 0));
-    for (const id of ['throw-coin', 'stop-needle']) $(id).disabled = available < 1;
-    if ((typeof performance !== 'undefined' ? performance.now() : clockTime) < needleFrozenUntil) $('stop-needle').disabled = true;
-    document.querySelectorAll('[data-heart]').forEach(button => { button.disabled = available < 1; });
-    if (changed) $('coin-feedback').textContent = available > 0
-      ? `Bạn có ${available} xu. Chọn một trò rồi chơi nhé.`
-      : total ? 'Bạn đã dùng hết xu. Có thêm tiền về thì lại chơi tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
-    current.displayedCoinTotal = total;
-    savePayment(current);
-  }
-  function tossCoin() {
-    if (selectedGame !== 'bowl' || !spendCoin()) return;
-    const current = payment;
-    const available = payment.coinTotal - payment.coinsThrown;
-    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
-    const willHit = Math.abs(433 + bowlOffsetAt(now + 625) - 307) < 47;
-    $('coin-feedback').textContent = `Xu đang bay… còn ${available} xu.`;
-    const coin = document.createElement('span');
-    coin.className = 'thrown-coin shot-coin';
-    coin.textContent = '₫';
-    coin.style.setProperty('--shot-distance', `${Math.max(170, $('coin-flight-layer').clientHeight * .5 || 220)}px`);
-    $('coin-flight-layer').append(coin);
-    setTimeout(() => {
-      if (payment !== current) return;
-      if (willHit) recordHit('bowl');
-      if (selectedGame === 'bowl') $('coin-feedback').textContent = willHit
-        ? `VÀO BÁT! Còn ${current.coinTotal - current.coinsThrown} xu.`
-        : `Trượt mất rồi! Còn ${current.coinTotal - current.coinsThrown} xu.`;
-    }, 625);
-    setTimeout(() => coin.remove(), 900);
-  }
-  function stopNeedle() {
-    if (selectedGame !== 'needle' || $('stop-needle').disabled || !spendCoin()) return;
-    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
-    needleFrozenPosition = needlePositionAt(now);
-    needleFrozenUntil = now + 700;
-    $('needle-marker').style.left = `${needleFrozenPosition}%`;
-    $('stop-needle').disabled = true;
-    const hit = Math.abs(needleFrozenPosition - 50) <= 12;
-    if (hit) recordHit('needle');
-    $('coin-feedback').textContent = `${hit ? 'Trúng vùng cam!' : 'Lệch kim rồi!'} Còn ${payment.coinTotal - payment.coinsThrown} xu.`;
-    const current = payment;
-    setTimeout(() => {
-      if (payment === current) $('stop-needle').disabled = current.coinsThrown >= current.coinTotal;
-    }, 700);
-  }
-  function catchHeart(position) {
-    if (selectedGame !== 'heart' || !spendCoin()) return;
-    const now = typeof performance !== 'undefined' ? performance.now() : clockTime;
-    const hit = position === heartPositionAt(now);
-    if (hit) recordHit('heart');
-    $('coin-feedback').textContent = `${hit ? 'Bắt được tim!' : 'Tim chạy mất rồi!'} Còn ${payment.coinTotal - payment.coinsThrown} xu.`;
-  }
-  function showPaidState(status, current) {
-    const donor = current.name || 'bạn';
-    const total = `${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}`;
-    personalThanks = status.message || `Tiền của ${donor} đã được ghi nhận. Cảm ơn bạn đã gửi một khoản rất dễ thương nhé!`;
-    $('payment').classList.add('paid');
-    $('paid-success').hidden = false;
-    $('payment-heading-text').textContent = 'Đã nhận tiền rồi, cảm ơn bạn!';
-    $('new-donation').textContent = 'Tạo QR khác';
-    $('paid-title').textContent = `Đã nhận ${total}. Hộp tiền vui hẳn lên.`;
-    $('paid-message').textContent = personalThanks;
-    $('scene').classList.add('grateful');
-    $('speech').classList.add('thanking');
-    $('speech-kicker').textContent = 'TIỀN ĐÃ VỀ, VUI QUÁ TRỜI';
-    $('speech-text').textContent = personalThanks;
-    current.coinTotal = coinTotal(status);
-    updateCoinGame(status, current);
-    if (thankedToken !== current.token) {
-      thankedToken = current.token;
-      speak(personalThanks);
-    }
-  }
-  async function pollEvents() {
-    try {
-      const result = await api(`/api/donations/events${cursor === undefined ? '' : `?after=${cursor}`}`);
-      for (const event of result.events) {
-        if (seen.has(event.id)) continue;
-        seen.add(event.id);
-        queue.push(event);
-      }
-      cursor = result.cursor;
-      while (seen.size > 1000) seen.delete(seen.values().next().value);
-      connection('Đang ngồi ở đây', true);
-      playNext();
-      if (active) setTimeout(pollEvents, result.hasMore ? 100 : 3000);
-    } catch {
-      connection('Đang nối lại…');
-      if (active) setTimeout(pollEvents, 3000);
-    }
-  }
-  async function checkStatus() {
-    const current = payment;
-    if (current) {
-      try {
-        const status = await api('/api/donations/status', { headers: { 'X-Donation-Token': current.token } });
-        if (payment === current) {
-          if (status.status === 'paid') showPaidState(status, current);
-          else {
-            $('payment').classList.remove('paid');
-            $('payment-status').classList.remove('paid');
-            $('payment-status').textContent = 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
-          }
-        }
-      } catch (error) {
-        if (payment === current) {
-          $('payment-status').classList.remove('paid');
-          $('payment-status').textContent = `${error.message} Nếu đã chuyển, đừng chuyển lại; trang sẽ tự cập nhật khi kết nối lại.`;
-        }
-      }
-    }
-  }
-  async function pollStatus() {
-    await checkStatus();
-    if (active) setTimeout(pollStatus, 3000);
-  }
-  function displayPayment(value) {
+  const json = body => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  function savePayment(value) {
     payment = value;
-    personalThanks = '';
-    thankedToken = null;
-    $('scene').classList.remove('grateful');
-    $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'HỘP NHẬN TIỀN ĐANG TRỐNG';
-    $('speech-text').textContent = defaultSpeech;
-    $('payment').classList.remove('paid');
-    $('paid-success').hidden = true;
-    $('coin-game').hidden = true;
-    $('payment-heading-text').textContent = 'Quét QR này, gửi mình một chút vui.';
-    $('new-donation').textContent = 'Đổi thông tin';
-    $('bank-name').textContent = value.bank;
-    $('account-name').textContent = value.accountName;
-    $('account-number').textContent = value.account;
-    $('payment-code').textContent = value.code;
-    $('payment-amount').textContent = money(value.amount);
-    $('qr-error').hidden = true;
-    $('qr-image').hidden = false;
-    $('qr-image').src = value.qrUrl;
-    $('payment-status').classList.remove('paid');
-    $('payment-status').textContent = 'QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.';
-    $('payment').hidden = false;
-    $('donation-form').hidden = true;
-    $('copy-status').textContent = '';
-    savePayment(value);
+    if (value) localStorage.setItem(paymentKey, JSON.stringify(value)); else localStorage.removeItem(paymentKey);
   }
-  choices.forEach(button => button.addEventListener('click', () => {
-    $('amount').value = button.dataset.amount;
-    updateChoices();
-  }));
-  function updateChoices() {
-    choices.forEach(button => {
-      const selected = button.dataset.amount === $('amount').value;
-      button.classList.toggle('selected', selected);
-      button.setAttribute('aria-pressed', String(selected));
-    });
+  function renderWallet(value) {
+    wallet = value;
+    $('wallet-balance').textContent = value.balance;
+    $('balance-large').textContent = value.balance;
+    const progress = Math.min(100, value.balance);
+    $('reward-progress').style.width = `${progress}%`;
+    $('reward-progress-text').textContent = value.balance >= 100 ? 'Đã đủ xu để đổi một ly trà sữa!' : `Còn ${100 - value.balance} xu nữa để đổi trà sữa.`;
+    $('redeem-button').disabled = value.balance < 100 || value.redemptionPending;
+    const labels = { deposit: 'Nạp xu', game_cost: 'Phí chơi', game_win: 'Thắng game', game_loss: 'Thua game', redemption: 'Đổi trà sữa', redemption_refund: 'Hoàn xu' };
+    $('history').replaceChildren(...(value.history.length ? value.history.map(item => {
+      const row = document.createElement('div');
+      row.className = 'history-row';
+      const detail = document.createElement('div');
+      const title = document.createElement('span'); title.textContent = labels[item.type] || item.type;
+      const time = document.createElement('small'); time.textContent = new Date(item.createdAt).toLocaleString('vi-VN');
+      detail.append(title, time);
+      const amount = document.createElement('b'); amount.className = item.amount > 0 ? 'plus' : 'minus'; amount.textContent = `${item.amount > 0 ? '+' : ''}${item.amount} xu`;
+      row.append(detail, amount); return row;
+    }) : [Object.assign(document.createElement('p'), { className: 'muted', textContent: 'Chưa có giao dịch.' })]));
   }
-  $('amount').addEventListener('input', updateChoices);
-  $('sound').addEventListener('click', () => {
-    if (!('speechSynthesis' in window)) {
-      $('sound-label').textContent = 'Máy chưa hỗ trợ giọng đọc';
+  async function refreshWallet() {
+    if (!walletToken) return;
+    const value = await api('/api/game/wallet');
+    renderWallet(value);
+    return value;
+  }
+  async function ensureWallet() {
+    if (walletToken) {
+      try { return await refreshWallet(); } catch { localStorage.removeItem(walletKey); walletToken = null; }
+    }
+    const created = await api('/api/game/wallets', { method: 'POST' }, false);
+    walletToken = created.token;
+    localStorage.setItem(walletKey, walletToken);
+    renderWallet(created);
+  }
+  async function refreshRedemption() {
+    const { redemption } = await api('/api/game/redemption');
+    if (!redemption) {
+      $('redemption-status').textContent = wallet?.balance >= 100 ? 'Bạn đã đủ xu. Nhập thông tin để đổi quà.' : 'Chưa đủ xu để đổi quà.';
       return;
     }
-    sound = !sound;
-    $('sound').setAttribute('aria-pressed', String(sound));
-    const hasVoice = window.speechSynthesis.getVoices().some(voice => /^vi(?:-|_|$)/i.test(voice.lang));
-    $('sound-label').textContent = sound ? (hasVoice ? 'Tắt giọng đọc' : 'Chưa có giọng Việt · Tắt') : 'Bật giọng đọc';
-    if (!sound) window.speechSynthesis.cancel();
-  });
-  $('donation-form').addEventListener('submit', async event => {
-    event.preventDefault();
-    $('form-error').hidden = true;
-    $('donation-fields').disabled = true;
-    $('create-qr').textContent = 'Đang tạo QR gửi tiền…';
-    try {
-      displayPayment(await api('/api/donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: $('donor-name').value, amount: Number($('amount').value) }) }));
-    } catch (error) {
-      $('form-error').textContent = error.message;
-      $('form-error').hidden = false;
-    } finally {
-      $('donation-fields').disabled = false;
-      $('create-qr').textContent = 'Tạo QR gửi tiền ↗';
-    }
-  });
-  $('new-donation').addEventListener('click', () => {
-    payment = null;
-    personalThanks = '';
-    thankedToken = null;
-    $('scene').classList.remove('grateful');
-    $('speech').classList.remove('thanking');
-    $('speech-kicker').textContent = 'HỘP NHẬN TIỀN ĐANG TRỐNG';
-    $('speech-text').textContent = defaultSpeech;
-    forgetPayment();
-    $('payment').hidden = true;
-    $('coin-game').hidden = true;
-    $('donation-form').hidden = false;
-    $('form-error').hidden = true;
-    $('donor-name').focus();
-  });
-  $('throw-coin').addEventListener('click', tossCoin);
-  $('stop-needle').addEventListener('click', stopNeedle);
-  document.querySelectorAll('[data-game]').forEach(button => button.addEventListener('click', () => selectGame(button.dataset.game)));
-  document.querySelectorAll('[data-heart]').forEach(button => button.addEventListener('click', () => catchHeart(Number(button.dataset.heart))));
-  $('share-payment').addEventListener('click', async () => {
-    if (!payment) return;
-    const text = `Gửi tiền ${money(payment.amount)}\nNgân hàng: ${payment.bank}\nSố tài khoản: ${payment.account}\nChủ tài khoản: ${payment.accountName}\nNội dung chuyển khoản: ${payment.code}`;
-    try {
-      if (navigator.share) await navigator.share({ title: 'Thông tin gửi tiền', text });
-      else {
-        await navigator.clipboard.writeText(text);
-        $('copy-status').textContent = 'Đã sao chép thông tin gửi tiền. Gửi cho người thương là xong.';
-      }
-    } catch (error) {
-      if (error.name !== 'AbortError') $('copy-status').textContent = 'Chưa chia sẻ được. Bạn có thể chép số tài khoản và mã ở bên dưới.';
-    }
-  });
-  $('qr-image').addEventListener('error', () => { $('qr-image').hidden = true; $('qr-error').hidden = false; });
-  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
-    const value = $(button.dataset.copy).textContent;
-    try {
-      await navigator.clipboard.writeText(value);
-      $('copy-status').textContent = `Đã sao chép: ${value}`;
-    } catch {
-      const range = document.createRange();
-      range.selectNodeContents($(button.dataset.copy));
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-      $('copy-status').textContent = 'Đã chọn nội dung. Bạn có thể nhấn giữ hoặc dùng Ctrl+C để sao chép.';
-    }
-  }));
-  async function init() {
-    try {
-      const config = await api('/api/donations/config');
-      if (!config.ready) {
-        $('availability').textContent = 'Góc nhận tiền đang được chuẩn bị. Trang chưa sẵn sàng nhận tiền, bạn ghé lại sau nhé!';
-        connection('Chưa mở nhận tiền');
-        return;
-      }
-      $('availability').hidden = true;
-      $('donation-fields').disabled = false;
-      try {
-        const cached = loadPayment();
-        if (cached && /^[a-f0-9]{64}$/.test(cached.token) && /^DH\d{7}$/.test(cached.code) && cached.account === config.account && cached.bank === config.bank && Number.isSafeInteger(cached.amount) && cached.amount > 0) {
-          // Rebuild the URL from trusted current configuration instead of using a cached URL.
-          const params = new URLSearchParams({ amount: String(cached.amount), addInfo: cached.code, accountName: config.accountName });
-          displayPayment({ ...cached, accountName: config.accountName, qrUrl: `https://img.vietqr.io/image/${encodeURIComponent(config.bank)}-${encodeURIComponent(config.account)}-compact2.png?${params}` });
-        }
-      } catch { /* An unavailable or outdated cached payment can be discarded. */ }
-      active = true;
-      startBowlMotion();
-      pollEvents();
-      pollStatus();
-    } catch {
-      $('availability').textContent = 'Chưa kết nối được góc nhận tiền. Hãy tải lại trang sau một chút nhé.';
-      connection('Chưa kết nối');
+    const names = { pending: 'đang chờ duyệt', approved: 'đã được duyệt, chờ liên hệ', fulfilled: 'đã tặng', rejected: `bị từ chối${redemption.reason ? `: ${redemption.reason}` : ''}` };
+    $('redemption-status').textContent = `Yêu cầu đổi trà sữa ${names[redemption.status] || redemption.status}.`;
+  }
+  async function syncClock() {
+    const started = Date.now();
+    const value = await api('/api/game/wallet');
+    const ended = Date.now();
+    const rtt = ended - started;
+    if (rtt > 400) throw new Error('Mạng đang chậm hơn 400ms. Chờ kết nối ổn định rồi bắt đầu nhé.');
+    clockOffset = value.serverNow - (started + ended) / 2;
+    renderWallet(value);
+  }
+  const serverNow = () => Date.now() + clockOffset;
+  function updateGameLabels() {
+    $('arena-game').textContent = gameNames[selectedGame];
+    $('arena-level').textContent = `${difficultyNames[difficulty]} · Thắng nhận ${payouts[difficulty]} xu`;
+  }
+  function setStageMessage(message) {
+    $('game-stage').replaceChildren(Object.assign(document.createElement('p'), { textContent: message }));
+  }
+  function createButton(text, handler) {
+    const button = document.createElement('button'); button.type = 'button'; button.textContent = text; button.addEventListener('click', handler); return button;
+  }
+  function prepareStage(game) {
+    memoryAnswers = []; orderAnswers = [];
+    const stage = $('game-stage'); stage.replaceChildren();
+    if (game.game === 'bowl') {
+      const coin = document.createElement('div'); coin.className = 'drop-coin'; coin.textContent = '🪙';
+      const bowl = document.createElement('div'); bowl.className = 'moving-bowl'; bowl.textContent = '🥣';
+      stage.append(coin, bowl, createButton('BẮN XU', () => submitReflex()));
+    } else if (game.game === 'needle') {
+      const track = document.createElement('div'); track.className = 'needle-track';
+      const target = document.createElement('span'); target.className = 'needle-target'; target.style.width = `${game.width * 100}%`;
+      const marker = document.createElement('span'); marker.className = 'needle-marker';
+      track.append(target, marker); stage.append(track, createButton('DỪNG KIM', () => submitReflex()));
+    } else if (game.game === 'heart') {
+      const grid = document.createElement('div'); grid.className = 'heart-grid'; grid.style.gridTemplateColumns = `repeat(${Math.min(3, game.cells)},1fr)`;
+      for (let index = 0; index < game.cells; index++) grid.append(createButton('♡', () => submitReflex(index)));
+      stage.append(grid);
+    } else if (game.game === 'memory') {
+      const display = document.createElement('div'); display.className = 'memory-display'; display.textContent = 'Sẵn sàng'; stage.append(display);
+    } else if (game.game === 'order') {
+      const grid = document.createElement('div'); grid.className = 'order-grid';
+      for (const value of game.order) grid.append(createButton(String(value), () => chooseOrder(value)));
+      stage.append(grid);
     }
   }
-  window.addEventListener('pageshow', () => { if (active) checkStatus(); });
-  document.addEventListener('visibilitychange', () => { if (active && document.visibilityState === 'visible') checkStatus(); });
-  init();
+  function animateGame() {
+    cancelAnimationFrame(frame);
+    const tick = () => {
+      if (!activeGame || actionPending) return;
+      const now = serverNow();
+      const elapsed = now - activeGame.startedAt;
+      const remaining = Math.max(0, activeGame.expiresAt - now);
+      $('game-timer').textContent = `${(remaining / 1000).toFixed(1)}s`;
+      if (remaining <= 0) { submitExpired(); return; }
+      const stage = $('game-stage');
+      if (activeGame.game === 'bowl') {
+        const position = .5 + Math.sin((elapsed / activeGame.period) * Math.PI * 2 + activeGame.phase) * .5;
+        stage.querySelector('.moving-bowl').style.left = `${position * 100}%`;
+      } else if (activeGame.game === 'needle') {
+        const position = .5 + Math.sin((elapsed / activeGame.period) * Math.PI * 2 + activeGame.phase) * .5;
+        stage.querySelector('.needle-marker').style.left = `${position * 100}%`;
+      } else if (activeGame.game === 'heart') {
+        const hot = activeGame.positions[Math.floor(elapsed / activeGame.interval)];
+        [...stage.querySelectorAll('button')].forEach((button, index) => { button.textContent = index === hot ? '♥' : '♡'; button.classList.toggle('hot', index === hot); });
+      } else if (activeGame.game === 'memory') renderMemory(elapsed);
+      frame = requestAnimationFrame(tick);
+    };
+    tick();
+  }
+  function renderMemory(elapsed) {
+    const stage = $('game-stage');
+    const revealDuration = activeGame.sequence.length * activeGame.revealMs;
+    if (elapsed < revealDuration) {
+      const display = stage.querySelector('.memory-display');
+      if (display) display.textContent = symbols[activeGame.sequence[Math.max(0, Math.floor(elapsed / activeGame.revealMs))]];
+    } else if (!stage.querySelector('.memory-buttons')) {
+      stage.replaceChildren();
+      const buttons = document.createElement('div'); buttons.className = 'memory-buttons';
+      symbols.forEach((symbol, index) => buttons.append(createButton(symbol, () => chooseMemory(index))));
+      stage.append(buttons);
+    }
+  }
+  async function startGame() {
+    $('game-result').textContent = '';
+    $('start-game').disabled = true;
+    try {
+      await syncClock();
+      const sentAt = Date.now();
+      const game = await api('/api/game/sessions', json({ game: selectedGame, difficulty, requestId: requestId() }));
+      const receivedAt = Date.now();
+      activeGame = game;
+      clockOffset = game.serverNow - (sentAt + receivedAt) / 2;
+      prepareStage(game); animateGame();
+      $('start-game').hidden = true;
+      await refreshWallet();
+    } catch (error) { $('game-result').textContent = error.message; $('start-game').disabled = false; }
+  }
+  async function finishGame(body, revealDelay = 0) {
+    if (!activeGame || actionPending) return;
+    actionPending = true;
+    cancelAnimationFrame(frame);
+    try {
+      const result = await api(`/api/game/sessions/${activeGame.id}/action`, json({ actionId: requestId(), ...body }));
+      if (revealDelay) await new Promise(resolve => setTimeout(resolve, revealDelay));
+      $('game-result').textContent = result.won ? `THẮNG! Nhận ${result.payout} xu.` : 'Chưa trúng. Thử lại ván sau nhé!';
+      activeGame = null; $('start-game').hidden = false; $('start-game').disabled = false; $('game-timer').textContent = '—';
+      await refreshWallet();
+    } catch (error) { $('game-result').textContent = error.message; }
+    finally { actionPending = false; }
+  }
+  function submitReflex(position) {
+    if (activeGame?.game === 'bowl') {
+      const coin = $('game-stage').querySelector('.drop-coin'); coin.style.transitionDuration = '400ms'; coin.style.top = '72%';
+      finishGame({ actionAt: Math.round(serverNow() + 400) }, 400);
+    } else finishGame({ actionAt: Math.round(serverNow()), ...(position == null ? {} : { position }) });
+  }
+  function submitExpired() { finishGame({ actionAt: Math.round(serverNow()), answers: [] }); }
+  function chooseMemory(value) {
+    if (!activeGame || actionPending) return;
+    memoryAnswers.push(value);
+    const index = memoryAnswers.length - 1;
+    if (value !== activeGame.sequence[index] || memoryAnswers.length === activeGame.sequence.length) finishGame({ answers: memoryAnswers });
+  }
+  function chooseOrder(value) {
+    if (!activeGame || actionPending) return;
+    orderAnswers.push(value);
+    const expected = orderAnswers.length;
+    const button = [...$('game-stage').querySelectorAll('button')].find(item => Number(item.textContent) === value); if (button) button.disabled = true;
+    if (value !== expected || orderAnswers.length === activeGame.order.length) finishGame({ answers: orderAnswers });
+  }
+  async function restoreGame() {
+    const response = await api('/api/game/current');
+    if (!response.game) return;
+    activeGame = response.game; clockOffset = response.serverNow - Date.now(); selectedGame = activeGame.game; difficulty = activeGame.difficulty;
+    document.querySelectorAll('[data-game]').forEach(button => button.classList.toggle('active', button.dataset.game === selectedGame));
+    document.querySelectorAll('[data-difficulty]').forEach(button => button.classList.toggle('active', button.dataset.difficulty === difficulty));
+    updateGameLabels(); prepareStage(activeGame); animateGame(); $('start-game').hidden = true;
+  }
+  async function pollPayment() {
+    if (!payment) return;
+    try {
+      const status = await api('/api/donations/status', { headers: { 'X-Donation-Token': payment.token } });
+      if (status.status === 'paid') {
+        $('payment-status').textContent = `Đã nhận ${money(status.paidAmount)}. Xu đã vào ví.`;
+        $('qr-box').hidden = true;
+        savePayment(null); await refreshWallet(); return;
+      }
+    } catch (error) { $('payment-status').textContent = `${error.message} Trang sẽ tự thử lại.`; }
+    setTimeout(pollPayment, 3000);
+  }
+  function displayPayment(value) {
+    savePayment(value); $('topup-form').hidden = true; $('payment').hidden = false;
+    $('qr-box').hidden = false; $('qr-image').hidden = false; $('qr-error').hidden = true;
+    $('qr-image').src = value.qrUrl; $('bank-name').textContent = value.bank; $('account-name').textContent = value.accountName; $('account-number').textContent = value.account; $('payment-code').textContent = value.code; $('payment-amount').textContent = money(value.amount); $('payment-status').textContent = 'Đang chờ tiền về…'; pollPayment();
+  }
+
+  document.querySelectorAll('[data-amount]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-amount]').forEach(item => item.classList.remove('active')); button.classList.add('active'); $('topup-amount').value = button.dataset.amount; }));
+  document.querySelectorAll('[data-game]').forEach(button => button.addEventListener('click', () => { if (activeGame) return; selectedGame = button.dataset.game; document.querySelectorAll('[data-game]').forEach(item => item.classList.toggle('active', item === button)); updateGameLabels(); setStageMessage('Bấm bắt đầu khi bạn đã sẵn sàng. Mỗi ván tốn 1 xu.'); }));
+  document.querySelectorAll('[data-difficulty]').forEach(button => button.addEventListener('click', () => { if (activeGame) return; difficulty = button.dataset.difficulty; document.querySelectorAll('[data-difficulty]').forEach(item => item.classList.toggle('active', item === button)); updateGameLabels(); }));
+  $('start-game').addEventListener('click', startGame);
+  $('topup-form').addEventListener('submit', async event => { event.preventDefault(); $('topup-error').hidden = true; $('create-qr').disabled = true; const attemptId = localStorage.getItem(topupAttemptKey) || requestId(); localStorage.setItem(topupAttemptKey, attemptId); try { const created = await api('/api/donations', json({ name: $('player-name').value, amount: Number($('topup-amount').value), requestId: attemptId })); localStorage.removeItem(topupAttemptKey); displayPayment(created); } catch (error) { $('topup-error').textContent = error.message; $('topup-error').hidden = false; } finally { $('create-qr').disabled = false; } });
+  $('new-topup').addEventListener('click', () => { savePayment(null); localStorage.removeItem(topupAttemptKey); $('payment').hidden = true; $('topup-form').hidden = false; });
+  $('qr-image').addEventListener('error', () => { $('qr-image').hidden = true; $('qr-error').hidden = false; });
+  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => navigator.clipboard.writeText($(button.dataset.copy).textContent)));
+  $('backup-wallet').addEventListener('click', async () => { await navigator.clipboard.writeText(walletToken); $('backup-wallet').textContent = 'Đã chép mã ví ✓'; });
+  $('show-import').addEventListener('click', () => { $('import-form').hidden = !$('import-form').hidden; });
+  $('import-form').addEventListener('submit', async event => { event.preventDefault(); const candidate = $('import-token').value.trim().toLowerCase(); const old = walletToken; walletToken = candidate; try { const value = await refreshWallet(); localStorage.setItem(walletKey, candidate); renderWallet(value); location.reload(); } catch (error) { walletToken = old; $('availability').textContent = error.message; } });
+  $('redeem-form').addEventListener('submit', async event => { event.preventDefault(); $('redeem-button').disabled = true; try { await api('/api/game/redemptions', json({ name: $('redeem-name').value, contact: $('redeem-contact').value, requestId: requestId() })); await refreshWallet(); await refreshRedemption(); } catch (error) { $('redemption-status').textContent = error.message; $('redeem-button').disabled = false; } });
+
+  async function init() {
+    try {
+      config = await api('/api/donations/config', {}, false);
+      if (!config.ready) { $('availability').textContent = 'Hệ thống chưa sẵn sàng nhận tiền.'; return; }
+      await ensureWallet(); $('availability').hidden = true; await refreshRedemption(); await restoreGame();
+      try { const cached = JSON.parse(localStorage.getItem(paymentKey)); if (cached?.token) displayPayment(cached); } catch { savePayment(null); }
+      setInterval(() => refreshWallet().then(refreshRedemption).catch(() => {}), 4000);
+    } catch (error) { $('availability').textContent = error.message; }
+  }
+  updateGameLabels(); init();
 })();

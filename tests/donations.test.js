@@ -1,201 +1,300 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const express = require('express');
-const { createDonationService, verifyKey, MAX_AMOUNT } = require('../features/donations/service');
+const session = require('express-session');
+const { createDonationService, verifyKey, MAX_AMOUNT, GAMES, DIFFICULTIES } = require('../features/donations/service');
 const { createDonationRouter } = require('../features/donations/routes');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
 
 const config = { bank: 'MB', account: '0000000000', accountName: 'TEST ONLY', webhookKey: 'test-secret-never-use-in-production' };
-const setup = () => { const db = new MemoryFirestore(); return { db, service: createDonationService({ db, config }) }; };
-const payload = (code, id = 1, extra = {}) => ({ id, code, content: `${code} TEST`, accountNumber: config.account, transferType: 'in', transferAmount: 20_000, ...extra });
+const id = () => crypto.randomUUID();
+const donationInput = (amount, name) => ({ amount, ...(name == null ? {} : { name }), requestId: id() });
+const setup = () => {
+  const db = new MemoryFirestore();
+  let clock = 1_800_000_000_000;
+  const service = createDonationService({ db, config, now: () => clock });
+  return { db, service, now: () => clock, setNow: value => { clock = value; } };
+};
+const payload = (code, transactionId = 1, extra = {}) => ({ id: transactionId, code, content: code, accountNumber: config.account, transferType: 'in', transferAmount: 20_000, ...extra });
 
-test('QR includes the recipient, unique code and amount; anonymous names default safely', async () => {
-  const { db, service } = setup();
-  const first = await service.create({ amount: 10_000 });
-  const second = await service.create({ amount: 10_000, name: '  Minh  ' });
-  assert.match(first.code, /^DH\d{7}$/);
-  assert.notEqual(first.code, second.code);
-  assert.equal(first.name, 'Người gửi tiền ẩn danh');
-  assert.equal(second.name, 'Minh');
-  const url = new URL(first.qrUrl);
-  assert.equal(url.pathname, '/image/MB-0000000000-compact2.png');
-  assert.equal(url.searchParams.get('amount'), '10000');
-  assert.equal(url.searchParams.get('addInfo'), first.code);
-  assert.equal(url.searchParams.get('accountName'), config.accountName);
-  assert.equal(db.rows.get(`donation_requests/${first.code}`).name, 'Người gửi tiền ẩn danh');
-  assert.equal(db.rows.get(`donation_requests/${second.code}`).name, 'Minh');
-  assert.ok(!JSON.stringify([...db.rows]).includes(first.token), 'raw lookup token is not stored');
-  assert.deepEqual(await service.status(first.token), { status: 'pending', paidAmount: 0, paymentCount: 0 });
-});
-
-test('rejects invalid amounts and names before writing', async () => {
-  const { db, service } = setup();
-  for (const amount of [0, -1, 1.2, '10000', NaN, Infinity, MAX_AMOUNT + 1, undefined]) {
-    await assert.rejects(service.create({ amount }), { status: 400 });
-  }
-  await assert.rejects(service.create({ amount: 1, name: 'x'.repeat(61) }), { status: 400 });
-  await assert.rejects(service.create({ amount: 1, name: {} }), { status: 400 });
-  assert.equal(db.rows.size, 0);
-});
-
-test('actual amount wins; multiple different transfers using one code remain separate gifts', async () => {
-  const { service } = setup();
-  const donation = await service.create({ amount: 10_000, name: 'Minh' });
-  assert.equal((await service.receive(payload(donation.code, 1, { transferAmount: 50_000 }))).result, 'matched_paid');
-  await service.receive(payload(donation.code, 2));
-  const status = await service.status(donation.token);
-  assert.equal(status.status, 'paid');
-  assert.equal(status.paidAmount, 70_000);
-  assert.equal(status.paymentCount, 2);
-  assert.match(status.message, /Kính gửi Minh/);
-  assert.match(status.message, /Tiền đã được ghi nhận/);
-  assert.ok(status.message.split(/\s+/).length >= 100, 'the payment confirmation should stay substantive');
-  const feed = await service.listEvents('0');
-  assert.deepEqual(feed.events.map(event => event.amount), [50_000, 20_000]);
-  assert.match(feed.events[0].message, /50\.000 đồng/);
-  assert.ok(feed.events[0].message.split(/\s+/).length >= 100, 'the public payment confirmation should stay substantive');
-});
-
-test('concurrent duplicate webhooks produce exactly one receipt, credit and event', async () => {
-  const { db, service } = setup();
-  const donation = await service.create({ amount: 20_000 });
-  const results = await Promise.all(Array.from({ length: 12 }, () => service.receive(payload(donation.code))));
-  assert.equal(results.filter(item => item.result === 'matched_paid').length, 1);
-  assert.equal(results.filter(item => item.result === 'duplicate').length, 11);
-  const { message, ...status } = await service.status(donation.token);
-  assert.deepEqual(status, { status: 'paid', paidAmount: 20_000, paymentCount: 1 });
-  assert.ok(message.length > 0);
-  assert.equal((await service.listEvents('0')).events.length, 1);
-  assert.equal([...db.rows.keys()].filter(key => key.startsWith('donation_sepay_events/')).length, 1);
-});
-
-test('concurrent distinct gifts preserve all increments and ordered events', async () => {
-  const { service } = setup();
-  const donation = await service.create({ amount: 20_000 });
-  await Promise.all(Array.from({ length: 12 }, (_, i) => service.receive(payload(donation.code, i + 1))));
-  assert.equal((await service.status(donation.token)).paidAmount, 240_000);
-  assert.deepEqual((await service.listEvents('0')).events.map(item => Number(item.id)), Array.from({ length: 12 }, (_, i) => i + 1));
-});
-
-test('wrong account, outgoing, unknown, missing/ambiguous codes and invalid amounts are private audit only', async () => {
-  const { db, service } = setup();
-  const donation = await service.create({ amount: 20_000 });
-  const cases = [
-    [{ accountNumber: '111111' }, 'wrong_account'],
-    [{ transferType: 'out' }, 'ignored_out'],
-    [{ code: 'DH0000001', content: '' }, 'unmatched'],
-    [{ code: null, content: 'cam on' }, 'unmatched'],
-    [{ content: 'DH9999999' }, 'unmatched'],
-    [{ transferAmount: 0 }, 'invalid_amount'],
-    [{ transferAmount: 1.5 }, 'invalid_amount'],
-  ];
-  for (const [index, [extra, expected]] of cases.entries()) {
-    const result = await service.receive(payload(donation.code, index + 1, extra));
-    assert.deepEqual(result, { success: true, result: expected });
-  }
-  assert.equal((await service.listEvents('0')).events.length, 0);
-  assert.equal((await service.status(donation.token)).status, 'pending');
-  assert.equal([...db.rows.keys()].filter(key => key.startsWith('donation_sepay_events/')).length, cases.length);
-});
-
-test('content fallback handles absent code and lowercase; long codes cannot partially match', async () => {
-  const { service } = setup();
-  const donation = await service.create({ amount: 20_000 });
-  assert.equal((await service.receive(payload(null, 1, { content: `ung ho ${donation.code.toLowerCase()} cam on` }))).result, 'matched_paid');
-  assert.equal((await service.receive(payload(null, 2, { content: `${donation.code}7` }))).result, 'unmatched');
-});
-
-test('storage failure rolls back every write and webhook retry can succeed', async () => {
-  const { db, service } = setup();
-  const donation = await service.create({ amount: 20_000 });
-  db.failWrites = true;
-  await assert.rejects(service.receive(payload(donation.code)), /storage failure/);
-  assert.equal((await service.status(donation.token)).status, 'pending');
-  assert.equal((await service.listEvents('0')).events.length, 0);
-  assert.equal(db.rows.has('donation_sepay_events/1'), false);
-  db.failWrites = false;
-  assert.equal((await service.receive(payload(donation.code))).result, 'matched_paid');
-});
-
-test('new viewers start at current sequence; reconnect paginates without losing or repeating events', async () => {
-  const { service } = setup();
-  const donation = await service.create({ amount: 20_000, name: '<img src=x onerror=alert(1)>' });
-  await service.receive(payload(donation.code, 1));
-  const start = await service.listEvents();
-  assert.deepEqual(start, { events: [], cursor: 1, hasMore: false });
-  for (let id = 2; id <= 53; id++) await service.receive(payload(donation.code, id));
-  const page1 = await service.listEvents(String(start.cursor));
-  const page2 = await service.listEvents(String(page1.cursor));
-  assert.equal(page1.events.length, 50);
-  assert.equal(page1.hasMore, true);
-  assert.equal(page2.events.length, 2);
-  assert.equal(page2.cursor, 53);
-  assert.equal((await service.listEvents(String(page2.cursor))).events.length, 0);
-  assert.deepEqual(Object.keys(page1.events[0]).sort(), ['id', 'name', 'amount', 'createdAt', 'message'].sort());
-  for (const cursor of ['-1', 'x', '1.2', ['1'], '1'.repeat(16)]) await assert.rejects(service.listEvents(cursor), { status: 400 });
-  await assert.rejects(service.status('bad-token'), { status: 401 });
-  await assert.rejects(service.status('a'.repeat(64)), { status: 404 });
-});
-
-test('API key is exact and missing configuration disables all payment operations', async () => {
-  assert.equal(verifyKey(`Apikey ${config.webhookKey}`, config.webhookKey), true);
-  for (const header of [undefined, 'Bearer test', 'Apikey wrong', `Apikey ${config.webhookKey} extra`]) assert.equal(verifyKey(header, config.webhookKey), false);
-  const service = createDonationService({ db: null, config });
-  assert.deepEqual(service.publicConfig(), { ready: false });
-  await assert.rejects(service.create({ amount: 20_000 }), { status: 503 });
-  const missingKey = createDonationService({ db: new MemoryFirestore(), config: { ...config, webhookKey: '' } });
-  assert.deepEqual(missingKey.publicConfig(), { ready: false });
-});
-
-async function serverFor(t, options) {
-  const app = express();
-  app.use(createDonationRouter(options));
-  const server = await new Promise(resolve => { const instance = app.listen(0, '127.0.0.1', () => resolve(instance)); });
-  t.after(() => new Promise(resolve => server.close(resolve)));
-  return (url, options) => fetch(`http://127.0.0.1:${server.address().port}${url}`, options);
+async function funded(amount = 100_000) {
+  const state = setup();
+  const wallet = await state.service.createWallet();
+  const donation = await state.service.create(donationInput(amount, '<b>Minh</b>'), wallet.token);
+  await state.service.receive(payload(donation.code, 1, { transferAmount: amount }));
+  return { ...state, wallet, donation };
 }
 
-test('HTTP integration: page, create/status, authentication, JSON errors, retries and rate limit', async t => {
-  const { db } = setup();
-  const request = await serverFor(t, { db, config });
-  const oldPage = await request('/an-xin', { redirect: 'manual' });
-  assert.equal(oldPage.status, 302);
-  assert.equal(oldPage.headers.get('location'), '/xin-tien');
-  const formerPage = await request('/tra-tien', { redirect: 'manual' });
-  assert.equal(formerPage.status, 302);
-  assert.equal(formerPage.headers.get('location'), '/xin-tien');
-  const page = await request('/xin-tien');
-  assert.equal(page.status, 200);
-  assert.match(page.headers.get('content-security-policy'), /script-src 'self'/);
-  assert.match(await page.text(), /Xin tiền cho/);
-  const post = data => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-  let response = await request('/api/donations', post({ amount: 20_000, name: 'Test' }));
-  assert.equal(response.status, 201);
-  assert.equal(response.headers.get('cache-control'), 'no-store');
-  const donation = await response.json();
-  assert.equal((await request('/api/donations/status')).status, 401);
-  assert.equal((await request('/api/webhooks/sepay', post(payload(donation.code)))).status, 401);
-  const webhook = post(payload(donation.code));
-  webhook.headers.Authorization = `Apikey ${config.webhookKey}`;
-  db.failWrites = true;
-  assert.equal((await request('/api/webhooks/sepay', webhook)).status, 503);
-  db.failWrites = false;
-  response = await request('/api/webhooks/sepay', webhook);
-  assert.deepEqual(await response.json(), { success: true, result: 'matched_paid' });
-  assert.deepEqual(await (await request('/api/webhooks/sepay', webhook)).json(), { success: true, result: 'duplicate' });
-  const status = await request('/api/donations/status', { headers: { 'X-Donation-Token': donation.token } });
-  assert.equal((await status.json()).status, 'paid');
-  assert.equal((await request('/api/webhooks/sepay', { ...webhook, body: '{bad' })).status, 400);
-  assert.equal((await request('/api/webhooks/sepay', { ...webhook, body: JSON.stringify({ x: 'a'.repeat(33_000) }) })).status, 413);
-  for (let i = 0; i < 9; i++) assert.equal((await request('/api/donations', post({ amount: 1 }))).status, 201);
-  response = await request('/api/donations', post({ amount: 1 }));
-  assert.equal(response.status, 429);
-  assert.ok(Number(response.headers.get('retry-after')) > 0);
+function reflexAction(game, shouldWin) {
+  const rules = GAMES[game.game][game.difficulty];
+  for (let elapsed = 0; elapsed < Math.min(15_000, game.expiresAt - game.startedAt); elapsed++) {
+    const position = .5 + Math.sin((elapsed / rules.period) * Math.PI * 2 + game.phase) * .5;
+    if ((Math.abs(position - .5) <= rules.width / 2) === shouldWin) return { elapsed };
+  }
+  throw new Error(`No ${shouldWin ? 'winning' : 'losing'} instant found`);
+}
+
+function gameAction(game, shouldWin) {
+  if (game.game === 'bowl' || game.game === 'needle') return reflexAction(game, shouldWin);
+  if (game.game === 'heart') return { elapsed: 0, position: shouldWin ? game.positions[0] : (game.positions[0] + 1) % game.cells };
+  if (game.game === 'memory') return { answers: shouldWin ? game.sequence : game.sequence.map((value, index) => index ? value : (value + 1) % 4) };
+  const answers = Array.from({ length: game.order.length }, (_, index) => index + 1);
+  return { answers: shouldWin ? answers : [2, 1, ...answers.slice(2)] };
+}
+
+async function playOutcome(state, token, gameName, difficulty, shouldWin) {
+  const game = await state.service.startGame(token, { game: gameName, difficulty, requestId: id() });
+  const action = gameAction(game, shouldWin);
+  if ('elapsed' in action) {
+    state.setNow(game.startedAt + action.elapsed);
+    action.actionAt = state.now();
+    delete action.elapsed;
+  }
+  const result = await state.service.play(token, game.id, { actionId: id(), ...action });
+  return { game, result };
+}
+
+test('wallet and top-up tokens are private, QR is correct and names are stored as plain data', async () => {
+  const { db, service } = setup();
+  const wallet = await service.createWallet();
+  assert.match(wallet.token, /^[a-f0-9]{64}$/);
+  const input = donationInput(10_000, '  <b>Minh</b>  ');
+  const topup = await service.create(input, wallet.token);
+  const replay = await service.create(input, wallet.token);
+  assert.deepEqual(replay, topup);
+  assert.match(topup.code, /^DH\d{7}$/);
+  const url = new URL(topup.qrUrl);
+  assert.equal(url.pathname, '/image/MB-0000000000-compact2.png');
+  assert.equal(url.searchParams.get('amount'), '10000');
+  assert.equal(url.searchParams.get('addInfo'), topup.code);
+  assert.equal(db.rows.get(`donation_requests/${topup.code}`).name, '<b>Minh</b>');
+  assert.ok(!JSON.stringify([...db.rows]).includes(wallet.token));
+  assert.ok(!JSON.stringify([...db.rows]).includes(topup.token));
+  await assert.rejects(service.status(topup.token, (await service.createWallet()).token), { status: 404 });
 });
 
-test('HTTP missing config does not issue QR or acknowledge payments', async t => {
-  const request = await serverFor(t, { db: null, config });
-  assert.deepEqual(await (await request('/api/donations/config')).json(), { ready: false });
-  assert.equal((await request('/api/donations', { method: 'POST' })).status, 503);
-  assert.equal((await request('/api/webhooks/sepay', { method: 'POST' })).status, 503);
+test('invalid amounts, names and wallet tokens are rejected', async () => {
+  const { service } = setup();
+  const wallet = await service.createWallet();
+  for (const amount of [0, -1, 1.2, '10000', NaN, Infinity, MAX_AMOUNT + 1, undefined]) {
+    await assert.rejects(service.create(donationInput(amount), wallet.token), { status: 400 });
+  }
+  await assert.rejects(service.create(donationInput(1, 'x'.repeat(61)), wallet.token), { status: 400 });
+  await assert.rejects(service.create({ amount: 1_000 }, wallet.token), { status: 400 });
+  await assert.rejects(service.wallet('bad-token'), { status: 401 });
+});
+
+test('actual money credits one coin per 1,000đ and carries remainder across top-ups', async () => {
+  const { service } = setup();
+  const wallet = await service.createWallet();
+  const first = await service.create(donationInput(10_000), wallet.token);
+  const second = await service.create(donationInput(10_000), wallet.token);
+  await service.receive(payload(first.code, 1, { transferAmount: 1_500 }));
+  assert.deepEqual(await service.status(first.token, wallet.token), { status: 'paid', paidAmount: 1500, paymentCount: 1 });
+  let view = await service.wallet(wallet.token);
+  assert.equal(view.balance, 1);
+  assert.equal(view.remainder, 500);
+  await service.receive(payload(second.code, 2, { transferAmount: 600 }));
+  view = await service.wallet(wallet.token);
+  assert.equal(view.balance, 2);
+  assert.equal(view.remainder, 100);
+  assert.equal(view.totalDeposited, 2_100);
+});
+
+test('duplicate and simultaneous SePay deliveries credit exactly once; distinct IDs both count', async () => {
+  const { db, service } = setup();
+  const wallet = await service.createWallet();
+  const topup = await service.create(donationInput(20_000), wallet.token);
+  const outcomes = await Promise.all(Array.from({ length: 12 }, () => service.receive(payload(topup.code, 91))));
+  assert.equal(outcomes.filter(item => item.result === 'matched_paid').length, 1);
+  assert.equal(outcomes.filter(item => item.result === 'duplicate').length, 11);
+  await Promise.all([service.receive(payload(topup.code, 92)), service.receive(payload(topup.code, 93))]);
+  assert.equal((await service.wallet(wallet.token)).balance, 60);
+  assert.equal([...db.rows.keys()].filter(key => key.startsWith('donation_sepay_events/')).length, 3);
+});
+
+test('old codes, wrong accounts, money out, ambiguous codes and invalid amounts never credit a wallet', async () => {
+  const { db, service } = setup();
+  const wallet = await service.createWallet();
+  const topup = await service.create(donationInput(20_000), wallet.token);
+  db.rows.set('donation_requests/DH7654321', { code: 'DH7654321', account: config.account, status: 'pending', paidAmount: 0, paymentCount: 0 });
+  const cases = [
+    payload(topup.code, 10, { accountNumber: '123' }),
+    payload(topup.code, 11, { transferType: 'out' }),
+    payload('DH9999999', 12),
+    payload('DH7654321', 13),
+    payload(topup.code, 14, { code: '', content: `${topup.code} DH1111111` }),
+    payload(topup.code, 15, { transferAmount: 0 }),
+  ];
+  for (const item of cases) await service.receive(item);
+  assert.equal((await service.wallet(wallet.token)).balance, 0);
+  assert.equal(db.rows.get(`donation_requests/${topup.code}`).status, 'pending');
+});
+
+test('all 15 game and difficulty combinations settle wins and losses on the server', async () => {
+  const state = await funded(100_000);
+  for (const gameName of Object.keys(GAMES)) {
+    for (const difficulty of Object.keys(DIFFICULTIES)) {
+      const beforeWin = (await state.service.wallet(state.wallet.token)).balance;
+      const won = await playOutcome(state, state.wallet.token, gameName, difficulty, true);
+      assert.equal(won.result.won, true, `${gameName}/${difficulty} should win`);
+      assert.equal(won.result.payout, DIFFICULTIES[difficulty].payout);
+      assert.equal((await state.service.wallet(state.wallet.token)).balance, beforeWin - 1 + DIFFICULTIES[difficulty].payout);
+
+      const beforeLoss = (await state.service.wallet(state.wallet.token)).balance;
+      const lost = await playOutcome(state, state.wallet.token, gameName, difficulty, false);
+      assert.equal(lost.result.won, false, `${gameName}/${difficulty} should lose`);
+      assert.equal(lost.result.payout, 0);
+      assert.equal((await state.service.wallet(state.wallet.token)).balance, beforeLoss - 1);
+    }
+  }
+});
+
+test('simultaneous retries start and settle one game exactly once', async () => {
+  const state = await funded(10_000);
+  const startRequest = id();
+  const games = await Promise.all(Array.from({ length: 8 }, () => state.service.startGame(state.wallet.token, { game: 'needle', difficulty: 'medium', requestId: startRequest })));
+  assert.equal(new Set(games.map(game => game.id)).size, 1);
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 9);
+  const game = games[0];
+  const action = reflexAction(game, true);
+  state.setNow(game.startedAt + action.elapsed);
+  const actionId = id();
+  const results = await Promise.all(Array.from({ length: 8 }, () => state.service.play(state.wallet.token, game.id, { actionId, actionAt: state.now() })));
+  assert.ok(results.every(result => result.won && result.payout === 3));
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 12);
+});
+
+test('one wallet has one active game, cannot go negative, resumes and settles expiry once', async () => {
+  const state = await funded(1_000);
+  const game = await state.service.startGame(state.wallet.token, { game: 'bowl', difficulty: 'easy', requestId: id() });
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 0);
+  await assert.rejects(state.service.startGame(state.wallet.token, { game: 'heart', difficulty: 'easy', requestId: id() }), { status: 409 });
+  assert.equal((await state.service.currentGame(state.wallet.token)).game.id, game.id);
+  state.setNow(game.expiresAt + 1);
+  const result = await state.service.play(state.wallet.token, game.id, { actionId: id(), actionAt: state.now() });
+  assert.equal(result.reason, 'expired');
+  const repeated = await state.service.play(state.wallet.token, game.id, { actionId: id(), actionAt: state.now() });
+  assert.deepEqual(repeated, result);
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 0);
+  await assert.rejects(state.service.startGame(state.wallet.token, { game: 'heart', difficulty: 'easy', requestId: id() }), { status: 409 });
+});
+
+test('client-supplied result and payout fields cannot change the server outcome', async () => {
+  const state = await funded(2_000);
+  const game = await state.service.startGame(state.wallet.token, { game: 'memory', difficulty: 'hard', requestId: id() });
+  const result = await state.service.play(state.wallet.token, game.id, { actionId: id(), answers: [], won: true, payout: 999_999, balance: 999_999 });
+  assert.equal(result.won, false);
+  assert.equal(result.payout, 0);
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 1);
+});
+
+test('redemption costs 100 coins, permits only one pending request and rejection refunds once', async () => {
+  const state = await funded(200_000);
+  const request = await state.service.redeem(state.wallet.token, { name: 'Minh', contact: '0900000000', requestId: id() });
+  assert.equal(request.status, 'pending');
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 100);
+  await assert.rejects(state.service.redeem(state.wallet.token, { name: 'Minh', contact: 'Zalo', requestId: id() }), { status: 409 });
+  const publicStatus = await state.service.redemption(state.wallet.token);
+  assert.equal(publicStatus.redemption.status, 'pending');
+  assert.equal('contact' in publicStatus.redemption, false);
+  const adminRows = await state.service.adminRedemptions();
+  assert.equal(adminRows[0].contact, '0900000000');
+  assert.ok(adminRows[0].walletHistory.length);
+  await assert.rejects(state.service.updateRedemption(request.id, { status: 'rejected' }), { status: 400 });
+  await state.service.updateRedemption(request.id, { status: 'rejected', reason: 'Không liên hệ được' });
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 200);
+  await state.service.updateRedemption(request.id, { status: 'rejected', reason: 'Không liên hệ được' });
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 200);
+});
+
+test('redemption follows pending → approved → fulfilled and then allows another request', async () => {
+  const state = await funded(200_000);
+  const request = await state.service.redeem(state.wallet.token, { name: 'Lan', contact: 'zalo-lan', requestId: id() });
+  await assert.rejects(state.service.updateRedemption(request.id, { status: 'fulfilled' }), { status: 409 });
+  await state.service.updateRedemption(request.id, { status: 'approved' });
+  await state.service.updateRedemption(request.id, { status: 'fulfilled' });
+  assert.equal((await state.service.redemption(state.wallet.token)).redemption.status, 'fulfilled');
+  const next = await state.service.redeem(state.wallet.token, { name: 'Lan', contact: 'zalo-lan', requestId: id() });
+  assert.equal(next.status, 'pending');
+  assert.equal((await state.service.wallet(state.wallet.token)).balance, 0);
+});
+
+test('storage errors roll back webhook credits and are surfaced for SePay retry', async () => {
+  const { db, service } = setup();
+  const wallet = await service.createWallet();
+  const topup = await service.create(donationInput(20_000), wallet.token);
+  db.failWrites = true;
+  await assert.rejects(service.receive(payload(topup.code, 55)), /Simulated storage failure/);
+  db.failWrites = false;
+  assert.equal((await service.wallet(wallet.token)).balance, 0);
+  assert.equal((await service.status(topup.token, wallet.token)).status, 'pending');
+  await service.receive(payload(topup.code, 55));
+  assert.equal((await service.wallet(wallet.token)).balance, 20);
+});
+
+test('webhook authentication uses the configured API key format', () => {
+  assert.equal(verifyKey(`Apikey ${config.webhookKey}`, config.webhookKey), true);
+  assert.equal(verifyKey(`Bearer ${config.webhookKey}`, config.webhookKey), false);
+  assert.equal(verifyKey('Apikey wrong', config.webhookKey), false);
+  assert.equal(verifyKey('', ''), false);
+});
+
+test('HTTP API creates a wallet, binds top-up status to it and rejects unauthenticated webhook', async t => {
+  const db = new MemoryFirestore();
+  const app = express();
+  app.use(createDonationRouter({ db, config }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const created = await fetch(`${base}/api/game/wallets`, { method: 'POST' });
+  assert.equal(created.status, 201);
+  const wallet = await created.json();
+  const topupResponse = await fetch(`${base}/api/donations`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Wallet-Token': wallet.token }, body: JSON.stringify(donationInput(5_000)) });
+  assert.equal(topupResponse.status, 201);
+  const topup = await topupResponse.json();
+  const denied = await fetch(`${base}/api/webhooks/sepay`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload(topup.code, 222, { transferAmount: 5_000 })) });
+  assert.equal(denied.status, 401);
+  const accepted = await fetch(`${base}/api/webhooks/sepay`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Apikey ${config.webhookKey}` }, body: JSON.stringify(payload(topup.code, 222, { transferAmount: 5_000 })) });
+  assert.equal(accepted.status, 200);
+  const status = await fetch(`${base}/api/donations/status`, { headers: { 'X-Wallet-Token': wallet.token, 'X-Donation-Token': topup.token } });
+  assert.deepEqual(await status.json(), { status: 'paid', paidAmount: 5000, paymentCount: 1 });
+});
+
+test('admin redemption page requires a session and CSRF token, and escapes contact data', async t => {
+  const db = new MemoryFirestore();
+  const service = createDonationService({ db, config });
+  const wallet = await service.createWallet();
+  const topup = await service.create(donationInput(100_000), wallet.token);
+  await service.receive(payload(topup.code, 333, { transferAmount: 100_000 }));
+  const redemption = await service.redeem(wallet.token, { name: '<img src=x>', contact: '<script>bad</script>', requestId: id() });
+
+  const app = express();
+  app.use(session({ secret: 'test-session-secret-should-be-long', resave: false, saveUninitialized: false }));
+  app.use(createDonationRouter({ db, config, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'correct-password' }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => server.close());
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  const anonymous = await fetch(`${base}/xin-tien/admin`, { redirect: 'manual' });
+  assert.equal(anonymous.status, 302);
+  const login = await fetch(`${base}/xin-tien/admin/login`, { method: 'POST', redirect: 'manual', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'password=correct-password' });
+  assert.equal(login.status, 302);
+  const cookie = login.headers.get('set-cookie').split(';')[0];
+  const page = await fetch(`${base}/xin-tien/admin`, { headers: { Cookie: cookie } });
+  const html = await page.text();
+  assert.equal(page.status, 200);
+  assert.match(html, /&lt;img src=x&gt;/);
+  assert.match(html, /&lt;script&gt;bad&lt;\/script&gt;/);
+  assert.doesNotMatch(html, /<script>bad<\/script>/);
+  const csrf = /name="csrf" value="([a-f0-9]+)"/.exec(html)[1];
+
+  const blocked = await fetch(`${base}/xin-tien/admin/redemptions/${redemption.id}`, { method: 'POST', redirect: 'manual', headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'status=approved' });
+  assert.equal(blocked.status, 403);
+  const approved = await fetch(`${base}/xin-tien/admin/redemptions/${redemption.id}`, { method: 'POST', redirect: 'manual', headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ status: 'approved', csrf }) });
+  assert.equal(approved.status, 302);
+  assert.equal((await service.redemption(wallet.token)).redemption.status, 'approved');
 });
