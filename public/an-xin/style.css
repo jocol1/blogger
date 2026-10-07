@@ -261,6 +261,11 @@ main {
   box-shadow:0 3px 0 #8c5d242e;
   animation:throw-coin-to-bowl .8s cubic-bezier(.18,.72,.35,1) forwards
 }
+.shot-coin {
+  top:25%;
+  left:48%;
+  animation:shoot-coin-to-bowl .8s cubic-bezier(.15,.72,.35,1) forwards
+}
 .scene-footer {
   display:flex;
   align-items:center;
@@ -828,6 +833,23 @@ footer>a:last-child {
   100% {
     opacity:0;
     transform:translate(146%,179%) rotate(650deg) scale(.7)
+  }
+}
+@keyframes shoot-coin-to-bowl {
+  0% {
+    opacity:0;
+    transform:translateY(0) rotate(0) scale(.65)
+  }
+  12% {
+    opacity:1
+  }
+  78% {
+    opacity:1;
+    transform:translateY(var(--shot-distance)) rotate(520deg) scale(1)
+  }
+  100% {
+    opacity:0;
+    transform:translateY(calc(var(--shot-distance) + 18px)) rotate(650deg) scale(.7)
   }
 }
 @keyframes sparkle {

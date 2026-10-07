@@ -10,6 +10,8 @@
   let active = false;
   let personalThanks = '';
   let thankedToken = null;
+  let bowlOffset = 0;
+  let bowlMotionStarted = false;
   const queue = [];
   // Sequence cursors already prevent replay; IDs also protect the animation queue.
   const seen = new Set();
@@ -81,6 +83,20 @@
   function coinTotal(status) {
     return Math.floor(Math.max(0, Number(status.paidAmount) || 0) / 1000);
   }
+  function bowlOffsetAt(time) {
+    return Math.sin(time / 520) * 118;
+  }
+  function startBowlMotion() {
+    if (bowlMotionStarted || typeof requestAnimationFrame !== 'function') return;
+    bowlMotionStarted = true;
+    const bowl = $('coin-bowl');
+    const move = time => {
+      bowlOffset = bowlOffsetAt(time);
+      bowl.setAttribute('transform', `translate(${bowlOffset} 0)`);
+      requestAnimationFrame(move);
+    };
+    requestAnimationFrame(move);
+  }
   function updateCoinGame(status, current) {
     const total = coinTotal(status);
     const thrown = Math.min(total, Math.max(0, Number.isSafeInteger(current.coinsThrown) ? current.coinsThrown : 0));
@@ -90,8 +106,8 @@
     $('coin-balance').textContent = String(available);
     $('throw-coin').disabled = available < 1;
     $('coin-feedback').textContent = available > 0
-      ? `Bạn có ${available} xu. Chạm nút để ném từng xu vào bát nhé.`
-      : total ? 'Bát có xu rồi. Nạp thêm để ném tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
+      ? `Bạn có ${available} xu. Canh bát lướt qua làn ném rồi bắn nhé.`
+      : total ? 'Bát có xu rồi. Nạp thêm để bắn tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
     savePayment(current);
   }
   function tossCoin() {
@@ -100,11 +116,17 @@
     const available = payment.coinTotal - payment.coinsThrown;
     $('coin-balance').textContent = String(available);
     $('throw-coin').disabled = available < 1;
-    $('coin-feedback').textContent = available ? `Ting! Còn ${available} xu, ném tiếp nào.` : 'Ting! Bát đã nhận hết xu của lượt này rồi.';
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    const willHit = Math.abs(433 + bowlOffsetAt(now + 760) - 310) < 52;
+    if (willHit) payment.coinHits = (Number.isSafeInteger(payment.coinHits) ? payment.coinHits : 0) + 1;
+    $('coin-feedback').textContent = willHit
+      ? (available ? `VÀO BÁT! Còn ${available} xu, canh nhịp rồi bắn tiếp nào.` : 'VÀO BÁT! Bạn đã bắn hết xu của lượt này rồi.')
+      : (available ? `Trượt mất rồi! Còn ${available} xu để gỡ lại.` : 'Trượt mất rồi, hết xu của lượt này rồi.');
     savePayment(payment);
     const coin = document.createElement('span');
-    coin.className = 'thrown-coin';
+    coin.className = 'thrown-coin shot-coin';
     coin.textContent = '₫';
+    coin.style['--shot-distance'] = `${Math.max(170, $('coin-flight-layer').clientHeight * .5 || 220)}px`;
     $('coin-flight-layer').append(coin);
     setTimeout(() => coin.remove(), 900);
   }
@@ -301,6 +323,7 @@
         }
       } catch { /* An unavailable or outdated cached payment can be discarded. */ }
       active = true;
+      startBowlMotion();
       pollEvents();
       pollStatus();
     } catch {
