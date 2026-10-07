@@ -230,12 +230,36 @@ main {
 }
 .scene {
   max-width:640px;
-  margin:0 auto
+  margin:0 auto;
+  position:relative
 }
 .character-art {
   width:100%;
   height:auto;
   display:block
+}
+.coin-flight-layer {
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  overflow:hidden
+}
+.thrown-coin {
+  position:absolute;
+  top:18%;
+  left:30%;
+  width:28px;
+  height:28px;
+  display:grid;
+  place-items:center;
+  border:2px solid #a86d22;
+  border-radius:50%;
+  background:radial-gradient(circle at 34% 28%,#fff4a1 0 12%,#efc34f 38%,#d69226 100%);
+  color:#8a551b;
+  font-size:15px;
+  font-weight:700;
+  box-shadow:0 3px 0 #8c5d242e;
+  animation:throw-coin-to-bowl .8s cubic-bezier(.18,.72,.35,1) forwards
 }
 .scene-footer {
   display:flex;
@@ -632,6 +656,55 @@ footer>a:last-child {
   color:#a38164;
   font:italic 11px/1.5 var(--ui-font)
 }
+.coin-game {
+  margin:19px 0 3px;
+  padding:17px;
+  border:1px dashed #d5b781;
+  border-radius:7px;
+  background:#fff9e9
+}
+.coin-rule {
+  display:block;
+  color:#a37643;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:1.4px
+}
+.coin-game strong {
+  display:block;
+  margin-top:4px;
+  color:#665034;
+  font-size:18px
+}
+.coin-game strong span {
+  color:var(--orange);
+  font-size:27px
+}
+.coin-game p {
+  margin:5px 0 12px;
+  color:#84735b;
+  font-size:11px;
+  line-height:1.55;
+  text-align:center;
+  white-space:normal
+}
+.coin-game button {
+  width:100%;
+  border:0;
+  border-radius:5px;
+  padding:10px 12px;
+  background:#b97031;
+  color:#fff8e8;
+  font-weight:700;
+  font-size:12px
+}
+.coin-game button:hover:not(:disabled) {
+  background:#9e5c25
+}
+.coin-game button:disabled {
+  background:#b8ac97;
+  opacity:1
+}
 .copy-status {
   font-size:10px;
   color:var(--green);
@@ -738,6 +811,23 @@ footer>a:last-child {
   100% {
     opacity:0;
     transform:translateY(78px)
+  }
+}
+@keyframes throw-coin-to-bowl {
+  0% {
+    opacity:0;
+    transform:translate(0,0) rotate(0) scale(.65)
+  }
+  14% {
+    opacity:1
+  }
+  72% {
+    opacity:1;
+    transform:translate(132%,170%) rotate(520deg) scale(1)
+  }
+  100% {
+    opacity:0;
+    transform:translate(146%,179%) rotate(650deg) scale(.7)
   }
 }
 @keyframes sparkle {

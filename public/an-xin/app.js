@@ -78,6 +78,36 @@
       setTimeout(playNext, 80);
     }, 7000);
   }
+  function coinTotal(status) {
+    return Math.floor(Math.max(0, Number(status.paidAmount) || 0) / 1000);
+  }
+  function updateCoinGame(status, current) {
+    const total = coinTotal(status);
+    const thrown = Math.min(total, Math.max(0, Number.isSafeInteger(current.coinsThrown) ? current.coinsThrown : 0));
+    const available = total - thrown;
+    current.coinsThrown = thrown;
+    $('coin-game').hidden = false;
+    $('coin-balance').textContent = String(available);
+    $('throw-coin').disabled = available < 1;
+    $('coin-feedback').textContent = available > 0
+      ? `Bạn có ${available} xu. Chạm nút để ném từng xu vào bát nhé.`
+      : total ? 'Bát có xu rồi. Nạp thêm để ném tiếp nhé!' : 'Khoản này chưa đủ 1.000đ để đổi thành xu.';
+    savePayment(current);
+  }
+  function tossCoin() {
+    if (!payment || !Number.isSafeInteger(payment.coinTotal) || payment.coinsThrown >= payment.coinTotal) return;
+    payment.coinsThrown++;
+    const available = payment.coinTotal - payment.coinsThrown;
+    $('coin-balance').textContent = String(available);
+    $('throw-coin').disabled = available < 1;
+    $('coin-feedback').textContent = available ? `Ting! Còn ${available} xu, ném tiếp nào.` : 'Ting! Bát đã nhận hết xu của lượt này rồi.';
+    savePayment(payment);
+    const coin = document.createElement('span');
+    coin.className = 'thrown-coin';
+    coin.textContent = '₫';
+    $('coin-flight-layer').append(coin);
+    setTimeout(() => coin.remove(), 900);
+  }
   function showPaidState(status, current) {
     const donor = current.name || 'bạn';
     const total = `${money(status.paidAmount)}${status.paymentCount > 1 ? ` qua ${status.paymentCount} lượt` : ''}`;
@@ -92,6 +122,8 @@
     $('speech').classList.add('thanking');
     $('speech-kicker').textContent = 'TIỀN ĐÃ VỀ, VUI QUÁ TRỜI';
     $('speech-text').textContent = personalThanks;
+    current.coinTotal = coinTotal(status);
+    updateCoinGame(status, current);
     if (thankedToken !== current.token) {
       thankedToken = current.token;
       speak(personalThanks);
@@ -150,6 +182,7 @@
     $('speech-text').textContent = defaultSpeech;
     $('payment').classList.remove('paid');
     $('paid-success').hidden = true;
+    $('coin-game').hidden = true;
     $('payment-heading-text').textContent = 'Quét QR này, gửi mình một chút vui.';
     $('new-donation').textContent = 'Đổi thông tin';
     $('bank-name').textContent = value.bank;
@@ -215,10 +248,12 @@
     $('speech-text').textContent = defaultSpeech;
     forgetPayment();
     $('payment').hidden = true;
+    $('coin-game').hidden = true;
     $('donation-form').hidden = false;
     $('form-error').hidden = true;
     $('donor-name').focus();
   });
+  $('throw-coin').addEventListener('click', tossCoin);
   $('share-payment').addEventListener('click', async () => {
     if (!payment) return;
     const text = `Gửi tiền ${money(payment.amount)}\nNgân hàng: ${payment.bank}\nSố tài khoản: ${payment.account}\nChủ tài khoản: ${payment.accountName}\nNội dung chuyển khoản: ${payment.code}`;

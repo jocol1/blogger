@@ -15,11 +15,13 @@ function fixture(handler, initialPayment) {
   function element() {
     const classes = new Set();
     return {
-      textContent: '', hidden: false, disabled: false, value: '', dataset: {}, handlers: {}, attributes: {},
+      textContent: '', hidden: false, disabled: false, value: '', dataset: {}, handlers: {}, attributes: {}, children: [], style: {},
       classList: { add: name => classes.add(name), remove: name => classes.delete(name), toggle(name, force) { if (force) classes.add(name); else classes.delete(name); }, contains: name => classes.has(name) },
       addEventListener(event, handler) { this.handlers[event] = handler; },
       setAttribute(name, value) { this.attributes[name] = value; },
       replaceChildren(...children) { this.textContent = children.map(item => item.textContent).join(''); },
+      append(...children) { this.children.push(...children); },
+      remove() {},
       focus() {},
     };
   }
@@ -112,5 +114,22 @@ test('a new tab restores the latest QR and immediately shows its paid status', a
   assert.equal(ui.get('paid-success').hidden, false);
   assert.match(ui.get('paid-title').textContent, /Đã nhận 20\.000đ/);
   assert.match(ui.get('paid-message').textContent, /Tiền của/);
+  assert.equal(ui.get('coin-game').hidden, false);
+  assert.equal(ui.get('coin-balance').textContent, '20');
   assert.equal(ui.get('scene').classList.contains('grateful'), true);
+});
+
+test('each confirmed 1.000đ grants one coin that can be thrown into the bowl', async () => {
+  const cached = { bank: 'MB', account: '0000000000', accountName: 'TEST', amount: 20000, code: 'DH0123456', token: 'a'.repeat(64), qrUrl: 'https://old.example/qr.png' };
+  const ui = fixture(async url => {
+    if (url.endsWith('/config')) return { body: { ready: true, bank: 'MB', account: '0000000000', accountName: 'TEST' } };
+    if (url === '/api/donations/status') return { body: { status: 'paid', paidAmount: 2500, paymentCount: 1 } };
+    return { body: { cursor: 0, events: [], hasMore: false } };
+  }, cached);
+  await settle();
+  assert.equal(ui.get('coin-balance').textContent, '2');
+  ui.get('throw-coin').handlers.click();
+  assert.equal(ui.get('coin-balance').textContent, '1');
+  assert.equal(ui.get('coin-flight-layer').children.length, 1);
+  assert.match(ui.get('coin-feedback').textContent, /Còn 1 xu/);
 });

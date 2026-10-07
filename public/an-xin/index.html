@@ -60,6 +60,7 @@
             </g>
             <g class="celebration-spark" fill="#c65d3a"><path d="m209 165 4 10 10 4-10 4-4 10-4-10-10-4 10-4Z"/><path d="m429 137 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z"/><circle cx="455" cy="198" r="4"/></g>
           </svg>
+          <div id="coin-flight-layer" class="coin-flight-layer" aria-hidden="true"></div>
         </div>
         <div class="scene-footer"><span class="handwritten">Xin một chút, cảm ơn thật nhiều.</span><span aria-hidden="true">✓ ♡</span></div>
       </section>
@@ -82,7 +83,7 @@
           <div class="qr-wrap"><img id="qr-image" alt="QR chuyển khoản gửi tiền" width="260" height="320" referrerpolicy="no-referrer"><p id="qr-error" hidden>Chưa tải được ảnh QR. Bạn vẫn có thể gửi tiền bằng thông tin bên dưới.</p></div>
           <dl class="bank-details"><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Chủ tài khoản</dt><dd id="account-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span><button class="copy-button" data-copy="account-number" type="button" aria-label="Sao chép số tài khoản">Chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div class="payment-code"><dt>Nội dung CK</dt><dd><span id="payment-code"></span><button class="copy-button" data-copy="payment-code" type="button" aria-label="Sao chép nội dung chuyển khoản">Chép</button></dd></div></dl>
           <p class="transfer-note">Giữ nguyên mã DH trong nội dung chuyển khoản để hệ thống nhận đúng khoản nhé.</p><p id="payment-status" class="payment-status" role="status">QR đã sẵn sàng. Chuyển đúng nội dung DH ở trên nhé.</p><p id="copy-status" class="copy-status" role="status"></p>
-          <div id="paid-success" class="paid-success" role="status" aria-live="polite" hidden><span class="paid-kicker">ĐÃ NHẬN ĐƯỢC TIỀN</span><div class="gratitude-seal" aria-hidden="true">♡</div><h3 id="paid-title">Đã nhận tiền rồi, cảm ơn bạn!</h3><p id="paid-message"></p><span class="paid-signature">— người trực hộp tiền rất vui</span></div>
+          <div id="paid-success" class="paid-success" role="status" aria-live="polite" hidden><span class="paid-kicker">ĐÃ NHẬN ĐƯỢC TIỀN</span><div class="gratitude-seal" aria-hidden="true">♡</div><h3 id="paid-title">Đã nhận tiền rồi, cảm ơn bạn!</h3><p id="paid-message"></p><section id="coin-game" class="coin-game" aria-label="Trò ném xu vào bát" hidden><span class="coin-rule">CỨ 1.000Đ = 1 XU</span><strong><span id="coin-balance">0</span> xu đang chờ được ném</strong><p id="coin-feedback">Chạm nút để ném một đồng xu vào bát nhé.</p><button id="throw-coin" type="button">Ném 1 xu vào bát <span aria-hidden="true">↗</span></button></section><span class="paid-signature">— người trực hộp tiền rất vui</span></div>
         </section>
         <div class="payment-footnote"><span aria-hidden="true">↔</span> Chuyển khoản ngân hàng · Tự động cập nhật</div>
       </section>
