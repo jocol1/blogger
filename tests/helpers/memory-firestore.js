@@ -5,7 +5,7 @@ class MemoryFirestore {
   collection(name) {
     const db = this;
     return {
-      doc(id) { return { path: `${name}/${id}`, async get() { return db.snapshot(this.path); } }; },
+      doc(id) { return { path: `${name}/${id}`, async get() { return db.snapshot(this.path); }, async set(data, options) { const current = db.rows.get(this.path); db.rows.set(this.path, structuredClone(options?.merge && current ? { ...current, ...data } : data)); db.version++; }, async delete() { db.rows.delete(this.path); db.version++; } }; },
       where(field, operator, value) {
         if (operator !== '>') throw new Error('Unsupported query');
         return { orderBy(order) { return { limit(count) { return { async get() {
@@ -28,6 +28,7 @@ class MemoryFirestore {
         create: (ref, data) => writes.push({ type: 'create', path: ref.path, data }),
         set: (ref, data) => writes.push({ type: 'set', path: ref.path, data }),
         update: (ref, data) => writes.push({ type: 'update', path: ref.path, data }),
+        delete: ref => writes.push({ type: 'delete', path: ref.path }),
       };
       const result = await fn(tx);
       if (this.version !== version) continue;
@@ -36,7 +37,10 @@ class MemoryFirestore {
         if (write.type === 'create' && this.rows.has(write.path)) throw new Error('Already exists');
         if (write.type === 'update' && !this.rows.has(write.path)) throw new Error('Missing document');
       }
-      for (const write of writes) this.rows.set(write.path, structuredClone(write.type === 'update' ? { ...this.rows.get(write.path), ...write.data } : write.data));
+      for (const write of writes) {
+        if (write.type === 'delete') this.rows.delete(write.path);
+        else this.rows.set(write.path, structuredClone(write.type === 'update' ? { ...this.rows.get(write.path), ...write.data } : write.data));
+      }
       if (writes.length) this.version++;
       return result;
     }

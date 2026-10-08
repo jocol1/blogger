@@ -10,7 +10,9 @@ const { marked } = require('marked');
 const sanitizeHtml = require('sanitize-html');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 const { createDonationRouter } = require('./features/donations/routes');
+const { createChatRouter } = require('./features/chat/routes');
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -23,17 +25,23 @@ const dbFile = path.join(dataDir, 'store.json');
 const store = fs.existsSync(dbFile) ? JSON.parse(fs.readFileSync(dbFile, 'utf8')) : { posts: [], notes: [], habits: [] };
 store.posts = store.posts || []; store.notes = store.notes || []; store.habits = store.habits || [];
 let firestore = null;
+let firebaseApp = null;
+let firebaseProjectId = null;
 if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   const serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'));
-  initializeApp({ credential: cert(serviceAccount) });
-  firestore = getFirestore();
+  firebaseProjectId = serviceAccount.project_id;
+  firebaseApp = initializeApp({ credential: cert(serviceAccount) });
+  firestore = getFirestore(firebaseApp);
 } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
+  firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
   if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) privateKey = privateKey.slice(1, -1);
   privateKey = privateKey.replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\r\n/g, '\n');
-  initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
-  firestore = getFirestore();
+  firebaseApp = initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
+  firestore = getFirestore(firebaseApp);
 }
+const chatBucketNames = firebaseApp ? [...new Set([process.env.CHAT_STORAGE_BUCKET?.trim(), firebaseProjectId && `${firebaseProjectId}.firebasestorage.app`, firebaseProjectId && `${firebaseProjectId}.appspot.com`].filter(Boolean))] : [];
+const chatBuckets = chatBucketNames.map(name => getStorage(firebaseApp).bucket(name));
 function save() { fs.writeFileSync(dbFile, JSON.stringify(store, null, 2), { mode: 0o600 }); if (firestore) syncRemote().catch(error => console.error('Firestore sync failed:', error.message)); }
 async function syncRemote() { const batch = firestore.batch(); for (const post of store.posts) batch.set(firestore.collection('posts').doc(post.id), post); for (const note of store.notes) batch.set(firestore.collection('notes').doc(note.id), note); for (const habit of store.habits) batch.set(firestore.collection('habits').doc(habit.id), habit); await batch.commit(); }
 async function loadRemote() { if (!firestore) return; const [posts, notes, habits] = await Promise.all([firestore.collection('posts').get(), firestore.collection('notes').get(), firestore.collection('habits').get()]); store.posts = posts.docs.map(d => d.data()); store.notes = notes.docs.map(d => d.data()); store.habits = habits.docs.map(d => d.data()); save(); console.log(`Đã kết nối Firestore: ${store.posts.length} bài viết, ${store.notes.length} note, ${store.habits.length} streak`); }
@@ -79,6 +87,7 @@ const editorialCss = `body{background:#f7f7f5;color:#181818}.editorial-header{he
 app.set('trust proxy', 1);
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
 app.use(createDonationRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+app.use(createChatRouter({ db: firestore, buckets: chatBuckets, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 // Keep the former blog in place, but make only the public payment page reachable while this switch is on.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {
