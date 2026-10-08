@@ -11,6 +11,7 @@ const sanitizeHtml = require('sanitize-html');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { getStorage } = require('firebase-admin/storage');
+const { Storage } = require('@google-cloud/storage');
 const { createDonationRouter } = require('./features/donations/routes');
 const { createChatRouter } = require('./features/chat/routes');
 
@@ -27,9 +28,11 @@ store.posts = store.posts || []; store.notes = store.notes || []; store.habits =
 let firestore = null;
 let firebaseApp = null;
 let firebaseProjectId = null;
+let firebaseCredentials = null;
 if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   const serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'));
   firebaseProjectId = serviceAccount.project_id;
+  firebaseCredentials = serviceAccount;
   firebaseApp = initializeApp({ credential: cert(serviceAccount) });
   firestore = getFirestore(firebaseApp);
 } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
@@ -37,11 +40,27 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
   if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) privateKey = privateKey.slice(1, -1);
   privateKey = privateKey.replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\r\n/g, '\n');
+  firebaseCredentials = { client_email: process.env.FIREBASE_CLIENT_EMAIL, private_key: privateKey };
   firebaseApp = initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
   firestore = getFirestore(firebaseApp);
 }
 const chatBucketNames = firebaseApp ? [...new Set([process.env.CHAT_STORAGE_BUCKET?.trim(), firebaseProjectId && `${firebaseProjectId}.firebasestorage.app`, firebaseProjectId && `${firebaseProjectId}.appspot.com`].filter(Boolean))] : [];
 const chatBuckets = chatBucketNames.map(name => getStorage(firebaseApp).bucket(name));
+async function ensureChatStorageBucket() {
+  const autoCreate = process.env.CHAT_STORAGE_AUTO_CREATE === 'true' || firebaseProjectId === 'blog-a8645';
+  if (!autoCreate || !firebaseCredentials || !firebaseProjectId || !chatBucketNames.length) return;
+  const bucketName = chatBucketNames[0];
+  const storage = new Storage({ projectId: firebaseProjectId, credentials: firebaseCredentials });
+  const [exists] = await storage.bucket(bucketName).exists();
+  if (exists) return;
+  await storage.createBucket(bucketName, {
+    location: 'ASIA-SOUTHEAST1',
+    storageClass: 'STANDARD',
+    iamConfiguration: { publicAccessPrevention: 'enforced', uniformBucketLevelAccess: { enabled: true } },
+    softDeletePolicy: { retentionDurationSeconds: 0 },
+  });
+  console.log(`Đã tạo bucket ảnh chat riêng tư: ${bucketName}`);
+}
 function save() { fs.writeFileSync(dbFile, JSON.stringify(store, null, 2), { mode: 0o600 }); if (firestore) syncRemote().catch(error => console.error('Firestore sync failed:', error.message)); }
 async function syncRemote() { const batch = firestore.batch(); for (const post of store.posts) batch.set(firestore.collection('posts').doc(post.id), post); for (const note of store.notes) batch.set(firestore.collection('notes').doc(note.id), note); for (const habit of store.habits) batch.set(firestore.collection('habits').doc(habit.id), habit); await batch.commit(); }
 async function loadRemote() { if (!firestore) return; const [posts, notes, habits] = await Promise.all([firestore.collection('posts').get(), firestore.collection('notes').get(), firestore.collection('habits').get()]); store.posts = posts.docs.map(d => d.data()); store.notes = notes.docs.map(d => d.data()); store.habits = habits.docs.map(d => d.data()); save(); console.log(`Đã kết nối Firestore: ${store.posts.length} bài viết, ${store.notes.length} note, ${store.habits.length} streak`); }
@@ -119,5 +138,9 @@ app.post('/notes',auth,(req,res)=>{store.notes.push({id:id(),title:req.body.titl
 app.get('/notes/:id',auth,(req,res)=>{const n=store.notes.find(x=>x.id===req.params.id);if(!n)return res.sendStatus(404);res.send(layout(n.title,`<div class="card"><h1>🔒 ${esc(n.title)}</h1><form method="post"><label>Nhập mật khẩu để mở note</label><input type="password" name="password" required autofocus><button>Mở note</button>${req.query.error?'<p class="danger">Mật khẩu không đúng.</p>':''}</form></div>`,req));});
 app.post('/notes/:id',auth,(req,res)=>{const n=store.notes.find(x=>x.id===req.params.id);if(!n)return res.sendStatus(404);if(!bcrypt.compareSync(req.body.password||'',n.passwordHash))return res.redirect(`/notes/${n.id}?error=1`);try{const body=decryptNote(n.payload,req.body.password);res.send(layout(n.title,`<article class="card"><h1>${esc(n.title)}</h1><div class="markdown">${marked.parse(body)}</div></article>`,req));}catch{res.redirect(`/notes/${n.id}?error=1`);}});
 app.use((err,req,res,next)=>{console.error(err);res.status(500).send(layout('Lỗi','<div class="card"><h1>Có lỗi xảy ra</h1><p>Kiểm tra log server để biết chi tiết.</p></div>',req));});
-async function start() { try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); } app.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`)); }
+async function start() {
+  try { await ensureChatStorageBucket(); } catch (error) { console.error('Không thể chuẩn bị bucket ảnh chat:', error.code || error.message); }
+  try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
+  app.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
+}
 start();

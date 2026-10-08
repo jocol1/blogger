@@ -44,6 +44,7 @@ DONATION_BANK_ACCOUNT=6999912092003
 DONATION_BANK_ACCOUNT_NAME="LY TAN LOC"
 SEPAY_WEBHOOK_API_KEY=<khoa-webhook-rieng>
 CHAT_STORAGE_BUCKET=<ten-firebase-storage-bucket>
+CHAT_STORAGE_AUTO_CREATE=false
 PAYMENT_PAGE_ONLY=true
 ```
 
@@ -53,7 +54,7 @@ Sinh khóa ngẫu nhiên bằng:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Firebase phải kết nối được tới Firestore. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. `CHAT_STORAGE_BUCKET` là tên bucket, ví dụ `project-id.firebasestorage.app`; nếu bỏ trống, server thử hai tên bucket mặc định của dự án. Service account cần quyền đọc, ghi và xóa object. Server kiểm tra bucket khi khởi động, chỉ cho mua giờ chat sau khi kiểm tra thành công. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
+Firebase phải kết nối được tới Firestore. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. `CHAT_STORAGE_BUCKET` là tên bucket, ví dụ `project-id.firebasestorage.app`; nếu bỏ trống, server thử hai tên bucket mặc định của dự án. Service account cần quyền đọc, ghi và xóa object. Dự án sản xuất `blog-a8645` tự tạo bucket riêng tư ở Singapore khi còn thiếu; dự án khác chỉ tự tạo khi đặt `CHAT_STORAGE_AUTO_CREATE=true`. Bucket chặn truy cập công khai, dùng quyền đồng nhất và tắt soft-delete để tác vụ dọn dữ liệu sau 7 ngày xóa thật. Server kiểm tra lại bucket mỗi phút và chỉ cho mua giờ chat sau khi đọc/ghi/xóa thử thành công. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
 
 Trang quản trị ở `/xin-tien/admin`, dùng `ADMIN_PASSWORD`. Phiên đăng nhập nằm ở server, cookie `httpOnly`, thao tác thay đổi trạng thái có CSRF token và đăng nhập bị giới hạn số lần thử. Trang này hiển thị thông tin liên hệ cùng lịch sử xu gần đây của ví.
 

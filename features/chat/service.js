@@ -311,7 +311,12 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       await verifyStorage();
       if (db) await sweep().catch(error => console.error('Chat maintenance failed:', error.code || error.name));
       if (!maintenanceTimer) {
-        maintenanceTimer = setInterval(() => sweep().catch(error => console.error('Chat maintenance failed:', error.code || error.name)), 60_000);
+        maintenanceTimer = setInterval(async () => {
+          try {
+            if (!ready()) await verifyStorage();
+            await sweep();
+          } catch (error) { console.error('Chat maintenance failed:', error.code || error.name); }
+        }, 60_000);
         maintenanceTimer.unref?.();
       }
     },
