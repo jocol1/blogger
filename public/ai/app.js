@@ -22,6 +22,23 @@
   let paymentTimer = 0;
   let messageTimer = 0;
   let messageAttemptId = null;
+  let toastTimer = 0;
+
+  function showToast(message) {
+    const toast = $('toast');
+    clearTimeout(toastTimer);
+    toast.textContent = message;
+    toast.classList.add('show');
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2200);
+  }
+
+  function setNotice(id, message) {
+    const holder = $(id);
+    const dot = document.createElement('i');
+    const text = document.createElement('span');
+    text.textContent = message;
+    holder.replaceChildren(dot, text);
+  }
 
   function openImage(image) {
     if (!image?.src) return;
@@ -67,15 +84,16 @@
     try {
       const status = await api('/api/donations/status', { headers: { 'X-Donation-Token': payment.token } });
       if (status.status === 'paid') {
-        $('payment-status').textContent = `Đã nhận ${money(status.paidAmount)}. Xu đã vào ví.`;
+        setNotice('payment-status', `Đã nhận ${money(status.paidAmount)}. Xu đã vào ví.`);
+        showToast('Nạp xu thành công. Số dư đã được cập nhật.');
         $('qr-box').hidden = true; savePayment(null); await refreshWallet(); return;
       }
-    } catch (error) { $('payment-status').textContent = `${error.message} Trang sẽ tự thử lại.`; }
+    } catch (error) { setNotice('payment-status', `${error.message} Trang sẽ tự thử lại.`); }
     paymentTimer = setTimeout(pollPayment, 3000);
   }
   function displayPayment(value) {
     savePayment(value); $('topup-form').hidden = true; $('payment').hidden = false; $('qr-box').hidden = false; $('qr-image').hidden = false; $('qr-error').hidden = true;
-    $('qr-image').src = value.qrUrl; $('bank-name').textContent = value.bank; $('account-number').textContent = value.account; $('payment-amount').textContent = money(value.amount); $('payment-code').textContent = value.code; $('payment-status').textContent = 'Đang chờ tiền về…'; pollPayment();
+    $('qr-image').src = value.qrUrl; $('bank-name').textContent = value.bank; $('account-number').textContent = value.account; $('payment-amount').textContent = money(value.amount); $('payment-code').textContent = value.code; setNotice('payment-status', 'Đang chờ tiền về…'); pollPayment();
   }
 
   function sessionLabel(session) {
@@ -96,6 +114,7 @@
     $('message-text').disabled = !active; $('image-input').disabled = !active; $('send-message').disabled = !active;
     $('session-state').textContent = selectedSession ? sessionLabel(selectedSession) : 'Chưa có phiên';
     $('live-dot').classList.toggle('live', active);
+    $('conversation-label').textContent = active ? 'Trực tuyến' : 'Đã kết thúc';
     $('new-session').hidden = Boolean(activeSessionId);
   }
   function updateTimer() {
@@ -168,7 +187,7 @@
     await refreshWallet();
   }
   function renderAvailability() {
-    $('availability').textContent = config?.ready ? (config.available ? 'Locly AI sẵn sàng nhận phiên mới.' : 'AI đang bận đủ 3 phiên. Bạn chưa bị trừ xu; hãy quay lại sau.') : 'Locly AI chưa sẵn sàng nhận phiên mới.';
+    setNotice('availability', config?.ready ? (config.available ? 'Locly AI sẵn sàng nhận phiên mới.' : 'AI đang bận đủ 3 phiên. Bạn chưa bị trừ xu; hãy quay lại sau.') : 'Locly AI chưa sẵn sàng nhận phiên mới.');
     $('availability').hidden = Boolean(config?.ready && config.available);
     if (wallet) renderWallet(wallet);
   }
@@ -190,22 +209,36 @@
   }
 
   document.querySelectorAll('[data-amount]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-amount]').forEach(item => item.classList.remove('active')); button.classList.add('active'); $('topup-amount').value = button.dataset.amount; }));
+  $('topup-amount').addEventListener('input', () => {
+    document.querySelectorAll('[data-amount]').forEach(item => item.classList.toggle('active', item.dataset.amount === $('topup-amount').value));
+  });
   $('image-lightbox-close').addEventListener('click', () => $('image-lightbox').close());
   $('image-lightbox').addEventListener('click', event => { if (event.target === $('image-lightbox')) $('image-lightbox').close(); });
-  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => navigator.clipboard.writeText($(button.dataset.copy).textContent)));
+  document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText($(button.dataset.copy).textContent);
+      const oldText = button.textContent;
+      button.textContent = 'Đã chép';
+      showToast('Đã sao chép vào bộ nhớ tạm.');
+      setTimeout(() => { button.textContent = oldText; }, 1500);
+    } catch { showToast('Không thể sao chép. Hãy nhấn giữ để chép thủ công.'); }
+  }));
   $('qr-image').addEventListener('error', () => { $('qr-image').hidden = true; $('qr-error').hidden = false; });
   $('topup-form').addEventListener('submit', async event => {
     event.preventDefault(); $('topup-error').textContent = ''; $('create-qr').disabled = true;
+    const buttonHtml = $('create-qr').innerHTML; $('create-qr').querySelector('span').textContent = 'Đang tạo QR…';
     const attemptId = localStorage.getItem(topupAttemptKey) || requestId(); localStorage.setItem(topupAttemptKey, attemptId);
     try { const created = await api('/api/donations', json({ name: $('player-name').value, amount: Number($('topup-amount').value), requestId: attemptId })); localStorage.removeItem(topupAttemptKey); displayPayment(created); }
-    catch (error) { $('topup-error').textContent = error.message; } finally { $('create-qr').disabled = false; }
+    catch (error) { $('topup-error').textContent = error.message; } finally { $('create-qr').innerHTML = buttonHtml; $('create-qr').disabled = false; }
   });
   $('new-topup').addEventListener('click', () => { savePayment(null); localStorage.removeItem(topupAttemptKey); $('payment').hidden = true; $('topup-form').hidden = false; });
   $('start-chat').addEventListener('click', async () => {
     $('start-error').textContent = ''; $('start-chat').disabled = true;
+    const buttonHtml = $('start-chat').innerHTML; $('start-chat').querySelector('span').textContent = 'Đang mở phiên…';
     const attemptId = localStorage.getItem(startAttemptKey) || requestId(); localStorage.setItem(startAttemptKey, attemptId);
     try { await api('/api/chat/sessions', json({ requestId: attemptId })); localStorage.removeItem(startAttemptKey); selectedSession = null; await refreshSessions(); }
     catch (error) { $('start-error').textContent = error.message; await refreshWallet().catch(() => {}); }
+    finally { $('start-chat').innerHTML = buttonHtml; if (!activeSessionId) $('start-chat').disabled = !config?.ready || !config.available || (wallet?.balance || 0) < 10; }
   });
   $('new-session').addEventListener('click', () => { $('purchase').hidden = false; $('purchase').scrollIntoView({ behavior: 'smooth' }); });
   $('image-input').addEventListener('change', event => {
@@ -214,10 +247,15 @@
     if (files.some(file => file.size > 5 * 1024 * 1024)) { $('message-error').textContent = 'Mỗi ảnh tối đa 5 MB.'; return; }
     selectedFiles.push(...files); event.target.value = ''; renderPreviews();
   });
+  $('message-text').addEventListener('input', event => {
+    $('character-count').textContent = event.target.value.length.toLocaleString('vi-VN');
+    event.target.style.height = 'auto';
+    event.target.style.height = `${Math.min(event.target.scrollHeight, 140)}px`;
+  });
   $('message-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!selectedSession) return; $('message-error').textContent = ''; $('send-message').disabled = true;
     messageAttemptId ||= requestId(); const data = new FormData(); data.append('requestId', messageAttemptId); data.append('text', $('message-text').value); selectedFiles.forEach(file => data.append('images', file, file.name));
-    try { await api(`/api/chat/sessions/${selectedSession.id}/messages`, { method: 'POST', body: data }); messageAttemptId = null; $('message-text').value = ''; selectedFiles = []; renderPreviews(); await pollMessages(); }
+    try { await api(`/api/chat/sessions/${selectedSession.id}/messages`, { method: 'POST', body: data }); messageAttemptId = null; $('message-text').value = ''; $('message-text').style.height = 'auto'; $('character-count').textContent = '0'; selectedFiles = []; renderPreviews(); await pollMessages(); }
     catch (error) { $('message-error').textContent = error.message; } finally { updateComposer(); }
   });
 

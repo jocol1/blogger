@@ -3,29 +3,98 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0d1020">
-  <meta name="description" content="Trò chuyện riêng với AI trong 60 phút, hỗ trợ gửi ảnh.">
-  <title>Locly AI · Chat riêng 60 phút</title>
+  <meta name="theme-color" content="#090b14">
+  <meta name="description" content="Trò chuyện riêng với Locly AI trong 60 phút, hỗ trợ gửi ảnh.">
+  <title>Locly AI · Phiên riêng 60 phút</title>
   <link rel="stylesheet" href="/assets/ai/style.css">
   <script src="/assets/ai/app.js" defer></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="/ai">locly<span>.ai</span></a><nav><a href="/xin-tien">Trò chơi</a><a class="active" href="/ai">AI</a></nav><div class="wallet"><b id="wallet-balance">0</b> xu</div></header>
+  <div class="page-glow glow-one" aria-hidden="true"></div>
+  <div class="page-glow glow-two" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a class="brand" href="/ai" aria-label="Locly AI - Trang chủ"><i>✦</i>locly<span>.ai</span></a>
+    <nav aria-label="Điều hướng chính"><a href="/xin-tien">Trò chơi</a><a class="active" href="/ai">AI</a></nav>
+    <div class="wallet" title="Số dư ví"><span>Ví của bạn</span><strong><b id="wallet-balance">0</b> xu</strong></div>
+  </header>
+
   <main>
-    <section class="intro"><div><span class="eyebrow">LOCLY AI · PHIÊN RIÊNG</span><h1>AI một giờ.<br><em>Hỏi gì cũng được.</em></h1><p>Gửi câu hỏi, ảnh chụp hoặc tài liệu dạng ảnh. AI đọc trọn ngữ cảnh trong phiên và trả lời ngay tại đây.</p></div><div class="orb" aria-hidden="true"><span></span><b>AI</b></div></section>
-    <p id="availability" class="notice" role="status">Đang kết nối…</p>
+    <section class="intro">
+      <div class="hero-copy">
+        <span class="eyebrow"><i></i> PHIÊN AI RIÊNG TƯ · 60 PHÚT</span>
+        <h1>Hỏi điều khó.<br><em>Nhận lời giải rõ.</em></h1>
+        <p>Gửi câu hỏi, ảnh chụp hoặc tài liệu dạng ảnh. Locly AI đọc trọn ngữ cảnh trong phiên và cùng bạn giải quyết từng việc.</p>
+        <div class="hero-points" aria-label="Tính năng"><span>✦ Hiểu tiếng Việt</span><span>▧ Đọc được ảnh</span><span>↺ Hoàn xu tự động</span></div>
+      </div>
+      <div class="orb-wrap" aria-hidden="true">
+        <div class="orb"><span class="ring ring-one"></span><span class="ring ring-two"></span><b>AI</b><i class="spark spark-one"></i><i class="spark spark-two"></i><i class="spark spark-three"></i></div>
+        <div class="orb-caption"><i></i><span>Sẵn sàng lắng nghe</span></div>
+      </div>
+    </section>
+
+    <p id="availability" class="notice" role="status"><i></i><span>Đang kết nối…</span></p>
 
     <section id="purchase" class="purchase-grid">
-      <article class="card rules"><div class="card-label">GÓI AI RIÊNG</div><div class="price"><strong>10</strong><span>xu / 60 phút</span></div><ul><li>Đồng hồ chạy liên tục sau khi bấm bắt đầu</li><li>Có thể gửi tối đa 3 ảnh trong mỗi tin</li><li>Cùng lúc chỉ nhận tối đa 3 khách</li><li>Không có phản hồi trong 60 phút: tự hoàn 10 xu</li></ul><p class="human-note"><b>Thông tin rõ ràng:</b> Locly AI được người hỗ trợ trực tiếp vận hành và soạn câu trả lời, không phải hệ thống trả lời tự động.</p><button id="start-chat" class="primary" type="button">Mở phiên AI · 10 xu</button><p id="start-error" class="error" role="alert"></p></article>
-      <article class="card topup"><div class="card-label">NẠP THÊM XU</div><form id="topup-form"><label>Tên hiển thị <small>không bắt buộc</small></label><input id="player-name" maxlength="60" placeholder="Người dùng ẩn danh"><label>Số tiền</label><div class="amounts"><button type="button" data-amount="10000" class="active">10k</button><button type="button" data-amount="20000">20k</button><button type="button" data-amount="50000">50k</button><button type="button" data-amount="100000">100k</button></div><input id="topup-amount" type="number" min="1000" max="9999999999" step="1000" value="10000" required><button class="primary" id="create-qr">Tạo QR nạp xu</button></form><section id="payment" hidden><div id="qr-box" class="qr"><img id="qr-image" alt="QR nạp xu"><p id="qr-error" hidden>Không tải được QR; dùng thông tin bên dưới.</p></div><dl><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span> <button type="button" data-copy="account-number">Chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div><dt>Nội dung</dt><dd><span id="payment-code"></span> <button type="button" data-copy="payment-code">Chép</button></dd></div></dl><p id="payment-status" class="notice">Đang chờ tiền về…</p><button id="new-topup" type="button">Tạo QR khác</button></section><p id="topup-error" class="error"></p></article>
+      <article class="card rules">
+        <div class="card-top"><div><div class="card-label">GÓI AI RIÊNG</div><h2>Một phiên, trọn cuộc trò chuyện</h2></div><span class="popular">PHỔ BIẾN</span></div>
+        <div class="price"><strong>10</strong><span>xu / 60 phút</span></div>
+        <div class="rule-grid">
+          <div><i>01</i><p><b>60 phút liên tục</b><span>Thời gian tính từ lúc mở phiên</span></p></div>
+          <div><i>02</i><p><b>Gửi ảnh trực tiếp</b><span>Tối đa 3 ảnh trong mỗi tin</span></p></div>
+          <div><i>03</i><p><b>Không bị bỏ quên</b><span>Không phản hồi sẽ tự hoàn 10 xu</span></p></div>
+        </div>
+        <p class="human-note"><span>i</span><span><b>Thông tin rõ ràng</b>Locly AI được người hỗ trợ trực tiếp vận hành và soạn câu trả lời, không phải hệ thống trả lời tự động.</span></p>
+        <button id="start-chat" class="primary" type="button"><span>Mở phiên AI</span><small>10 xu · 60 phút</small><i>→</i></button>
+        <p id="start-error" class="error" role="alert"></p>
+      </article>
+
+      <article class="card topup">
+        <div class="card-top"><div><div class="card-label">NẠP XU QUA QR</div><h2>Nạp một lần, dùng chung toàn web</h2></div><span class="secure">✓ An toàn</span></div>
+        <div class="steps"><span class="active"><i>1</i>Chọn tiền</span><span><i>2</i>Quét QR</span><span><i>3</i>Nhận xu</span></div>
+        <form id="topup-form">
+          <label for="player-name">Tên hiển thị <small>không bắt buộc</small></label>
+          <input id="player-name" maxlength="60" placeholder="Ví dụ: Minh">
+          <label for="topup-amount">Số tiền muốn nạp</label>
+          <div class="amounts"><button type="button" data-amount="10000" class="active">10.000đ</button><button type="button" data-amount="20000">20.000đ</button><button type="button" data-amount="50000">50.000đ</button><button type="button" data-amount="100000">100.000đ</button></div>
+          <div class="amount-input"><input id="topup-amount" type="number" min="1000" max="9999999999" step="1000" value="10000" required><span>VNĐ</span></div>
+          <p class="rate"><span>Quy đổi</span><strong>1.000đ = 1 xu</strong></p>
+          <button class="primary compact" id="create-qr"><span>Tạo mã QR</span><small>Hiện ngay trên màn hình</small><i>→</i></button>
+        </form>
+
+        <section id="payment" class="payment" hidden>
+          <div class="payment-heading"><span class="payment-pulse"></span><div><b>Quét QR để nạp xu</b><small>Mã chỉ dành cho lần nạp này</small></div></div>
+          <div id="qr-box" class="qr"><img id="qr-image" alt="QR nạp xu"><p id="qr-error" hidden>Không tải được QR; dùng thông tin bên dưới.</p></div>
+          <dl><div><dt>Ngân hàng</dt><dd id="bank-name"></dd></div><div><dt>Số tài khoản</dt><dd><span id="account-number"></span> <button type="button" data-copy="account-number">Sao chép</button></dd></div><div><dt>Số tiền</dt><dd id="payment-amount"></dd></div><div><dt>Nội dung</dt><dd><span id="payment-code"></span> <button type="button" data-copy="payment-code">Sao chép</button></dd></div></dl>
+          <p id="payment-status" class="notice"><i></i><span>Đang chờ tiền về…</span></p>
+          <button id="new-topup" class="secondary" type="button">Tạo QR khác</button>
+        </section>
+        <p id="topup-error" class="error" role="alert"></p>
+      </article>
     </section>
 
     <section id="chat-shell" class="chat-shell" hidden>
-      <aside class="sessions"><div class="session-head"><div><span>PHIÊN CỦA BẠN</span><strong id="session-state">Đang hoạt động</strong></div><time id="chat-timer">60:00</time></div><div id="session-list"></div><button id="new-session" type="button" hidden>Mua phiên mới</button><p class="privacy">Nội dung và ảnh được giữ 7 ngày sau khi phiên kết thúc.</p></aside>
-      <article class="conversation"><header><div class="avatar">AI</div><div><strong>Locly AI</strong><span>AI do người hỗ trợ vận hành</span></div><i id="live-dot"></i></header><div id="messages" class="messages"><div class="empty"><b>Xin chào!</b><p>Hãy gửi câu hỏi hoặc ảnh cho AI.</p></div></div><form id="message-form" class="composer"><div id="previews" class="previews" hidden></div><div class="compose-row"><label class="attach" title="Gửi ảnh"><input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple>＋</label><textarea id="message-text" maxlength="4000" rows="1" placeholder="Hỏi AI điều gì đó…"></textarea><button id="send-message" type="submit">Gửi</button></div><small>Tối đa 4.000 ký tự · 3 ảnh · 5 MB mỗi ảnh</small></form><p id="message-error" class="error"></p></article>
+      <aside class="sessions">
+        <div class="session-head"><div><span>PHIÊN CỦA BẠN</span><strong id="session-state">Đang hoạt động</strong></div><time id="chat-timer">60:00</time></div>
+        <div id="session-list"></div>
+        <button id="new-session" type="button" hidden>＋ Mở phiên mới</button>
+        <p class="privacy"><i>⌾</i>Nội dung và ảnh được giữ 7 ngày sau khi phiên kết thúc.</p>
+      </aside>
+      <article class="conversation">
+        <header><div class="avatar"><span>✦</span>AI</div><div><strong>Locly AI</strong><span><i></i> AI do người hỗ trợ vận hành</span></div><div class="conversation-status"><i id="live-dot"></i><small id="conversation-label">Trực tuyến</small></div></header>
+        <div id="messages" class="messages"><div class="empty"><span>✦</span><b>Chào bạn, mình là Locly AI</b><p>Gửi câu hỏi hoặc ảnh để bắt đầu cuộc trò chuyện.</p></div></div>
+        <form id="message-form" class="composer">
+          <div id="previews" class="previews" hidden></div>
+          <div class="compose-row"><label class="attach" title="Gửi ảnh" aria-label="Đính kèm ảnh"><input id="image-input" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" multiple><span>＋</span></label><textarea id="message-text" maxlength="4000" rows="1" placeholder="Hỏi Locly AI điều gì đó…"></textarea><button id="send-message" type="submit" aria-label="Gửi tin nhắn"><span>Gửi</span><i>↑</i></button></div>
+          <div class="compose-meta"><small>JPEG, PNG, WebP · tối đa 3 ảnh</small><small><b id="character-count">0</b>/4.000</small></div>
+        </form>
+        <p id="message-error" class="error"></p>
+      </article>
     </section>
   </main>
-  <footer><span>locly.ai</span><a href="/ai/admin">Quản trị AI</a></footer>
+
+  <footer><a class="brand footer-brand" href="/ai"><i>✦</i>locly<span>.ai</span></a><p>AI riêng tư cho những câu hỏi cần được lắng nghe.</p><a href="/ai/admin">Quản trị AI</a></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <dialog id="image-lightbox" class="image-lightbox"><button id="image-lightbox-close" class="lightbox-close" type="button" aria-label="Đóng ảnh">×</button><img id="image-lightbox-img" alt=""><p id="image-lightbox-caption"></p></dialog>
 </body>
 </html>
