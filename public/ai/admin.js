@@ -80,7 +80,7 @@
   async function refresh() {
     clearTimeout(pollTimer);
     try {
-      const data = await api('/api/chat/admin/bootstrap'); csrf = data.csrf; sessions = data.sessions; clockOffset = (data.sessions[0]?.serverNow || Date.now()) - Date.now(); $('admin-status').textContent = data.ready ? 'Kho ảnh và Firestore đang hoạt động.' : 'Dịch vụ chat chưa sẵn sàng.';
+      const data = await api('/api/chat/admin/bootstrap'); csrf = data.csrf; sessions = data.sessions; clockOffset = (data.sessions[0]?.serverNow || Date.now()) - Date.now(); $('admin-status').textContent = data.ready ? 'Firestore và ảnh riêng tư đang hoạt động.' : 'Dịch vụ chat chưa sẵn sàng.';
       const userTotal = sessions.reduce((sum, item) => sum + (item.userMessageCount || 0), 0); if (previousUserTotal != null && userTotal > previousUserTotal) beep(); previousUserTotal = userTotal;
       if (selected) { const updated = sessions.find(item => item.id === selected.id); if (updated) selected = updated; else selected = null; }
       else if (sessions.length) await selectSession(sessions[0]);

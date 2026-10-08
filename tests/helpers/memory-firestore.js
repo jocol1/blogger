@@ -7,11 +7,12 @@ class MemoryFirestore {
     return {
       doc(id) { return { path: `${name}/${id}`, async get() { return db.snapshot(this.path); }, async set(data, options) { const current = db.rows.get(this.path); db.rows.set(this.path, structuredClone(options?.merge && current ? { ...current, ...data } : data)); db.version++; }, async delete() { db.rows.delete(this.path); db.version++; } }; },
       where(field, operator, value) {
-        if (operator !== '>') throw new Error('Unsupported query');
-        return { orderBy(order) { return { limit(count) { return { async get() {
-          const matches = [...db.rows.entries()].filter(([key, row]) => key.startsWith(`${name}/`) && row[field] > value).sort((a, b) => a[1][order] - b[1][order]).slice(0, count);
+        if (!['>', '<'].includes(operator)) throw new Error('Unsupported query');
+        const result = (count, order = field) => ({ async get() {
+          const matches = [...db.rows.entries()].filter(([key, row]) => key.startsWith(`${name}/`) && (operator === '>' ? row[field] > value : row[field] < value)).sort((a, b) => a[1][order] - b[1][order]).slice(0, count);
           return { docs: matches.map(([key]) => db.snapshot(key)) };
-        } }; } }; } };
+        } });
+        return { limit: count => result(count), orderBy(order) { return { limit: count => result(count, order) }; } };
       },
     };
   }

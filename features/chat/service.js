@@ -8,6 +8,7 @@ const MAX_ACTIVE = 3;
 const MAX_TEXT = 4000;
 const MAX_IMAGES = 3;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_STORED_IMAGE_BYTES = 700 * 1024;
 // Keep a session below Firestore's 500-write transaction limit so retention
 // cleanup can delete every message and mark the session purged atomically.
 const MAX_MESSAGES = 400;
@@ -51,10 +52,7 @@ function publicSession(row, now) {
   };
 }
 
-function createChatService({ db, bucket, buckets = [], now = () => Date.now() }) {
-  const storageCandidates = [bucket, ...buckets].filter(Boolean);
-  let storageBucket = null;
-  let storageVerified = false;
+function createChatService({ db, now = () => Date.now() }) {
   let maintenanceTimer = null;
   let lastOrphanSweep = 0;
   const col = name => db.collection(name);
@@ -62,8 +60,9 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
   const walletTokens = () => col('game_wallet_tokens');
   const sessions = () => col('chat_sessions');
   const messages = () => col('chat_messages');
+  const images = () => col('chat_images');
   const metaRef = () => col('chat_meta').doc('sessions');
-  const ready = () => Boolean(db && storageBucket && storageVerified);
+  const ready = () => Boolean(db);
   const requireDb = () => { if (!db) throw new ChatError(503, 'Trợ lý chat chưa sẵn sàng. Vui lòng quay lại sau.'); };
   const requireReady = () => { if (!ready()) throw new ChatError(503, 'Trợ lý chat chưa sẵn sàng. Vui lòng quay lại sau.'); };
 
@@ -77,30 +76,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
   }
 
   async function verifyStorage() {
-    if (!db || !storageCandidates.length) return false;
-    let lastError;
-    for (const candidate of storageCandidates) {
-      let probe = null;
-      try {
-        const probePath = `private-chat-health/${crypto.randomUUID()}.txt`;
-        probe = candidate.file(probePath);
-        await probe.save(Buffer.from('ok'), { resumable: false, contentType: 'text/plain', metadata: { cacheControl: 'private, no-store, max-age=0' } });
-        const [contents] = await probe.download();
-        if (!Buffer.isBuffer(contents) || contents.toString() !== 'ok') throw new Error('storage health check mismatch');
-        await probe.delete({ ignoreNotFound: true });
-        probe = null;
-        storageBucket = candidate;
-        storageVerified = true;
-        return true;
-      } catch (error) {
-        lastError = error;
-        if (probe) await probe.delete({ ignoreNotFound: true }).catch(() => {});
-      }
-    }
-    storageBucket = null;
-    storageVerified = false;
-    console.error('Chat storage verification failed:', lastError?.code || lastError?.name || 'unavailable');
-    return false;
+    return Boolean(db);
   }
 
   async function sessionForWallet(token, sessionIdValue, allowPurged = false) {
@@ -112,7 +88,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
     const snapshot = await sessions().doc(sessionId).get();
     if (!snapshot.exists || snapshot.data().walletId !== walletId) throw new ChatError(404, 'Không tìm thấy phiên trò chuyện.');
     const row = snapshot.data();
-    if (!allowPurged && (row.status === 'purged' || now() >= row.purgeAt)) throw new ChatError(410, 'Nội dung phiên trò chuyện đã hết thời hạn lưu trữ.');
+    if (!allowPurged && (row.status === 'purged' || row.status === 'purging' || now() >= row.purgeAt)) throw new ChatError(410, 'Nội dung phiên trò chuyện đã hết thời hạn lưu trữ.');
     return { walletId, row };
   }
 
@@ -155,7 +131,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
     });
   }
 
-  async function encodeAndUpload(files, sessionId, messageId) {
+  async function encodeAndStore(files, sessionId, messageId) {
     if (!files?.length) return [];
     if (files.length > MAX_IMAGES) throw new ChatError(400, `Mỗi tin nhắn chỉ được gửi tối đa ${MAX_IMAGES} ảnh.`);
     const attachments = [];
@@ -163,30 +139,42 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       for (let index = 0; index < files.length; index++) {
         const file = files[index];
         if (!file?.buffer || file.buffer.length > MAX_IMAGE_BYTES) throw new ChatError(400, 'Mỗi ảnh tối đa 5 MB.');
-        let pipeline;
         let metadata;
         try {
-          pipeline = sharp(file.buffer, { failOn: 'error', limitInputPixels: 40_000_000 });
-          metadata = await pipeline.metadata();
+          metadata = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 40_000_000 }).metadata();
         } catch {
           throw new ChatError(400, 'Tệp gửi lên không phải ảnh hợp lệ.');
         }
         if (!ALLOWED_FORMATS.has(metadata.format)) throw new ChatError(400, 'Chỉ nhận ảnh JPEG, PNG hoặc WebP.');
-        const output = await pipeline.rotate().resize({ width: 2048, height: 2048, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer();
-        if (output.length > MAX_IMAGE_BYTES) throw new ChatError(400, 'Ảnh sau xử lý vẫn vượt quá 5 MB.');
-        const storagePath = `private-chat/${sessionId}/${messageId}/${crypto.randomUUID()}-${index}.webp`;
-        await storageBucket.file(storagePath).save(output, { resumable: false, contentType: 'image/webp', metadata: { cacheControl: 'private, no-store, max-age=0' } });
-        attachments.push({ index, name: safeFileName(file.originalname), mime: 'image/webp', size: output.length, storagePath });
+        let width = 2048;
+        let quality = 82;
+        let output;
+        for (let attempt = 0; attempt < 7; attempt++) {
+          output = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 40_000_000 }).rotate().resize({ width, height: width, fit: 'inside', withoutEnlargement: true }).webp({ quality }).toBuffer();
+          if (output.length <= MAX_STORED_IMAGE_BYTES) break;
+          width = Math.max(720, Math.round(width * 0.78));
+          quality = Math.max(48, quality - 7);
+        }
+        if (!output || output.length > MAX_STORED_IMAGE_BYTES) throw new ChatError(400, 'Ảnh quá phức tạp để lưu. Hãy chọn ảnh nhỏ hơn.');
+        const imageId = crypto.randomUUID().replace(/-/g, '');
+        const createdAtMs = now();
+        const attachment = { index, name: safeFileName(file.originalname), mime: 'image/webp', size: output.length, imageId };
+        await images().doc(imageId).set({ id: imageId, sessionId, messageId, index, data: output, mime: attachment.mime, name: attachment.name, size: output.length, createdAt: iso(createdAtMs), createdAtMs });
+        attachments.push(attachment);
       }
       return attachments;
     } catch (error) {
-      await removeFiles(attachments);
+      await removeImages(attachments);
       throw error;
     }
   }
 
-  async function removeFiles(attachments) {
-    await Promise.allSettled((attachments || []).map(item => storageBucket.file(item.storagePath).delete({ ignoreNotFound: true })));
+  async function removeImages(attachments, strict = false) {
+    const results = await Promise.allSettled((attachments || []).map(item => item.imageId ? images().doc(item.imageId).delete() : null));
+    if (strict) {
+      const failed = results.find(item => item.status === 'rejected');
+      if (failed) throw failed.reason;
+    }
   }
 
   async function sendMessage({ sessionIdValue, requestIdValue, textValue, files, role, walletToken }) {
@@ -201,7 +189,6 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
     const messageId = hash(`${sessionId}:${role}:${requestId}`).slice(0, 32);
     const existing = await messages().doc(messageId).get();
     if (existing.exists) return existing.data();
-    if (files?.length) requireReady();
     const before = await sessions().doc(sessionId).get();
     if (!before.exists || (role === 'user' && before.data().walletId !== walletId)) throw new ChatError(404, 'Không tìm thấy phiên trò chuyện.');
     if (before.data().status !== 'active' || now() >= before.data().expiresAt) {
@@ -210,7 +197,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
     }
     let attachments = [];
     try {
-      attachments = await encodeAndUpload(files, sessionId, messageId);
+      attachments = await encodeAndStore(files, sessionId, messageId);
       const at = now();
       const result = await db.runTransaction(async tx => {
         const sessionRef = sessions().doc(sessionId);
@@ -229,11 +216,11 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
         tx.update(sessionRef, { messageCount: seq, messageIds: [...(session.messageIds || []), messageId], userMessageCount: (session.userMessageCount || 0) + (role === 'user' ? 1 : 0), adminMessageCount: (session.adminMessageCount || 0) + (role === 'admin' ? 1 : 0), updatedAt: createdAt, ...(role === 'admin' ? { adminRepliedAt: session.adminRepliedAt || createdAt } : {}) });
         return row;
       });
-      const keptPaths = new Set((result.attachments || []).map(item => item.storagePath));
-      await removeFiles(attachments.filter(item => !keptPaths.has(item.storagePath)));
+      const keptIds = new Set((result.attachments || []).map(item => item.imageId));
+      await removeImages(attachments.filter(item => !keptIds.has(item.imageId)));
       return result;
     } catch (error) {
-      await removeFiles(attachments);
+      await removeImages(attachments);
       throw error;
     }
   }
@@ -251,37 +238,29 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
 
   async function purgeSession(sessionIdValue) {
     const sessionId = cleanId(sessionIdValue);
-    if (!sessionId || !db || !storageBucket) return false;
+    if (!sessionId || !db) return false;
     const snapshot = await sessions().doc(sessionId).get();
     if (!snapshot.exists) return false;
     const row = snapshot.data();
     if (row.status === 'purged' || now() < row.purgeAt) return false;
+    await sessions().doc(sessionId).set({ status: 'purging', updatedAt: iso(now()) }, { merge: true });
     const messageSnapshots = await Promise.all((row.messageIds || []).map(id => messages().doc(id).get()));
     const attachments = messageSnapshots.filter(item => item.exists).flatMap(item => item.data().attachments || []);
-    await removeFiles(attachments);
-    await db.runTransaction(async tx => {
-      const sessionRef = sessions().doc(sessionId);
-      const current = await tx.get(sessionRef);
-      const currentMessages = await Promise.all((current.exists ? current.data().messageIds || [] : []).map(id => tx.get(messages().doc(id))));
-      if (!current.exists || current.data().status === 'purged') return;
-      for (const item of currentMessages) if (item.exists) tx.delete(messages().doc(item.data().id));
-      tx.update(sessionRef, { status: 'purged', messageIds: [], messageCount: 0, contentPurgedAt: iso(now()), updatedAt: iso(now()) });
-    });
+    await removeImages(attachments, true);
+    await Promise.all(messageSnapshots.filter(item => item.exists).map(item => messages().doc(item.data().id).delete()));
+    await sessions().doc(sessionId).set({ status: 'purged', messageIds: [], messageCount: 0, contentPurgedAt: iso(now()), updatedAt: iso(now()) }, { merge: true });
     return true;
   }
 
   async function cleanupOrphanImages() {
     const at = now();
-    if (!storageBucket?.getFiles || at - lastOrphanSweep < 60 * 60 * 1000) return;
-    lastOrphanSweep = at;
-    const [files] = await storageBucket.getFiles({ prefix: 'private-chat/' });
-    for (const file of files) {
-      const created = Date.parse(file.metadata?.timeCreated || '');
-      if (!Number.isFinite(created) || at - created < 60 * 60 * 1000) continue;
-      const parts = String(file.name || '').split('/');
-      const messageId = parts.length === 4 ? cleanId(parts[2]) : null;
-      if (!messageId || !(await messages().doc(messageId).get()).exists) await file.delete({ ignoreNotFound: true });
+    if (!db || at - lastOrphanSweep < 60 * 60 * 1000) return;
+    const stale = await images().where('createdAtMs', '<', at - 60 * 60 * 1000).limit(200).get();
+    for (const image of stale.docs) {
+      const row = image.data();
+      if (!row.messageId || !(await messages().doc(row.messageId).get()).exists) await images().doc(row.id).delete();
     }
+    lastOrphanSweep = at;
   }
 
   async function sweep() {
@@ -370,7 +349,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       for (const id of ids) await settleExpired(id);
       const snapshots = await Promise.all(ids.map(id => sessions().doc(id).get()));
       const at = now();
-      const rows = snapshots.filter(item => item.exists).map(item => item.data()).filter(row => row.status !== 'purged' && at < row.purgeAt);
+      const rows = snapshots.filter(item => item.exists).map(item => item.data()).filter(row => !['purged', 'purging'].includes(row.status) && at < row.purgeAt);
       return { sessions: rows.map(row => publicSession(row, at)), activeSessionId: rows.find(row => row.status === 'active' && row.expiresAt > at)?.id || null, serverNow: at };
     },
     async get(walletToken, sessionId) {
@@ -389,7 +368,7 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       const ids = meta.exists ? (meta.data().ids || []).slice().reverse() : [];
       const snapshots = await Promise.all(ids.map(id => sessions().doc(id).get()));
       const at = now();
-      return snapshots.filter(item => item.exists).map(item => item.data()).filter(row => row.status !== 'purged' && at < row.purgeAt).map(row => publicSession(row, at));
+      return snapshots.filter(item => item.exists).map(item => item.data()).filter(row => !['purged', 'purging'].includes(row.status) && at < row.purgeAt).map(row => publicSession(row, at));
     },
     async adminMessages(sessionIdValue, after) {
       requireDb();
@@ -397,12 +376,12 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       if (!sessionId) throw new ChatError(400, 'Phiên trò chuyện không hợp lệ.');
       await settleExpired(sessionId);
       const snapshot = await sessions().doc(sessionId).get();
-      if (!snapshot.exists || snapshot.data().status === 'purged' || now() >= snapshot.data().purgeAt) throw new ChatError(404, 'Không tìm thấy phiên trò chuyện.');
+      if (!snapshot.exists || ['purged', 'purging'].includes(snapshot.data().status) || now() >= snapshot.data().purgeAt) throw new ChatError(404, 'Không tìm thấy phiên trò chuyện.');
       return listMessages(snapshot.data(), after);
     },
     sendAdminMessage(sessionId, input, files) { return sendMessage({ sessionIdValue: sessionId, requestIdValue: input?.requestId, textValue: input?.text, files, role: 'admin' }); },
     async readImage({ walletToken, sessionIdValue, messageIdValue, indexValue, admin = false }) {
-      requireReady();
+      requireDb();
       const sessionId = cleanId(sessionIdValue);
       const messageId = cleanId(messageIdValue);
       const index = Number(indexValue);
@@ -410,14 +389,15 @@ function createChatService({ db, bucket, buckets = [], now = () => Date.now() })
       if (!admin) await sessionForWallet(walletToken, sessionId);
       else {
         const session = await sessions().doc(sessionId).get();
-        if (!session.exists || session.data().status === 'purged' || now() >= session.data().purgeAt) throw new ChatError(404, 'Không tìm thấy ảnh.');
+        if (!session.exists || ['purged', 'purging'].includes(session.data().status) || now() >= session.data().purgeAt) throw new ChatError(404, 'Không tìm thấy ảnh.');
       }
       const message = await messages().doc(messageId).get();
       if (!message.exists || message.data().sessionId !== sessionId) throw new ChatError(404, 'Không tìm thấy ảnh.');
       const attachment = (message.data().attachments || []).find(item => item.index === index);
       if (!attachment) throw new ChatError(404, 'Không tìm thấy ảnh.');
-      const [buffer] = await storageBucket.file(attachment.storagePath).download();
-      return { buffer, mime: attachment.mime, name: attachment.name };
+      const image = await images().doc(attachment.imageId).get();
+      if (!image.exists || image.data().sessionId !== sessionId || image.data().messageId !== messageId) throw new ChatError(404, 'Không tìm thấy ảnh.');
+      return { buffer: Buffer.from(image.data().data), mime: attachment.mime, name: attachment.name };
     },
   };
 }

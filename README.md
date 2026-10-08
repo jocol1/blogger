@@ -1,6 +1,6 @@
 # Blogger Vault / Tiệm game trà sữa
 
-Ứng dụng Express dùng Firebase Admin, Firestore và Firebase Storage. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), hai trang công khai là `/xin-tien` và `/ai`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
+Ứng dụng Express dùng Firebase Admin và Firestore. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), hai trang công khai là `/xin-tien` và `/ai`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
 
 ## Chạy local
 
@@ -28,7 +28,7 @@ Chỉ các QR được tạo từ phiên bản ví mới mới cộng xu. Các m
 
 Trang chat dùng chung ví xu. Khách bấm bắt đầu để trả 10 xu và mở một phiên 60 phút chạy liên tục. Đây là dịch vụ do người quản trị trực tiếp đọc và trả lời, không gọi API AI. Hệ thống nhận tối đa ba phiên còn hạn cùng lúc; khách thứ tư không bị trừ xu. Nếu hết giờ mà quản trị chưa gửi phản hồi nào, 10 xu được hoàn nguyên tử đúng một lần.
 
-Khách và quản trị gửi được văn bản cùng tối đa ba ảnh JPEG, PNG hoặc WebP, mỗi ảnh tối đa 5 MB. Server giải mã, xoay và mã hóa lại ảnh thành WebP trước khi lưu trong bucket riêng tư. Ảnh chỉ đọc qua API đã xác thực, không có URL Storage công khai. Tin nhắn và ảnh hết quyền truy cập, sau đó được xóa vật lý sau 7 ngày kể từ lúc phiên kết thúc.
+Khách và quản trị gửi được văn bản cùng tối đa ba ảnh JPEG, PNG hoặc WebP, mỗi ảnh tải lên tối đa 5 MB. Server giải mã, xoay, thu nhỏ và nén mỗi ảnh thành WebP dưới 700 KB trước khi lưu trong document Firestore riêng tư. Ảnh chỉ đọc qua API đã xác thực, không có URL công khai. Tin nhắn và ảnh hết quyền truy cập, sau đó được xóa sau 7 ngày kể từ lúc phiên kết thúc.
 
 Trang quản trị chat ở `/ai/admin`, dùng chung `ADMIN_PASSWORD` và phiên đăng nhập hiện có. Âm báo tin mới mặc định tắt.
 
@@ -43,8 +43,6 @@ DONATION_BANK_CODE=MB
 DONATION_BANK_ACCOUNT=6999912092003
 DONATION_BANK_ACCOUNT_NAME="LY TAN LOC"
 SEPAY_WEBHOOK_API_KEY=<khoa-webhook-rieng>
-CHAT_STORAGE_BUCKET=<ten-firebase-storage-bucket>
-CHAT_STORAGE_AUTO_CREATE=false
 PAYMENT_PAGE_ONLY=true
 ```
 
@@ -54,7 +52,7 @@ Sinh khóa ngẫu nhiên bằng:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Firebase phải kết nối được tới Firestore. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. `CHAT_STORAGE_BUCKET` là tên bucket, ví dụ `project-id.firebasestorage.app`; nếu bỏ trống, server thử hai tên bucket mặc định của dự án. Service account cần quyền đọc, ghi và xóa object. Dự án sản xuất `blog-a8645` tự tạo bucket riêng tư ở Singapore khi còn thiếu; dự án khác chỉ tự tạo khi đặt `CHAT_STORAGE_AUTO_CREATE=true`. Bucket chặn truy cập công khai, dùng quyền đồng nhất và tắt soft-delete để tác vụ dọn dữ liệu sau 7 ngày xóa thật. Server kiểm tra lại bucket mỗi phút và chỉ cho mua giờ chat sau khi đọc/ghi/xóa thử thành công. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
+Firebase chỉ cần kết nối được tới Firestore, không cần bật Firebase Storage hay nâng cấp gói để dùng ảnh chat. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. Server chỉ cho mua giờ chat khi Firestore hoạt động. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
 
 Trang quản trị ở `/xin-tien/admin`, dùng `ADMIN_PASSWORD`. Phiên đăng nhập nằm ở server, cookie `httpOnly`, thao tác thay đổi trạng thái có CSRF token và đăng nhập bị giới hạn số lần thử. Trang này hiển thị thông tin liên hệ cùng lịch sử xu gần đây của ví.
 
@@ -79,7 +77,7 @@ Các collection riêng của tính năng này:
 - `game_sessions`
 - `game_redemptions`, `game_meta`
 - `donation_requests`, `donation_tokens`, `donation_idempotency`, `donation_sepay_events`
-- `chat_sessions`, `chat_messages`, `chat_meta`
+- `chat_sessions`, `chat_messages`, `chat_images`, `chat_meta`
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -104,9 +102,9 @@ npm test
 node tests/preview.js
 ```
 
-`npm test` dùng Firestore và Storage test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, mã hóa WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần và xóa dữ liệu sau 7 ngày.
+`npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần và xóa dữ liệu sau 7 ngày.
 
-Preview ở `http://127.0.0.1:3101/xin-tien` và `/ai` dùng RAM, kho ảnh giả, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị chat local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
+Preview ở `http://127.0.0.1:3101/xin-tien` và `/ai` dùng RAM, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị chat local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
 
 ```powershell
 $testPayload = @{

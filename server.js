@@ -10,8 +10,6 @@ const { marked } = require('marked');
 const sanitizeHtml = require('sanitize-html');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
-const { getStorage } = require('firebase-admin/storage');
-const { Storage } = require('@google-cloud/storage');
 const { createDonationRouter } = require('./features/donations/routes');
 const { createChatRouter } = require('./features/chat/routes');
 
@@ -27,39 +25,16 @@ const store = fs.existsSync(dbFile) ? JSON.parse(fs.readFileSync(dbFile, 'utf8')
 store.posts = store.posts || []; store.notes = store.notes || []; store.habits = store.habits || [];
 let firestore = null;
 let firebaseApp = null;
-let firebaseProjectId = null;
-let firebaseCredentials = null;
 if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
   const serviceAccount = JSON.parse(Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8'));
-  firebaseProjectId = serviceAccount.project_id;
-  firebaseCredentials = serviceAccount;
   firebaseApp = initializeApp({ credential: cert(serviceAccount) });
   firestore = getFirestore(firebaseApp);
 } else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_CLIENT_EMAIL && process.env.FIREBASE_PRIVATE_KEY) {
-  firebaseProjectId = process.env.FIREBASE_PROJECT_ID;
   let privateKey = process.env.FIREBASE_PRIVATE_KEY.trim();
   if ((privateKey.startsWith('"') && privateKey.endsWith('"')) || (privateKey.startsWith("'") && privateKey.endsWith("'"))) privateKey = privateKey.slice(1, -1);
   privateKey = privateKey.replace(/\\n/g, '\n').replace(/\\r/g, '').replace(/\r\n/g, '\n');
-  firebaseCredentials = { client_email: process.env.FIREBASE_CLIENT_EMAIL, private_key: privateKey };
   firebaseApp = initializeApp({ credential: cert({ projectId: process.env.FIREBASE_PROJECT_ID, clientEmail: process.env.FIREBASE_CLIENT_EMAIL, privateKey }) });
   firestore = getFirestore(firebaseApp);
-}
-const chatBucketNames = firebaseApp ? [...new Set([process.env.CHAT_STORAGE_BUCKET?.trim(), firebaseProjectId && `${firebaseProjectId}.firebasestorage.app`, firebaseProjectId && `${firebaseProjectId}.appspot.com`].filter(Boolean))] : [];
-const chatBuckets = chatBucketNames.map(name => getStorage(firebaseApp).bucket(name));
-async function ensureChatStorageBucket() {
-  const autoCreate = process.env.CHAT_STORAGE_AUTO_CREATE === 'true' || firebaseProjectId === 'blog-a8645';
-  if (!autoCreate || !firebaseCredentials || !firebaseProjectId || !chatBucketNames.length) return;
-  const bucketName = chatBucketNames[0];
-  const storage = new Storage({ projectId: firebaseProjectId, credentials: firebaseCredentials });
-  const [exists] = await storage.bucket(bucketName).exists();
-  if (exists) return;
-  await storage.createBucket(bucketName, {
-    location: 'ASIA-SOUTHEAST1',
-    storageClass: 'STANDARD',
-    iamConfiguration: { publicAccessPrevention: 'enforced', uniformBucketLevelAccess: { enabled: true } },
-    softDeletePolicy: { retentionDurationSeconds: 0 },
-  });
-  console.log(`Đã tạo bucket ảnh chat riêng tư: ${bucketName}`);
 }
 function save() { fs.writeFileSync(dbFile, JSON.stringify(store, null, 2), { mode: 0o600 }); if (firestore) syncRemote().catch(error => console.error('Firestore sync failed:', error.message)); }
 async function syncRemote() { const batch = firestore.batch(); for (const post of store.posts) batch.set(firestore.collection('posts').doc(post.id), post); for (const note of store.notes) batch.set(firestore.collection('notes').doc(note.id), note); for (const habit of store.habits) batch.set(firestore.collection('habits').doc(habit.id), habit); await batch.commit(); }
@@ -106,7 +81,7 @@ const editorialCss = `body{background:#f7f7f5;color:#181818}.editorial-header{he
 app.set('trust proxy', 1);
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
 app.use(createDonationRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
-app.use(createChatRouter({ db: firestore, buckets: chatBuckets, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 // Keep the former blog in place, but make only the public payment page reachable while this switch is on.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {
@@ -139,7 +114,6 @@ app.get('/notes/:id',auth,(req,res)=>{const n=store.notes.find(x=>x.id===req.par
 app.post('/notes/:id',auth,(req,res)=>{const n=store.notes.find(x=>x.id===req.params.id);if(!n)return res.sendStatus(404);if(!bcrypt.compareSync(req.body.password||'',n.passwordHash))return res.redirect(`/notes/${n.id}?error=1`);try{const body=decryptNote(n.payload,req.body.password);res.send(layout(n.title,`<article class="card"><h1>${esc(n.title)}</h1><div class="markdown">${marked.parse(body)}</div></article>`,req));}catch{res.redirect(`/notes/${n.id}?error=1`);}});
 app.use((err,req,res,next)=>{console.error(err);res.status(500).send(layout('Lỗi','<div class="card"><h1>Có lỗi xảy ra</h1><p>Kiểm tra log server để biết chi tiết.</p></div>',req));});
 async function start() {
-  try { await ensureChatStorageBucket(); } catch (error) { console.error('Không thể chuẩn bị bucket ảnh chat:', error.code || error.message); }
   try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
   app.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
 }

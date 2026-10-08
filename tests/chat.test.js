@@ -46,12 +46,12 @@ function setup() {
   };
 }
 
-test('chat remains unavailable until private storage is verified', async () => {
+test('chat is ready with Firestore and does not require a paid Storage bucket', async () => {
   const state = setup();
-  assert.equal((await state.chat.publicConfig()).ready, false);
+  assert.equal((await state.chat.publicConfig()).ready, true);
   state.bucket.available = false;
-  assert.equal(await state.chat.verifyStorage(), false);
-  await assert.rejects(state.chat.start('bad', { requestId: requestId() }), { status: 503 });
+  assert.equal(await state.chat.verifyStorage(), true);
+  await assert.rejects(state.chat.start('bad', { requestId: requestId() }), { status: 401 });
 });
 
 test('starting a session costs 10 coins and retries never charge twice', async () => {
@@ -95,7 +95,8 @@ test('messages are ordered, idempotent, private and images are re-encoded to Web
   assert.equal(first.text, '<b>xin chào</b>');
   assert.equal(first.attachments[0].mime, 'image/webp');
   assert.equal(first.attachments[0].name, '.._ảnh.png');
-  assert.equal((await sharp([...state.bucket.files.values()][0].buffer).metadata()).format, 'webp');
+  const storedImage = [...state.db.rows.entries()].find(([key]) => key.startsWith('chat_images/'))[1];
+  assert.equal((await sharp(Buffer.from(storedImage.data)).metadata()).format, 'webp');
   const page = await state.chat.messages(owner.token, session.id, 0);
   assert.deepEqual(page.messages.map(item => item.seq), [1]);
   assert.equal('storagePath' in page.messages[0].attachments[0], false);
@@ -115,7 +116,7 @@ test('simultaneous image retries keep one message and remove the losing upload',
     state.chat.sendUserMessage(wallet.token, session.id, { requestId: sendId, text: 'hai' }, [{ buffer: blue, originalname: 'blue.png' }]),
   ]);
   assert.equal(rows[0].id, rows[1].id);
-  assert.equal(state.bucket.files.size, 1);
+  assert.equal([...state.db.rows.keys()].filter(key => key.startsWith('chat_images/')).length, 1);
   assert.equal((await state.chat.messages(wallet.token, session.id, 0)).messages.length, 1);
 });
 
@@ -131,8 +132,6 @@ test('SVG, fake images, oversized text and too many images are rejected', async 
 test('an unanswered expired session refunds 10 coins exactly once', async () => {
   const state = setup(); await state.ready();
   const wallet = await state.wallet(10_000); const session = await state.chat.start(wallet.token, { requestId: requestId() });
-  state.bucket.available = false;
-  assert.equal(await state.chat.verifyStorage(), false);
   state.setNow(session.expiresAt + 1);
   await Promise.all([state.chat.sweep(), ...Array.from({ length: 8 }, () => state.chat.settleExpired(session.id))]);
   assert.equal((await state.donations.wallet(wallet.token)).balance, 10);
@@ -157,10 +156,10 @@ test('purging after seven days deletes message documents and image bytes', async
   const wallet = await state.wallet(10_000); const session = await state.chat.start(wallet.token, { requestId: requestId() });
   const png = await sharp({ create: { width: 3, height: 3, channels: 3, background: '#123456' } }).png().toBuffer();
   const message = await state.chat.sendUserMessage(wallet.token, session.id, { requestId: requestId(), text: '' }, [{ buffer: png, originalname: 'x.png' }]);
-  assert.equal(state.bucket.files.size, 1);
+  assert.equal([...state.db.rows.keys()].filter(key => key.startsWith('chat_images/')).length, 1);
   state.setNow(session.expiresAt + RETENTION_MS + 1);
   await state.chat.sweep();
-  assert.equal(state.bucket.files.size, 0);
+  assert.equal([...state.db.rows.keys()].filter(key => key.startsWith('chat_images/')).length, 0);
   assert.equal(state.db.rows.has(`chat_messages/${message.id}`), false);
   await assert.rejects(state.chat.get(wallet.token, session.id), { status: 410 });
 });
