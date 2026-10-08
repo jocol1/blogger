@@ -15,6 +15,14 @@
   const readKey = 'locly-chat-admin-read';
   let readCounts = (() => { try { return JSON.parse(localStorage.getItem(readKey)) || {}; } catch { return {}; } })();
 
+  function openImage(image) {
+    if (!image?.src) return;
+    $('image-lightbox-img').src = image.src;
+    $('image-lightbox-img').alt = image.alt || 'Ảnh phóng lớn';
+    $('image-lightbox-caption').textContent = image.alt || '';
+    $('image-lightbox').showModal();
+  }
+
   async function api(url, options = {}) {
     const response = await fetch(url, { ...options, cache: 'no-store', signal: AbortSignal.timeout(15_000) });
     const body = await response.json().catch(() => ({}));
@@ -48,7 +56,9 @@
     $('admin-text').disabled = !active; $('admin-images').disabled = !active; $('admin-send').disabled = !active;
   }
   function renderImage(sessionId, messageId, attachment) {
-    const image = document.createElement('img'); image.loading = 'lazy'; image.alt = attachment.name; image.src = `/api/chat/sessions/${sessionId}/images/${messageId}/${attachment.index}`; return image;
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'image-open'; button.setAttribute('aria-label', `Phóng lớn ${attachment.name || 'ảnh đính kèm'}`);
+    const image = document.createElement('img'); image.loading = 'lazy'; image.alt = attachment.name; image.src = `/api/chat/sessions/${sessionId}/images/${messageId}/${attachment.index}`;
+    button.addEventListener('click', () => openImage(image)); button.append(image); return button;
   }
   function appendMessages(items, sessionId) {
     const box = $('admin-messages'); const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 90;
@@ -92,6 +102,8 @@
     const holder = $('admin-previews'); holder.replaceChildren(); selectedFiles.forEach((file, index) => { const box = document.createElement('div'); box.className = 'preview'; const image = document.createElement('img'); image.src = URL.createObjectURL(file); const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = '×'; remove.addEventListener('click', () => { selectedFiles.splice(index, 1); renderPreviews(); }); box.append(image, remove); holder.append(box); }); holder.hidden = !selectedFiles.length;
   }
   $('admin-images').addEventListener('change', event => { const files = [...event.target.files]; if (selectedFiles.length + files.length > 3) { $('admin-error').textContent = 'Tối đa 3 ảnh.'; return; } selectedFiles.push(...files); event.target.value = ''; renderPreviews(); });
+  $('image-lightbox-close').addEventListener('click', () => $('image-lightbox').close());
+  $('image-lightbox').addEventListener('click', event => { if (event.target === $('image-lightbox')) $('image-lightbox').close(); });
   $('admin-form').addEventListener('submit', async event => {
     event.preventDefault(); if (!selected) return; $('admin-error').textContent = ''; $('admin-send').disabled = true;
     replyAttemptId ||= requestId(); const data = new FormData(); data.append('requestId', replyAttemptId); data.append('text', $('admin-text').value); selectedFiles.forEach(file => data.append('images', file, file.name));

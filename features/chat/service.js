@@ -63,8 +63,8 @@ function createChatService({ db, now = () => Date.now() }) {
   const images = () => col('chat_images');
   const metaRef = () => col('chat_meta').doc('sessions');
   const ready = () => Boolean(db);
-  const requireDb = () => { if (!db) throw new ChatError(503, 'Trợ lý chat chưa sẵn sàng. Vui lòng quay lại sau.'); };
-  const requireReady = () => { if (!ready()) throw new ChatError(503, 'Trợ lý chat chưa sẵn sàng. Vui lòng quay lại sau.'); };
+  const requireDb = () => { if (!db) throw new ChatError(503, 'Locly AI chưa sẵn sàng. Vui lòng quay lại sau.'); };
+  const requireReady = () => { if (!ready()) throw new ChatError(503, 'Locly AI chưa sẵn sàng. Vui lòng quay lại sau.'); };
 
   async function walletIdFor(token) {
     requireDb();

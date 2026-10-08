@@ -24,13 +24,13 @@ Trình duyệt giữ một mã ví ngẫu nhiên trong `localStorage`. Các tab 
 
 Chỉ các QR được tạo từ phiên bản ví mới mới cộng xu. Các mã cũ không có `walletId` được lưu audit khi webhook đến nhưng không cộng vào ví.
 
-## Trợ lý chat — `/ai`
+## Locly AI — `/ai`
 
-Trang chat dùng chung ví xu. Khách bấm bắt đầu để trả 10 xu và mở một phiên 60 phút chạy liên tục. Đây là dịch vụ do người quản trị trực tiếp đọc và trả lời, không gọi API AI. Hệ thống nhận tối đa ba phiên còn hạn cùng lúc; khách thứ tư không bị trừ xu. Nếu hết giờ mà quản trị chưa gửi phản hồi nào, 10 xu được hoàn nguyên tử đúng một lần.
+Trang AI dùng chung ví xu. Khách bấm bắt đầu để trả 10 xu và mở một phiên 60 phút chạy liên tục. Locly AI do người quản trị trực tiếp vận hành và soạn câu trả lời, không gọi API AI. Hệ thống nhận tối đa ba phiên còn hạn cùng lúc; khách thứ tư không bị trừ xu. Nếu hết giờ mà quản trị chưa gửi phản hồi nào, 10 xu được hoàn nguyên tử đúng một lần.
 
 Khách và quản trị gửi được văn bản cùng tối đa ba ảnh JPEG, PNG hoặc WebP, mỗi ảnh tải lên tối đa 5 MB. Server giải mã, xoay, thu nhỏ và nén mỗi ảnh thành WebP dưới 700 KB trước khi lưu trong document Firestore riêng tư. Ảnh chỉ đọc qua API đã xác thực, không có URL công khai. Tin nhắn và ảnh hết quyền truy cập, sau đó được xóa sau 7 ngày kể từ lúc phiên kết thúc.
 
-Trang quản trị chat ở `/ai/admin`, dùng chung `ADMIN_PASSWORD` và phiên đăng nhập hiện có. Âm báo tin mới mặc định tắt.
+Trang quản trị AI ở `/ai/admin`, dùng chung `ADMIN_PASSWORD` và phiên đăng nhập hiện có. Âm báo tin mới mặc định tắt. Ảnh trong cuộc trò chuyện có thể bấm để xem lớn ở cả trang khách và trang quản trị.
 
 ## Cấu hình
 

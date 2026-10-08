@@ -23,6 +23,14 @@
   let messageTimer = 0;
   let messageAttemptId = null;
 
+  function openImage(image) {
+    if (!image?.src) return;
+    $('image-lightbox-img').src = image.src;
+    $('image-lightbox-img').alt = image.alt || 'Ảnh phóng lớn';
+    $('image-lightbox-caption').textContent = image.alt || '';
+    $('image-lightbox').showModal();
+  }
+
   async function api(url, options = {}, withWallet = true) {
     const headers = { ...(options.headers || {}) };
     if (withWallet && walletToken) headers['X-Wallet-Token'] = walletToken;
@@ -101,13 +109,16 @@
   }
 
   async function attachmentImage(sessionId, messageId, index, alt) {
+    const button = document.createElement('button'); button.type = 'button'; button.className = 'image-open'; button.setAttribute('aria-label', `Phóng lớn ${alt || 'ảnh đính kèm'}`);
     const image = document.createElement('img'); image.alt = alt || 'Ảnh đính kèm'; image.loading = 'lazy';
     try {
       const response = await fetch(`/api/chat/sessions/${sessionId}/images/${messageId}/${index}`, { headers: { 'X-Wallet-Token': walletToken }, cache: 'no-store' });
       if (!response.ok) throw new Error();
       image.src = URL.createObjectURL(await response.blob());
-    } catch { image.alt = 'Không tải được ảnh'; }
-    return image;
+      button.addEventListener('click', () => openImage(image));
+    } catch { image.alt = 'Không tải được ảnh'; button.disabled = true; }
+    button.append(image);
+    return button;
   }
   async function appendMessages(items, sessionId) {
     const box = $('messages');
@@ -157,7 +168,7 @@
     await refreshWallet();
   }
   function renderAvailability() {
-    $('availability').textContent = config?.ready ? (config.available ? 'Sẵn sàng nhận phiên trò chuyện.' : 'Hiện đang bận đủ 3 phiên. Bạn chưa bị trừ xu; hãy quay lại sau.') : 'Trợ lý chat chưa sẵn sàng nhận phiên mới.';
+    $('availability').textContent = config?.ready ? (config.available ? 'Locly AI sẵn sàng nhận phiên mới.' : 'AI đang bận đủ 3 phiên. Bạn chưa bị trừ xu; hãy quay lại sau.') : 'Locly AI chưa sẵn sàng nhận phiên mới.';
     $('availability').hidden = Boolean(config?.ready && config.available);
     if (wallet) renderWallet(wallet);
   }
@@ -179,6 +190,8 @@
   }
 
   document.querySelectorAll('[data-amount]').forEach(button => button.addEventListener('click', () => { document.querySelectorAll('[data-amount]').forEach(item => item.classList.remove('active')); button.classList.add('active'); $('topup-amount').value = button.dataset.amount; }));
+  $('image-lightbox-close').addEventListener('click', () => $('image-lightbox').close());
+  $('image-lightbox').addEventListener('click', event => { if (event.target === $('image-lightbox')) $('image-lightbox').close(); });
   document.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => navigator.clipboard.writeText($(button.dataset.copy).textContent)));
   $('qr-image').addEventListener('error', () => { $('qr-image').hidden = true; $('qr-error').hidden = false; });
   $('topup-form').addEventListener('submit', async event => {
