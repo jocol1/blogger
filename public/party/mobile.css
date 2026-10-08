@@ -1,0 +1,48 @@
+@media (max-width: 680px) {
+  .room-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .play-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    padding: 20px 14px;
+    overflow: hidden;
+  }
+
+  .game-area,
+  .game-content,
+  .game-content > * {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .question {
+    width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .choice-grid,
+  .game-form,
+  .secret-card,
+  .result-card,
+  .clue-list {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .choice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .member-list {
+    scrollbar-width: none;
+  }
+
+  .member-list::-webkit-scrollbar {
+    display: none;
+  }
+}

@@ -44,7 +44,7 @@
     $('reward-progress').style.width = `${progress}%`;
     $('reward-progress-text').textContent = value.balance >= 100 ? 'Đã đủ xu để đổi một ly trà sữa!' : `Còn ${100 - value.balance} xu nữa để đổi trà sữa.`;
     $('redeem-button').disabled = value.balance < 100 || value.redemptionPending;
-    const labels = { deposit: 'Nạp xu', game_cost: 'Phí chơi', game_win: 'Thắng game', game_loss: 'Thua game', redemption: 'Đổi trà sữa', redemption_refund: 'Hoàn xu', chat_cost: 'Mua giờ chat', chat_refund: 'Hoàn giờ chat' };
+    const labels = { deposit: 'Nạp xu', game_cost: 'Phí chơi', game_win: 'Thắng game', game_loss: 'Thua game', redemption: 'Đổi trà sữa', redemption_refund: 'Hoàn xu', chat_cost: 'Mua giờ chat', chat_refund: 'Hoàn giờ chat', party_cost: 'Mở phòng Party', party_refund: 'Hoàn phòng Party' };
     $('history').replaceChildren(...(value.history.length ? value.history.map(item => {
       const row = document.createElement('div');
       row.className = 'history-row';

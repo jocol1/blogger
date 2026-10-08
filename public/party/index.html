@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ff6d4d">
+  <meta name="description" content="Locly Party — tạo phòng, gửi mã cho bạn bè và chơi ba trò cà khịa có duyên.">
+  <title>Locly Party · Càng thân càng dễ bị réo</title>
+  <link rel="stylesheet" href="/assets/party/style.css">
+  <link rel="stylesheet" href="/assets/party/mobile.css">
+  <script src="/assets/party/app.js" defer></script>
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <header class="topbar">
+    <a class="brand" href="/party"><i>✦</i>locly<span>.party</span></a>
+    <nav><a href="/xin-tien">Trò chơi</a><a href="/ai">AI</a><a class="active" href="/party">Party</a></nav>
+    <a class="wallet" href="/xin-tien"><span>VÍ CỦA BẠN</span><strong><b id="wallet-balance">0</b> xu</strong></a>
+  </header>
+
+  <main>
+    <section id="landing">
+      <section class="hero">
+        <div class="hero-copy"><span class="eyebrow">PHÒNG CHƠI CHO HỘI BẠN THÂN</span><h1>Càng thân,<br><em>càng dễ bị réo.</em></h1><p>Một người mở phòng, cả nhóm vào bằng điện thoại. Không cài ứng dụng, không cần đăng nhập — chỉ cần đủ thân để còn nhìn mặt nhau sau trận.</p><div class="hero-facts"><span>3–10 người</span><span>1 trận miễn phí</span><span>Khách vào không tốn xu</span></div></div>
+        <div class="hero-art" aria-hidden="true"><div class="face face-one">ಠ‿ಠ</div><div class="face face-two">¬‿¬</div><div class="face face-three">◉‿◉</div><div class="speech">Ai vừa<br>réo tên tui?</div></div>
+      </section>
+      <p id="availability" class="notice" role="status">Đang kết nối phòng chơi…</p>
+
+      <section class="entry-grid">
+        <article class="entry-card create-card"><span class="card-number">01</span><div class="card-kicker">LÀM CHỦ CUỘC VUI</div><h2>Tạo phòng mới</h2><p>Mời bạn bè bằng mã sáu ký tự. Bạn chọn trò và điều khiển nhịp trận.</p><form id="create-form"><label for="create-name">Biệt danh của bạn</label><input id="create-name" maxlength="30" placeholder="Ví dụ: Chúa tể đi trễ" required><button id="create-room" class="primary"><span>Tạo phòng miễn phí</span><i>→</i></button></form></article>
+        <article class="entry-card join-card"><span class="card-number">02</span><div class="card-kicker">ĐÃ CÓ MÃ PHÒNG</div><h2>Vào réo bạn bè</h2><p>Nhập mã chủ phòng gửi. Người tham gia không cần ví xu.</p><form id="join-form"><label for="join-code">Mã phòng</label><input id="join-code" class="room-code-input" maxlength="6" autocomplete="off" placeholder="ABC123" required><label for="join-name">Biệt danh của bạn</label><input id="join-name" maxlength="30" placeholder="Đừng dùng tên thật cũng được" required><button id="join-room" class="primary coral"><span>Vào phòng</span><i>→</i></button></form></article>
+      </section>
+
+      <section class="game-showcase">
+        <div class="section-heading"><span>BA TRÒ · BA KIỂU MẤT TÌNH BẠN</span><h2>Tối nay réo ai?</h2></div>
+        <div class="showcase-grid">
+          <article><div class="game-icon court-icon">⚖</div><span>01 · BỎ PHIẾU KÍN</span><h3>Tòa án bạn thân</h3><p>Réo tên, nghe biện hộ rồi cả hội quyết định tha hay phạt.</p></article>
+          <article><div class="game-icon writer-icon">✎</div><span>02 · ĐOÁN TÁC GIẢ</span><h3>Ai viết câu này?</h3><p>Cùng trả lời một câu hỏi. Đọc câu bựa và đoán xem ai viết.</p></article>
+          <article><div class="game-icon spy-icon">◉</div><span>03 · GIẤU VAI TRÒ</span><h3>Kẻ nằm vùng</h3><p>Một người nhận từ khác. Nói đủ khéo để không bị cả nhóm phát hiện.</p></article>
+        </div>
+      </section>
+
+      <section class="price-strip"><div><span>CHƠI THỬ</span><strong>1 trận miễn phí</strong><small>Mỗi ví được thử một lần</small></div><b>+</b><div><span>MỞ KHÓA CUỘC VUI</span><strong>19 xu · 2 giờ</strong><small>Mua một lần, cả nhóm cùng chơi</small></div><a href="/xin-tien">Nạp xu <i>→</i></a></section>
+    </section>
+
+    <section id="room-shell" hidden>
+      <header class="room-header"><div><button id="leave-view" class="back-button" type="button">←</button><div><span>PHÒNG PARTY</span><h1 id="room-code">———</h1></div></div><div class="room-share"><button id="sound-toggle" type="button" aria-pressed="false">Âm thanh: tắt</button><button id="copy-link" type="button">Sao chép link mời</button><button id="lock-room" type="button" hidden>Khóa phòng</button></div></header>
+      <p id="room-error" class="error" role="alert"></p>
+
+      <div class="room-layout">
+        <aside class="lobby-panel">
+          <div class="panel-head"><div><span>NGƯỜI CHƠI</span><strong><b id="player-count">0</b>/10 người</strong></div><i id="connection-dot"></i></div>
+          <div id="room-members" class="member-list"></div>
+          <div id="entitlement" class="entitlement"></div>
+          <button id="ready-button" class="ready-button" type="button">Tôi sẵn sàng</button>
+          <button id="purchase-button" class="purchase-button" type="button" hidden>Mở phòng 2 giờ · 19 xu</button>
+          <button id="close-room" class="text-button" type="button" hidden>Đóng phòng</button>
+        </aside>
+
+        <section class="play-panel">
+          <div id="lobby-controls">
+            <div class="play-title"><span>CHỌN TRÒ</span><h2>Cả nhóm muốn mất lòng kiểu nào?</h2></div>
+            <div class="game-picker">
+              <button type="button" data-party-game="court" class="active"><i>⚖</i><span><b>Tòa án bạn thân</b><small>Réo tên · biện hộ · phán quyết</small></span></button>
+              <button type="button" data-party-game="writer"><i>✎</i><span><b>Ai viết câu này?</b><small>Viết ẩn danh · đoán tác giả</small></span></button>
+              <button type="button" data-party-game="undercover"><i>◉</i><span><b>Kẻ nằm vùng</b><small>Nhận từ khóa · giấu thân phận</small></span></button>
+            </div>
+            <div class="start-box"><div><span id="start-label">Cần ít nhất 3 người và tất cả sẵn sàng</span><small id="selected-game-label">Tòa án bạn thân · 5 vòng</small></div><button id="start-button" type="button">Bắt đầu trận <i>→</i></button></div>
+          </div>
+
+          <div id="game-area" class="game-area" hidden>
+            <header><div><span id="game-round">VÒNG 1/5</span><h2 id="game-title">Tòa án bạn thân</h2></div><time id="phase-timer">00:20</time></header>
+            <div id="game-content" class="game-content"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <footer><a class="brand" href="/party"><i>✦</i>locly<span>.party</span></a><p>Cà khịa có duyên. Thử thách luôn có thể bỏ qua.</p><a href="/party/admin">Quản trị</a></footer>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

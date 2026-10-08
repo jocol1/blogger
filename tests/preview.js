@@ -5,6 +5,7 @@ const path = require('node:path');
 const session = require('express-session');
 const { createDonationRouter } = require('../features/donations/routes');
 const { createChatRouter } = require('../features/chat/routes');
+const { createPartyRouter } = require('../features/party/routes');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
 if (process.env.NODE_ENV === 'production') throw new Error('Do not run the UI fixture in production.');
 const db = new MemoryFirestore();
@@ -22,4 +23,5 @@ app.get(['/an-xin', '/tra-tien', '/xin-tien'], (req, res) => {
 });
 app.use(createDonationRouter({ db, config }));
 app.use(createChatRouter({ db, bucket, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));
+app.use(createPartyRouter({ db, secret: 'local-party-secret', isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));
 app.listen(3101, '127.0.0.1', () => console.log('UI test fixture: http://127.0.0.1:3101/xin-tien (fake data only)'));

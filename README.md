@@ -1,6 +1,6 @@
 # Blogger Vault / Tiệm game trà sữa
 
-Ứng dụng Express dùng Firebase Admin và Firestore. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), hai trang công khai là `/xin-tien` và `/ai`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
+Ứng dụng Express dùng Firebase Admin và Firestore. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), ba trang công khai là `/xin-tien`, `/ai` và `/party`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
 
 ## Chạy local
 
@@ -31,6 +31,14 @@ Trang AI dùng chung ví xu. Khách bấm bắt đầu để trả 10 xu và m�
 Khách và quản trị gửi được văn bản cùng tối đa ba ảnh JPEG, PNG hoặc WebP, mỗi ảnh tải lên tối đa 5 MB. Server giải mã, xoay, thu nhỏ và nén mỗi ảnh thành WebP dưới 700 KB trước khi lưu trong document Firestore riêng tư. Ảnh chỉ đọc qua API đã xác thực, không có URL công khai. Tin nhắn và ảnh hết quyền truy cập, sau đó được xóa sau 7 ngày kể từ lúc phiên kết thúc.
 
 Trang quản trị AI ở `/ai/admin`, dùng chung `ADMIN_PASSWORD` và phiên đăng nhập hiện có. Âm báo tin mới mặc định tắt. Ảnh trong cuộc trò chuyện có thể bấm để xem lớn ở cả trang khách và trang quản trị.
+
+## Locly Party — `/party`
+
+Locly Party là phòng chơi chung cho 3–10 người. Chủ phòng tạo mã sáu ký tự hoặc sao chép link mời; khách chỉ cần nhập biệt danh, không cần tài khoản và không tốn xu. Ba trò có sẵn là **Tòa án bạn thân**, **Ai viết câu này?** và **Kẻ nằm vùng**. Câu hỏi, vai trò bí mật, thời hạn và kết quả đều do server quản lý; trình duyệt chỉ gửi lựa chọn hoặc câu trả lời.
+
+Mỗi ví có một trận miễn phí. Sau đó chủ ví trả **19 xu** để mở phòng trong hai giờ; đồng hồ chỉ bắt đầu khi trận trả phí đầu tiên chạy. Gói đã mua nhưng chưa bắt đầu sẽ tự hoàn 19 xu sau 24 giờ, đúng một lần. Chủ phòng có thể khóa phòng, mời người chơi ra, trao quyền điều khiển và đóng phòng. Âm báo chuyển lượt mặc định tắt; mỗi người tự bật trên thiết bị của mình.
+
+Trang quản trị Party ở `/party/admin`, dùng chung phiên quản trị. Quản trị có thể xem phòng, đóng phòng có lý do và hoàn phí nguyên tử khi cần.
 
 ## Cấu hình
 
@@ -78,6 +86,7 @@ Các collection riêng của tính năng này:
 - `game_redemptions`, `game_meta`
 - `donation_requests`, `donation_tokens`, `donation_idempotency`, `donation_sepay_events`
 - `chat_sessions`, `chat_messages`, `chat_images`, `chat_meta`
+- `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -92,6 +101,9 @@ Các API chính:
 - `GET/POST /api/chat/sessions`, `GET/POST /api/chat/sessions/:id/messages`
 - `GET /api/chat/sessions/:id/images/:messageId/:index`
 - `/api/chat/admin/*` cho phiên quản trị
+- `POST /api/party/rooms`, `POST /api/party/rooms/:code/join`
+- `GET /api/party/rooms/:code`, `POST /api/party/rooms/:code/actions`
+- `POST /api/party/rooms/:code/purchase`
 
 Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
 
@@ -102,9 +114,9 @@ npm test
 node tests/preview.js
 ```
 
-`npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần và xóa dữ liệu sau 7 ngày.
+`npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần, xóa dữ liệu sau 7 ngày và quyền phòng Party.
 
-Preview ở `http://127.0.0.1:3101/xin-tien` và `/ai` dùng RAM, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị chat local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
+Preview ở `http://127.0.0.1:3101/xin-tien`, `/ai` và `/party` dùng RAM, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
 
 ```powershell
 $testPayload = @{
