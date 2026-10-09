@@ -9,6 +9,7 @@ const {
   advanceDrawing,
   validateDrawingInput,
   processDrawing,
+  createBotDrawing,
 } = require('./drawing');
 
 const ROOM_COST = 19;
@@ -18,6 +19,11 @@ const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 10;
 const GAME_LABELS = { court: 'Tòa án bạn thân', writer: 'Ai viết câu này?', undercover: 'Kẻ nằm vùng', drawing: 'Vẽ chuyền tay' };
+const BOT_NAMES = ['Bot Mắm', 'Bot Cà Khịa', 'Bot Mơ Ngủ', 'Bot Bẻ Lái', 'Bot Ú Òa', 'Bot Nhiều Chuyện', 'Bot Tấu Hài', 'Bot Hóng Hớt', 'Bot Lạc Trôi'];
+const BOT_WRITER_LINES = ['Tôi xin từ chối trả lời vì danh dự đang bảo trì.', 'Chuyện này mà kể thật thì phòng mình mất thêm ba người.', 'Tôi vô tội, chiếc camera trong tủ lạnh làm chứng.', 'Câu trả lời nằm trong ly trà sữa vừa biến mất.', 'Tôi đã định nghiêm túc nhưng hệ điều hành không cho phép.'];
+const BOT_DEFENSES = ['Tôi có bằng chứng ngoại phạm: lúc đó đang sạc pin.', 'Xin hội đồng nhẹ tay, tôi chỉ là vài dòng mã ngây thơ.', 'Camera ghi lại một người giống tôi, nhưng đẹp trai hơn.', 'Tôi phản đối vì câu hỏi làm tổn thương bộ vi xử lý.'];
+const BOT_CLUES = ['Nghe quen lắm nhưng nói ra là lộ liền.', 'Thường thấy, đôi khi dùng, nhìn kỹ hơi đáng ngờ.', 'Có liên quan đến đời sống và một chút hỗn loạn.', 'Tôi biết đáp án nhưng CPU bảo giữ bí mật.'];
+const BOT_GUESSES = ['Một sinh vật đang làm chuyện rất đáng ngờ', 'Ai đó đi mua trà sữa nhưng quên mang ví', 'Một chiếc bánh biết đi và đang nổi giận', 'Con mèo làm nghề tay trái sau nửa đêm', 'Tác phẩm này vượt quá khả năng xử lý của bot'];
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 const iso = value => new Date(value).toISOString();
 const cleanToken = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : null;
@@ -85,7 +91,7 @@ function beginGame(room, key, at) {
 function finishGame(room, at, extra = {}) {
   room.game = { ...room.game, ...extra, status: 'finished', phase: 'finished', phaseEndsAt: null, finishedAt: at };
   room.status = 'lobby';
-  room.players = room.players.map(player => ({ ...player, ready: false }));
+  room.players = room.players.map(player => ({ ...player, ready: player.isBot === true }));
   if (room.packageStatus === 'active' && at >= room.activeUntil) room.packageStatus = 'expired';
 }
 function nextCourtRound(room, at) {
@@ -198,6 +204,7 @@ function publicRoom(room, playerId, at) {
     id: player.id,
     name: player.name,
     ready: player.ready,
+    isBot: player.isBot === true,
     isHost: player.id === room.hostPlayerId,
     isBillingOwner: player.id === room.billingPlayerId,
     eliminated: Boolean(room.game?.eliminated?.includes(player.id)),
@@ -376,6 +383,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         return next;
       });
     }
+    room = await settleBots(code) || room;
     return publicState(room, player.playerId, at);
   }
 
@@ -438,6 +446,116 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         if (Object.keys(game.votes).length >= voters) resolveUndercoverVotes(room, at);
       } else throw new PartyError(409, 'Hãy chờ giai đoạn bỏ phiếu.');
     }
+  }
+
+  function chooseBotValue(seed, values) {
+    return values.length ? values[pickIndex(seed, values.length)] : null;
+  }
+
+  function nextBotMove(room) {
+    const game = room.game;
+    if (!game || game.status !== 'active') return null;
+    const bots = room.players.filter(player => player.isBot === true);
+    if (!bots.length) return null;
+    if (game.key === 'court') {
+      if (game.phase === 'vote') {
+        const bot = bots.find(player => !game.votes?.[player.id]);
+        if (!bot) return null;
+        return { bot, input: { targetId: chooseBotValue(`${game.gameNumber}:${game.round}:court:${bot.id}`, room.players.filter(player => player.id !== bot.id).map(player => player.id)) } };
+      }
+      if (game.phase === 'defense') {
+        const bot = bots.find(player => player.id === game.accusedId && !game.defense);
+        return bot ? { bot, input: { text: chooseBotValue(`${game.gameNumber}:${game.round}:defense:${bot.id}`, BOT_DEFENSES) } } : null;
+      }
+      if (game.phase === 'verdict') {
+        const bot = bots.find(player => player.id !== game.accusedId && !game.verdicts?.[player.id]);
+        return bot ? { bot, input: { choice: pickIndex(`${game.gameNumber}:${game.round}:verdict:${bot.id}`, 3) ? 'forgive' : 'punish' } } : null;
+      }
+      return null;
+    }
+    if (game.key === 'writer') {
+      if (game.phase === 'answer') {
+        const bot = bots.find(player => !game.responses?.[player.id]);
+        return bot ? { bot, input: { text: chooseBotValue(`${game.gameNumber}:${game.round}:writer:${bot.id}`, BOT_WRITER_LINES) } } : null;
+      }
+      if (game.phase === 'guess') {
+        const bot = bots.find(player => player.id !== game.selectedWriterId && !game.guesses?.[player.id]);
+        if (!bot) return null;
+        return { bot, input: { targetId: chooseBotValue(`${game.gameNumber}:${game.round}:guess:${bot.id}`, room.players.filter(player => player.id !== bot.id).map(player => player.id)) } };
+      }
+      return null;
+    }
+    if (game.key === 'undercover') {
+      if (game.phase === 'clue') {
+        const currentId = game.clueOrder?.[game.clueIndex];
+        const bot = bots.find(player => player.id === currentId);
+        return bot ? { bot, input: { text: chooseBotValue(`${game.gameNumber}:${game.round}:clue:${bot.id}`, BOT_CLUES) } } : null;
+      }
+      if (game.phase === 'vote') {
+        const alive = alivePlayers(room);
+        const bot = bots.find(player => alive.some(item => item.id === player.id) && !game.votes?.[player.id]);
+        if (!bot) return null;
+        const allowed = (game.revote ? game.tieIds : alive.map(player => player.id)).filter(id => id !== bot.id);
+        return { bot, input: { targetId: chooseBotValue(`${game.gameNumber}:${game.round}:undercover-vote:${bot.id}`, allowed) } };
+      }
+      return null;
+    }
+    if (game.key === 'drawing') {
+      const bot = bots.find(player => !game.submittedIds?.includes(player.id));
+      if (!bot) return null;
+      return { bot, assignment: assignmentFor(game, bot.id) };
+    }
+    return null;
+  }
+
+  async function settleBots(code) {
+    let latest = null;
+    for (let step = 0; step < 40; step++) {
+      const result = await db.runTransaction(async tx => {
+        const roomRef = rooms().doc(code);
+        const snapshot = await tx.get(roomRef);
+        if (!snapshot.exists) throw new PartyError(404, 'Không tìm thấy phòng.');
+        const current = clone(snapshot.data());
+        const at = now();
+        const progressed = progressRoom(current, at);
+        const move = nextBotMove(current);
+        if (!move) {
+          if (progressed) tx.update(roomRef, current);
+          return { changed: progressed, room: current };
+        }
+        if (current.game.key === 'drawing') {
+          const assignment = move.assignment;
+          const id = contributionId(current.game.gameId, assignment.chainId, current.game.turn);
+          const base = {
+            id, code, gameId: current.game.gameId, chainId: assignment.chainId, turn: current.game.turn,
+            kind: assignment.kind, playerId: move.bot.id, isBot: true, createdAt: at, purgeAt: current.game.purgeAt,
+          };
+          if (assignment.kind === 'drawing') {
+            const data = await createBotDrawing(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}:${move.bot.id}`);
+            tx.create(drawingContributions().doc(id), { ...base, data, mime: 'image/webp', size: data.length });
+          } else {
+            const text = assignment.kind === 'prompt'
+              ? suggestionFor(current.game, assignment.chainId, DRAWING_PROMPTS)
+              : chooseBotValue(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}`, BOT_GUESSES);
+            tx.create(drawingContributions().doc(id), { ...base, text });
+          }
+          current.game.submittedIds.push(move.bot.id);
+          if (current.game.submittedIds.length >= current.players.length) advanceDrawing(current, at);
+        } else {
+          applyGameAction(current, move.bot.id, move.input, at);
+          if (current.game?.key === 'undercover' && current.game.phase === 'discussion' && current.players.some(player => player.isBot)) {
+            current.game.phaseEndsAt = Math.min(current.game.phaseEndsAt, at + 5_000);
+          }
+        }
+        current.version++;
+        current.updatedAt = at;
+        tx.update(roomRef, current);
+        return { changed: true, room: current };
+      });
+      latest = result.room;
+      if (!result.changed) break;
+    }
+    return latest;
   }
 
   return {
@@ -550,7 +668,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
       if (!code || !requestId || !type) throw new PartyError(400, 'Thao tác phòng không hợp lệ.');
       const player = await playerFor(code, partyToken);
       const at = now();
-      const room = await db.runTransaction(async tx => {
+      let room = await db.runTransaction(async tx => {
         const roomRef = rooms().doc(code);
         const actionRef = actions().doc(hash(`${code}:${player.playerId}:${requestId}`));
         const snapshot = await tx.get(roomRef);
@@ -571,6 +689,14 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         if (type === 'ready') {
           if (current.status !== 'lobby') throw new PartyError(409, 'Không thể đổi trạng thái khi đang chơi.');
           current.players = current.players.map(item => item.id === player.playerId ? { ...item, ready: input.ready === true } : item);
+        } else if (type === 'add_bot') {
+          requireHost(current, player.playerId);
+          if (current.status !== 'lobby') throw new PartyError(409, 'Chỉ thêm bot ở phòng chờ.');
+          if (current.players.length >= MAX_PLAYERS) throw new PartyError(409, 'Phòng đã đủ 10 người.');
+          const usedNames = new Set(current.players.map(item => item.name.toLocaleLowerCase('vi')));
+          const name = BOT_NAMES.find(value => !usedNames.has(value.toLocaleLowerCase('vi')));
+          if (!name) throw new PartyError(409, 'Phòng đã đủ bot vui tính.');
+          current.players.push({ id: crypto.randomBytes(12).toString('hex'), name, ready: true, isBot: true, joinedAt: at });
         } else if (type === 'select_game') {
           requireHost(current, player.playerId);
           if (!GAME_LABELS[input.game] || current.status !== 'lobby') throw new PartyError(400, 'Trò chơi không hợp lệ.');
@@ -584,7 +710,9 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
           if (current.status !== 'lobby') throw new PartyError(409, 'Chỉ loại người chơi ở phòng chờ.');
           current.players = current.players.filter(item => item.id !== input.targetId);
         } else if (type === 'transfer') {
-          requireHost(current, player.playerId); validateTarget(current, input.targetId); current.hostPlayerId = input.targetId;
+          requireHost(current, player.playerId); validateTarget(current, input.targetId);
+          if (current.players.find(item => item.id === input.targetId)?.isBot) throw new PartyError(400, 'Bot không thể làm chủ phòng.');
+          current.hostPlayerId = input.targetId;
         } else if (type === 'start_game') {
           requireHost(current, player.playerId);
           if (current.game?.status === 'active') throw new PartyError(409, 'Một trận đang diễn ra.');
@@ -628,7 +756,8 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         tx.create(actionRef, { code, playerId: player.playerId, type, createdAt: at });
         return current;
       });
-      return publicState(room, player.playerId, at);
+      room = await settleBots(code) || room;
+      return publicState(room, player.playerId, now());
     },
     async submitDrawing(codeValue, partyToken, input, file) {
       requireReady();
@@ -640,7 +769,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
       try { data = await processDrawing(file); }
       catch (error) { throw new PartyError(error.status || 400, error.message); }
       const at = now();
-      const room = await db.runTransaction(async tx => {
+      let room = await db.runTransaction(async tx => {
         const roomRef = rooms().doc(code);
         const actionRef = actions().doc(hash(`${code}:${player.playerId}:${requestId}`));
         const snapshot = await tx.get(roomRef);
@@ -664,7 +793,8 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         tx.create(actionRef, { code, playerId: player.playerId, type: 'drawing_upload', createdAt: at });
         return current;
       });
-      return publicState(room, player.playerId, at);
+      room = await settleBots(code) || room;
+      return publicState(room, player.playerId, now());
     },
     async drawingImage(codeValue, partyToken, imageIdValue) {
       requireReady();

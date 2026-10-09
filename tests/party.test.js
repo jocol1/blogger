@@ -52,6 +52,92 @@ test('drawing assignments pass every chain through every player exactly once for
   }
 });
 
+test('one person can add two bots and finish a complete drawing chain with bot images', async () => {
+  const state = await setup();
+  const created = await state.party.createRoom(state.wallet.token, { name: 'Người chơi thật', requestId: reqId(1) });
+  const code = created.room.code;
+  let view = await state.party.action(code, created.token, { requestId: reqId(2), type: 'add_bot' });
+  view = await state.party.action(code, created.token, { requestId: reqId(3), type: 'add_bot' });
+  assert.equal(view.players.length, 3);
+  assert.equal(view.players.filter(player => player.isBot).length, 2);
+  assert.ok(view.players.filter(player => player.isBot).every(player => player.ready));
+  await state.party.action(code, created.token, { requestId: reqId(4), type: 'select_game', game: 'drawing' });
+  await state.party.action(code, created.token, { requestId: reqId(5), type: 'ready', ready: true });
+  view = await state.party.action(code, created.token, { requestId: reqId(6), type: 'start_game' });
+  assert.equal(view.game.turn, 0);
+  assert.equal(view.game.submittedCount, 2);
+  const gameId = view.game.gameId;
+  view = await state.party.action(code, created.token, { requestId: reqId(7), type: 'game_action', gameId, turn: 0, text: 'Một chú cá đi mua dép' });
+  assert.equal(view.game.turn, 1);
+  assert.equal(view.game.submittedCount, 2);
+  const imageBuffer = await sharp({ create: { width: 800, height: 600, channels: 3, background: '#fff' } }).png().toBuffer();
+  view = await state.party.submitDrawing(code, created.token, { requestId: reqId(8), gameId, turn: '1' }, { buffer: imageBuffer, mimetype: 'image/png' });
+  assert.equal(view.game.turn, 2);
+  assert.equal(view.game.submittedCount, 2);
+  assert.equal(view.game.previous.kind, 'drawing');
+  assert.equal((await state.party.drawingImage(code, created.token, view.game.previous.imageId)).mime, 'image/webp');
+  view = await state.party.action(code, created.token, { requestId: reqId(9), type: 'game_action', gameId, turn: 2, text: 'Bot đang tấu hài' });
+  assert.equal(view.game.status, 'finished');
+  assert.equal(view.game.chains.length, 3);
+  assert.ok(view.game.chains.flatMap(chain => chain.contributions).some(item => item.kind === 'drawing' && item.authorName.startsWith('Bot ')));
+  const botImages = [...state.db.rows.values()].filter(row => row.gameId === gameId && row.kind === 'drawing' && row.isBot);
+  assert.equal(botImages.length, 2);
+  assert.ok(botImages.every(row => Buffer.from(row.data).length <= 128 * 1024));
+});
+
+test('bots take their opening turns in every original Party game and can never become host', async () => {
+  for (const game of ['court', 'writer', 'undercover']) {
+    const state = await setup();
+    const created = await state.party.createRoom(state.wallet.token, { name: 'Solo', requestId: reqId(1) });
+    const code = created.room.code;
+    await state.party.action(code, created.token, { requestId: reqId(2), type: 'add_bot' });
+    const withBots = await state.party.action(code, created.token, { requestId: reqId(3), type: 'add_bot' });
+    const botId = withBots.players.find(player => player.isBot).id;
+    await assert.rejects(() => state.party.action(code, created.token, { requestId: reqId(4), type: 'transfer', targetId: botId }), /không thể làm chủ/i);
+    await state.party.action(code, created.token, { requestId: reqId(5), type: 'select_game', game });
+    await state.party.action(code, created.token, { requestId: reqId(6), type: 'ready', ready: true });
+    const started = await state.party.action(code, created.token, { requestId: reqId(7), type: 'start_game' });
+    const stored = state.db.rows.get(`party_rooms/${code}`).game;
+    if (game === 'court') assert.equal(Object.keys(stored.votes).length, 2);
+    if (game === 'writer') assert.equal(Object.keys(stored.responses).length, 2);
+    if (game === 'undercover') assert.equal(stored.clueOrder[stored.clueIndex], started.self.id);
+  }
+});
+
+test('a solo human can play every original Party game with two bots through the final result', async () => {
+  for (const game of ['court', 'writer', 'undercover']) {
+    const state = await setup();
+    const created = await state.party.createRoom(state.wallet.token, { name: 'Solo', requestId: reqId(1) });
+    const code = created.room.code;
+    await state.party.action(code, created.token, { requestId: reqId(2), type: 'add_bot' });
+    await state.party.action(code, created.token, { requestId: reqId(3), type: 'add_bot' });
+    await state.party.action(code, created.token, { requestId: reqId(4), type: 'select_game', game });
+    await state.party.action(code, created.token, { requestId: reqId(5), type: 'ready', ready: true });
+    let view = await state.party.action(code, created.token, { requestId: reqId(6), type: 'start_game' });
+    let request = 20;
+    for (let guard = 0; guard < 80 && view.game.status !== 'finished'; guard++) {
+      const current = view.game;
+      let payload = null;
+      if (game === 'court' && current.phase === 'vote' && !current.hasActed) payload = { targetId: view.players.find(player => player.id !== view.self.id).id };
+      else if (game === 'court' && current.phase === 'defense' && current.accusedId === view.self.id && !current.hasActed) payload = { text: 'Tôi đang chơi một mình nên bot phải chịu trách nhiệm.' };
+      else if (game === 'court' && current.phase === 'verdict' && current.accusedId !== view.self.id && !current.hasActed) payload = { choice: 'forgive' };
+      else if (game === 'writer' && current.phase === 'answer' && !current.hasActed) payload = { text: 'Câu trả lời của người thật duy nhất.' };
+      else if (game === 'writer' && current.phase === 'guess' && !current.isSelectedWriter && !current.hasActed) payload = { targetId: view.players.find(player => player.id !== view.self.id).id };
+      else if (game === 'undercover' && current.phase === 'clue' && current.currentPlayerId === view.self.id && !current.hasActed) payload = { text: 'Một gợi ý rất con người.' };
+      else if (game === 'undercover' && current.phase === 'vote' && !current.hasActed && !current.eliminated.includes(view.self.id)) {
+        const allowed = current.tieIds?.length ? current.tieIds : view.players.filter(player => !current.eliminated.includes(player.id)).map(player => player.id);
+        payload = { targetId: allowed.find(id => id !== view.self.id) };
+      }
+      if (payload) view = await state.party.action(code, created.token, { requestId: reqId(request++), type: 'game_action', ...payload });
+      else if (current.phaseEndsAt != null) {
+        state.tick(Math.max(1, current.phaseEndsAt - state.now() + 1));
+        view = await state.party.state(code, created.token);
+      } else break;
+    }
+    assert.equal(view.game.status, 'finished', `${game} phải kết thúc khi chơi với bot`);
+  }
+});
+
 test('drawing party keeps chains private, accepts images once and reveals every contribution at the end', async () => {
   const state = await setup();
   const { code, actors } = await makeRoom(state, 'drawing');
@@ -268,6 +354,8 @@ test('party rejects forged control, duplicate names and rooms with fewer than th
   const created = await state.party.createRoom(state.wallet.token, { name: 'Host', requestId: reqId(1) });
   const code = created.room.code;
   await assert.rejects(() => state.party.join(code, { name: 'Host', requestId: reqId(2) }), /biệt danh/i);
+  const guest = await state.party.join(code, { name: 'Khách', requestId: reqId(5) });
+  await assert.rejects(() => state.party.action(code, guest.token, { requestId: reqId(6), type: 'add_bot' }), /chủ phòng/i);
   await state.party.action(code, created.token, { requestId: reqId(3), type: 'ready', ready: true });
   await assert.rejects(() => state.party.action(code, created.token, { requestId: reqId(4), type: 'start_game' }), /ít nhất 3/i);
   await assert.rejects(() => state.party.state(code, '0'.repeat(64)), /người chơi/i);

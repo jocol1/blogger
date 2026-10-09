@@ -135,17 +135,18 @@
   function renderMembers() {
     $('player-count').textContent = room.players.length;
     $('room-members').replaceChildren(...room.players.map(player => {
-      const item = document.createElement('article'); item.className = 'member';
-      const avatar = document.createElement('span'); avatar.className = 'member-avatar'; avatar.textContent = player.name.slice(0, 1).toUpperCase();
+      const item = document.createElement('article'); item.className = `member${player.isBot ? ' bot-member' : ''}`;
+      const avatar = document.createElement('span'); avatar.className = 'member-avatar'; avatar.textContent = player.isBot ? '🤖' : player.name.slice(0, 1).toUpperCase();
       const info = document.createElement('div');
       const name = document.createElement('b'); name.textContent = player.name + (player.isHost ? ' 👑' : '');
-      const state = document.createElement('small'); state.className = player.ready ? 'ready' : ''; state.textContent = player.eliminated ? 'Đã bị loại' : player.ready ? '✓ Sẵn sàng' : 'Chưa sẵn sàng';
+      if (player.isBot) { const tag = document.createElement('span'); tag.className = 'member-bot-tag'; tag.textContent = 'BOT'; name.append(' ', tag); }
+      const state = document.createElement('small'); state.className = player.ready ? 'ready' : ''; state.textContent = player.eliminated ? 'Đã bị loại' : player.isBot ? '🤖 Luôn sẵn sàng' : player.ready ? '✓ Sẵn sàng' : 'Chưa sẵn sàng';
       info.append(name, state); item.append(avatar, info);
       if (room.self.isHost && player.id !== room.self.id && room.status === 'lobby') {
         const actions = document.createElement('span'); actions.className = 'member-actions';
-        const host = document.createElement('button'); host.type = 'button'; host.textContent = 'Trao quyền'; host.addEventListener('click', () => postAction('transfer', { targetId: player.id }).catch(() => {}));
-        const kick = document.createElement('button'); kick.type = 'button'; kick.textContent = 'Mời ra'; kick.addEventListener('click', () => postAction('kick', { targetId: player.id }).catch(() => {}));
-        actions.append(host, kick); item.append(actions);
+        if (!player.isBot) { const host = document.createElement('button'); host.type = 'button'; host.textContent = 'Trao quyền'; host.addEventListener('click', () => postAction('transfer', { targetId: player.id }).catch(() => {})); actions.append(host); }
+        const kick = document.createElement('button'); kick.type = 'button'; kick.textContent = player.isBot ? 'Xóa bot' : 'Mời ra'; kick.addEventListener('click', () => postAction('kick', { targetId: player.id }).catch(() => {}));
+        actions.append(kick); item.append(actions);
       }
       return item;
     }));
@@ -157,6 +158,7 @@
     $('ready-button').textContent = self?.ready ? '✓ Đã sẵn sàng' : 'Tôi sẵn sàng';
     $('ready-button').classList.toggle('active', Boolean(self?.ready));
     $('ready-button').disabled = room.status !== 'lobby';
+    $('add-bot').hidden = !room.self.isHost || room.status !== 'lobby' || room.players.length >= config.maxPlayers;
     $('lock-room').hidden = !room.self.isHost;
     $('lock-room').textContent = room.locked ? 'Mở khóa phòng' : 'Khóa phòng';
     $('close-room').hidden = !room.self.isBillingOwner || room.status !== 'lobby';
@@ -169,7 +171,7 @@
     const allReady = room.players.length >= config.minPlayers && room.players.every(player => player.ready);
     const entitlement = room.entitlement.trialAvailable || room.entitlement.packageStatus === 'paid' || (room.entitlement.packageStatus === 'active' && room.entitlement.activeUntil > now());
     $('start-button').disabled = !room.self.isHost || !allReady || !entitlement;
-    $('start-label').textContent = room.players.length < config.minPlayers ? `Cần thêm ${config.minPlayers - room.players.length} người` : !room.players.every(player => player.ready) ? 'Đang chờ mọi người sẵn sàng' : !entitlement ? 'Cần mở khóa phòng để chơi tiếp' : 'Cả nhóm đã sẵn sàng';
+    $('start-label').textContent = room.players.length < config.minPlayers ? `Cần thêm ${config.minPlayers - room.players.length} người hoặc bot` : !room.players.every(player => player.ready) ? 'Đang chờ mọi người sẵn sàng' : !entitlement ? 'Cần mở khóa phòng để chơi tiếp' : 'Cả nhóm đã sẵn sàng';
     $('selected-game-label').textContent = `${room.selectedGameLabel} · ${gameRounds[room.selectedGame]}`;
   }
   function acceptRoom(next) {
@@ -463,6 +465,11 @@
   }));
   $('ready-button').addEventListener('click', () => {
     const self = memberById(room.self.id); postAction('ready', { ready: !self.ready }).catch(() => {});
+  });
+  $('add-bot').addEventListener('click', event => {
+    const button = event.currentTarget;
+    setBusy(button, true, 'Đang gọi bot…');
+    postAction('add_bot').catch(() => {}).finally(() => setBusy(button, false));
   });
   $('start-button').addEventListener('click', () => postAction('start_game').catch(() => {}));
   $('purchase-button').addEventListener('click', async () => { setBusy($('purchase-button'), true, 'Đang mở khóa…'); try { await purchaseRoom(); } finally { setBusy($('purchase-button'), false); } });

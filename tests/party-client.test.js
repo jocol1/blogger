@@ -17,6 +17,7 @@ test('party page clearly presents four games, free trial and paid room price', (
   assert.match(html, /1 trận miễn phí/);
   assert.match(html, /19 xu · 2 giờ/);
   assert.match(html, /3–10 người/);
+  assert.match(html, /Thêm một bot/);
 });
 
 test('party client keeps wallet and player tokens in headers and supports invite links', () => {
@@ -30,6 +31,8 @@ test('party client keeps wallet and player tokens in headers and supports invite
   assert.match(app, /pointerdown/);
   assert.match(app, /toBlob\(resolve, 'image\/webp'/);
   assert.match(app, /lastDrawingRenderKey === renderKey/);
+  assert.match(app, /postAction\('add_bot'\)/);
+  assert.match(app, /player\.isBot/);
 });
 
 test('party UI supports mobile and reduced motion', () => {

@@ -82,7 +82,7 @@ function advanceDrawing(room, startedAt) {
   if (nextTurn >= game.playerOrder.length) {
     room.game = { ...game, status: 'finished', phase: 'finished', phaseEndsAt: null, finishedAt: startedAt, submittedIds: [] };
     room.status = 'lobby';
-    room.players = room.players.map(player => ({ ...player, ready: false }));
+    room.players = room.players.map(player => ({ ...player, ready: player.isBot === true }));
     if (room.packageStatus === 'active' && startedAt >= room.activeUntil) room.packageStatus = 'expired';
     return;
   }
@@ -129,6 +129,27 @@ async function processDrawing(file) {
   return output;
 }
 
+async function createBotDrawing(seed) {
+  const palette = ['#ff7052', '#ffd35a', '#65e6c3', '#a882ff', '#38bdf8', '#f472b6'];
+  const first = pickIndex(`${seed}:first`, palette.length);
+  const second = pickIndex(`${seed}:second`, palette.length);
+  const eye = 170 + pickIndex(`${seed}:eye`, 80);
+  const tilt = -18 + pickIndex(`${seed}:tilt`, 37);
+  const svg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+    <rect width="800" height="600" fill="#fff"/>
+    <g transform="rotate(${tilt} 400 300)" stroke="#24152f" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="400" cy="310" rx="210" ry="175" fill="${palette[first]}"/>
+      <circle cx="315" cy="${eye}" r="28" fill="#fff"/><circle cx="485" cy="${eye}" r="28" fill="#fff"/>
+      <circle cx="315" cy="${eye}" r="10" fill="#24152f" stroke="none"/><circle cx="485" cy="${eye}" r="10" fill="#24152f" stroke="none"/>
+      <path d="M315 370 Q400 445 485 370" fill="none"/>
+      <path d="M205 320 L95 250 M595 320 L705 250 M320 475 L275 555 M480 475 L525 555" fill="none"/>
+      <path d="M355 285 L400 245 L445 285 Z" fill="${palette[second]}"/>
+    </g>
+    <text x="400" y="70" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#24152f">BOT VẼ BẰNG CẢ TÂM HỒN</text>
+  </svg>`);
+  return sharp(svg, { limitInputPixels: 4_000_000 }).webp({ quality: 76, smartSubsample: true }).toBuffer();
+}
+
 module.exports = {
   DRAWING_WIDTH,
   DRAWING_HEIGHT,
@@ -144,4 +165,5 @@ module.exports = {
   advanceDrawing,
   validateDrawingInput,
   processDrawing,
+  createBotDrawing,
 };
