@@ -4,10 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#ff6d4d">
-  <meta name="description" content="Locly Party — tạo phòng, gửi mã cho bạn bè và chơi ba trò cà khịa có duyên.">
+  <meta name="description" content="Locly Party — tạo phòng, gửi mã cho bạn bè và chơi bốn trò cà khịa có duyên.">
   <title>Locly Party · Càng thân càng dễ bị réo</title>
   <link rel="stylesheet" href="/assets/party/style.css">
   <link rel="stylesheet" href="/assets/party/mobile.css">
+  <link rel="stylesheet" href="/assets/party/drawing.css">
   <script src="/assets/party/app.js" defer></script>
 </head>
 <body>
@@ -32,11 +33,12 @@
       </section>
 
       <section class="game-showcase">
-        <div class="section-heading"><span>BA TRÒ · BA KIỂU MẤT TÌNH BẠN</span><h2>Tối nay réo ai?</h2></div>
+        <div class="section-heading"><span>BỐN TRÒ · BỐN KIỂU MẤT TÌNH BẠN</span><h2>Tối nay réo ai?</h2></div>
         <div class="showcase-grid">
           <article><div class="game-icon court-icon">⚖</div><span>01 · BỎ PHIẾU KÍN</span><h3>Tòa án bạn thân</h3><p>Réo tên, nghe biện hộ rồi cả hội quyết định tha hay phạt.</p></article>
           <article><div class="game-icon writer-icon">✎</div><span>02 · ĐOÁN TÁC GIẢ</span><h3>Ai viết câu này?</h3><p>Cùng trả lời một câu hỏi. Đọc câu bựa và đoán xem ai viết.</p></article>
           <article><div class="game-icon spy-icon">◉</div><span>03 · GIẤU VAI TRÒ</span><h3>Kẻ nằm vùng</h3><p>Một người nhận từ khác. Nói đủ khéo để không bị cả nhóm phát hiện.</p></article>
+          <article><div class="game-icon drawing-icon">✎</div><span>04 · VIẾT · VẼ · ĐOÁN</span><h3>Vẽ chuyền tay</h3><p>“Mèo đi đòi nợ” qua vài bàn tay có thể thành bất cứ thứ gì.</p></article>
         </div>
       </section>
 
@@ -64,6 +66,7 @@
               <button type="button" data-party-game="court" class="active"><i>⚖</i><span><b>Tòa án bạn thân</b><small>Réo tên · biện hộ · phán quyết</small></span></button>
               <button type="button" data-party-game="writer"><i>✎</i><span><b>Ai viết câu này?</b><small>Viết ẩn danh · đoán tác giả</small></span></button>
               <button type="button" data-party-game="undercover"><i>◉</i><span><b>Kẻ nằm vùng</b><small>Nhận từ khóa · giấu thân phận</small></span></button>
+              <button type="button" data-party-game="drawing"><i>✐</i><span><b>Vẽ chuyền tay</b><small>Viết một câu · vẽ lại · đoán tiếp</small></span></button>
             </div>
             <div class="start-box"><div><span id="start-label">Cần ít nhất 3 người và tất cả sẵn sàng</span><small id="selected-game-label">Tòa án bạn thân · 5 vòng</small></div><button id="start-button" type="button">Bắt đầu trận <i>→</i></button></div>
           </div>
@@ -79,5 +82,6 @@
 
   <footer><a class="brand" href="/party"><i>✦</i>locly<span>.party</span></a><p>Cà khịa có duyên. Thử thách luôn có thể bỏ qua.</p><a href="/party/admin">Quản trị</a></footer>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="drawing-lightbox" class="drawing-lightbox"><button id="drawing-lightbox-close" type="button" aria-label="Đóng ảnh">×</button><img id="drawing-lightbox-image" alt="Bức vẽ chuyền tay"></dialog>
 </body>
 </html>

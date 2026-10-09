@@ -1,5 +1,15 @@
 const crypto = require('node:crypto');
-const { COURT_QUESTIONS, WRITER_QUESTIONS, WORD_PAIRS, CHALLENGES } = require('./content');
+const { COURT_QUESTIONS, WRITER_QUESTIONS, WORD_PAIRS, CHALLENGES, DRAWING_PROMPTS } = require('./content');
+const {
+  DRAWING_RETENTION_MS,
+  beginDrawingGame,
+  assignmentFor,
+  contributionId,
+  suggestionFor,
+  advanceDrawing,
+  validateDrawingInput,
+  processDrawing,
+} = require('./drawing');
 
 const ROOM_COST = 19;
 const PAID_DURATION_MS = 2 * 60 * 60 * 1000;
@@ -7,7 +17,7 @@ const PURCHASE_HOLD_MS = 24 * 60 * 60 * 1000;
 const RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 const MIN_PLAYERS = 3;
 const MAX_PLAYERS = 10;
-const GAME_LABELS = { court: 'Tòa án bạn thân', writer: 'Ai viết câu này?', undercover: 'Kẻ nằm vùng' };
+const GAME_LABELS = { court: 'Tòa án bạn thân', writer: 'Ai viết câu này?', undercover: 'Kẻ nằm vùng', drawing: 'Vẽ chuyền tay' };
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 const iso = value => new Date(value).toISOString();
 const cleanToken = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : null;
@@ -57,6 +67,7 @@ function winnerIds(votes, eligibleIds) {
 }
 
 function beginGame(room, key, at) {
+  if (key === 'drawing') return beginDrawingGame(room, at, DRAWING_PROMPTS);
   const gameNumber = (room.gameNumber || 0) + 1;
   const seed = `${room.code}:${gameNumber}:${at}`;
   const base = { key, label: GAME_LABELS[key], status: 'active', round: 1, gameNumber, scores: scoresFor(room.players), startedAt: at };
@@ -170,7 +181,7 @@ function advancePhase(room, at) {
     if (phase === 'clue') advanceUndercoverClue(room, at);
     else if (phase === 'discussion') room.game = { ...room.game, phase: 'vote', phaseEndsAt: at + 30_000, votes: {}, tieIds: [], revote: false };
     else if (phase === 'vote') resolveUndercoverVotes(room, at);
-  }
+  } else if (room.game.key === 'drawing') advanceDrawing(room, room.game.phaseEndsAt);
   return true;
 }
 function progressRoom(room, at) {
@@ -208,6 +219,11 @@ function publicRoom(room, playerId, at) {
       if (['guess', 'result', 'finished'].includes(source.phase)) game.selectedResponse = source.selectedResponse;
       if (source.phase === 'guess') game.isSelectedWriter = source.selectedWriterId === playerId;
       if (['result', 'finished'].includes(source.phase)) game.result = source.result;
+    } else if (source.key === 'drawing') {
+      game.gameId = source.gameId;
+      game.turn = source.turn;
+      game.submittedCount = source.submittedIds?.length || 0;
+      game.hasActed = Boolean(source.submittedIds?.includes(playerId));
     } else {
       game.currentPlayerId = source.clueOrder?.[source.clueIndex] || null;
       game.clues = (source.clues || []).map(item => ({ playerId: item.playerId, name: playerName(room, item.playerId), text: item.text }));
@@ -254,10 +270,59 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
   const rooms = () => col('party_rooms');
   const tokens = () => col('party_tokens');
   const actions = () => col('party_actions');
+  const drawingContributions = () => col('party_drawing_contributions');
   const wallets = () => col('game_wallets');
   const walletTokens = () => col('game_wallet_tokens');
   const ready = () => Boolean(db);
   const requireReady = () => { if (!ready()) throw new PartyError(503, 'Locly Party chưa sẵn sàng.'); };
+
+  function requireDrawingInput(game, playerId, input, expectedKind) {
+    try { return validateDrawingInput(game, playerId, input, expectedKind); }
+    catch (error) { throw new PartyError(error.status || 400, error.message); }
+  }
+
+  function fallbackContribution(room, game, chainId, turn) {
+    const authorId = game.playerOrder[(game.playerOrder.indexOf(chainId) + turn) % game.playerOrder.length];
+    if (turn === 0) return { kind: 'prompt', text: suggestionFor(game, chainId, DRAWING_PROMPTS), skipped: false, authorId, authorName: playerName(room, authorId), automatic: true };
+    return { kind: turn % 2 ? 'drawing' : 'guess', skipped: true, authorId, authorName: playerName(room, authorId) };
+  }
+
+  async function contributionView(room, game, chainId, turn, revealAuthor) {
+    const id = contributionId(game.gameId, chainId, turn);
+    const snapshot = await drawingContributions().doc(id).get();
+    const row = snapshot.exists ? snapshot.data() : null;
+    const base = row ? { kind: row.kind, skipped: false, ...(row.kind === 'drawing' ? { imageId: id } : { text: row.text }) } : fallbackContribution(room, game, chainId, turn);
+    if (!revealAuthor) {
+      delete base.authorId; delete base.authorName;
+      return base;
+    }
+    if (row) { base.authorId = row.playerId; base.authorName = playerName(room, row.playerId); }
+    return base;
+  }
+
+  async function publicState(room, playerId, at) {
+    const output = publicRoom(room, playerId, at);
+    if (room.game?.key !== 'drawing') return output;
+    const game = room.game;
+    if (game.status === 'active') {
+      const assignment = assignmentFor(game, playerId);
+      output.game.assignment = { kind: assignment.kind, chainId: assignment.chainId };
+      output.game.suggestion = assignment.kind === 'prompt' ? suggestionFor(game, assignment.chainId, DRAWING_PROMPTS) : null;
+      output.game.previous = game.turn > 0 ? await contributionView(room, game, assignment.chainId, game.turn - 1, false) : null;
+    } else if (game.status === 'finished') {
+      if (at >= game.finishedAt + DRAWING_RETENTION_MS) {
+        output.game.expired = true;
+        output.game.chains = [];
+      } else {
+        output.game.chains = await Promise.all(game.playerOrder.map(async chainId => ({
+          id: chainId,
+          ownerName: playerName(room, chainId),
+          contributions: await Promise.all(Array.from({ length: game.playerOrder.length }, (_, turn) => contributionView(room, game, chainId, turn, true))),
+        })));
+      }
+    }
+    return output;
+  }
 
   async function walletIdFor(token) {
     const valid = cleanToken(token);
@@ -311,7 +376,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         return next;
       });
     }
-    return publicRoom(room, player.playerId, at);
+    return publicState(room, player.playerId, at);
   }
 
   function requireHost(room, playerId) {
@@ -355,6 +420,8 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         game.guesses[playerId] = input.targetId;
         if (Object.keys(game.guesses).length >= room.players.length - 1) resolveWriterGuesses(room, at);
       } else throw new PartyError(409, 'Hãy chờ vòng tiếp theo.');
+    } else if (game.key === 'drawing') {
+      throw new PartyError(400, 'Hãy gửi bài Vẽ chuyền tay bằng đúng biểu mẫu của lượt này.');
     } else {
       if ((game.eliminated || []).includes(playerId)) throw new PartyError(403, 'Bạn đã bị loại khỏi ván.');
       if (game.phase === 'clue') {
@@ -409,7 +476,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
           tx.update(walletRef, { activePartyCode: code, updatedAt: iso(at) });
           return row;
         });
-        if (created) return { token: partyToken, room: publicRoom(created, playerId, now()) };
+        if (created) return { token: partyToken, room: await publicState(created, playerId, now()) };
       }
       throw new PartyError(503, 'Chưa tạo được mã phòng. Vui lòng thử lại.');
     },
@@ -440,7 +507,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         tx.create(tokenRef, { code, playerId, createdAt: at });
         return next;
       });
-      return { token: partyToken, room: publicRoom(room, playerId, now()) };
+      return { token: partyToken, room: await publicState(room, playerId, now()) };
     },
     state,
     async purchase(codeValue, partyToken, walletToken, input) {
@@ -473,7 +540,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         tx.create(attemptRef, { walletId, code, purchaseId, createdAt: at });
         return next;
       });
-      return publicRoom(room, player.playerId, at);
+      return publicState(room, player.playerId, at);
     },
     async action(codeValue, partyToken, input) {
       requireReady();
@@ -535,7 +602,20 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
           current.gameNumber = current.game.gameNumber;
           current.status = 'playing';
         } else if (type === 'game_action') {
-          applyGameAction(current, player.playerId, input, at);
+          if (current.game?.key === 'drawing') {
+            const assignment = assignmentFor(current.game, player.playerId);
+            if (!assignment) throw new PartyError(400, 'Không tìm thấy lượt của bạn.');
+            requireDrawingInput(current.game, player.playerId, input, assignment.kind);
+            if (assignment.kind === 'drawing') throw new PartyError(400, 'Lượt này cần gửi một bức vẽ.');
+            const text = cleanText(input.text, 120);
+            const id = contributionId(current.game.gameId, assignment.chainId, current.game.turn);
+            tx.create(drawingContributions().doc(id), {
+              id, code, gameId: current.game.gameId, chainId: assignment.chainId, turn: current.game.turn,
+              kind: assignment.kind, playerId: player.playerId, text, createdAt: at, purgeAt: current.game.purgeAt,
+            });
+            current.game.submittedIds.push(player.playerId);
+            if (current.game.submittedIds.length >= current.players.length) advanceDrawing(current, at);
+          } else applyGameAction(current, player.playerId, input, at);
         } else if (type === 'close_room') {
           if (current.billingPlayerId !== player.playerId) throw new PartyError(403, 'Chỉ chủ ví được đóng phòng.');
           if (current.game?.status === 'active') throw new PartyError(409, 'Hãy kết thúc trận trước khi đóng phòng.');
@@ -548,7 +628,63 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
         tx.create(actionRef, { code, playerId: player.playerId, type, createdAt: at });
         return current;
       });
-      return publicRoom(room, player.playerId, at);
+      return publicState(room, player.playerId, at);
+    },
+    async submitDrawing(codeValue, partyToken, input, file) {
+      requireReady();
+      const code = cleanCode(codeValue);
+      const requestId = cleanRequestId(input?.requestId);
+      if (!code || !requestId) throw new PartyError(400, 'Yêu cầu gửi hình không hợp lệ.');
+      const player = await playerFor(code, partyToken);
+      let data;
+      try { data = await processDrawing(file); }
+      catch (error) { throw new PartyError(error.status || 400, error.message); }
+      const at = now();
+      const room = await db.runTransaction(async tx => {
+        const roomRef = rooms().doc(code);
+        const actionRef = actions().doc(hash(`${code}:${player.playerId}:${requestId}`));
+        const snapshot = await tx.get(roomRef);
+        const previous = await tx.get(actionRef);
+        if (!snapshot.exists) throw new PartyError(404, 'Không tìm thấy phòng.');
+        if (previous.exists) return snapshot.data();
+        const current = clone(snapshot.data());
+        progressRoom(current, at);
+        const assignment = requireDrawingInput(current.game, player.playerId, input, 'drawing');
+        const id = contributionId(current.game.gameId, assignment.chainId, current.game.turn);
+        tx.create(drawingContributions().doc(id), {
+          id, code, gameId: current.game.gameId, chainId: assignment.chainId, turn: current.game.turn,
+          kind: 'drawing', playerId: player.playerId, data, mime: 'image/webp', size: data.length,
+          createdAt: at, purgeAt: current.game.purgeAt,
+        });
+        current.game.submittedIds.push(player.playerId);
+        if (current.game.submittedIds.length >= current.players.length) advanceDrawing(current, at);
+        current.version++;
+        current.updatedAt = at;
+        tx.update(roomRef, current);
+        tx.create(actionRef, { code, playerId: player.playerId, type: 'drawing_upload', createdAt: at });
+        return current;
+      });
+      return publicState(room, player.playerId, at);
+    },
+    async drawingImage(codeValue, partyToken, imageIdValue) {
+      requireReady();
+      const code = cleanCode(codeValue);
+      const imageId = typeof imageIdValue === 'string' && /^[a-f0-9]{32}-\d{2}-[a-f0-9]{24}$/.test(imageIdValue) ? imageIdValue : null;
+      if (!code || !imageId) throw new PartyError(400, 'Ảnh vẽ không hợp lệ.');
+      const player = await playerFor(code, partyToken);
+      const roomSnapshot = await rooms().doc(code).get();
+      if (!roomSnapshot.exists) throw new PartyError(404, 'Không tìm thấy phòng.');
+      const room = roomSnapshot.data();
+      const game = room.game;
+      if (!game || game.key !== 'drawing' || !imageId.startsWith(`${game.gameId}-`)) throw new PartyError(404, 'Không tìm thấy ảnh vẽ.');
+      if (game.status === 'active') {
+        const assignment = assignmentFor(game, player.playerId);
+        const allowedId = game.turn > 0 ? contributionId(game.gameId, assignment.chainId, game.turn - 1) : null;
+        if (imageId !== allowedId) throw new PartyError(403, 'Bạn chưa được xem bức vẽ này.');
+      } else if (game.status !== 'finished' || now() >= game.finishedAt + DRAWING_RETENTION_MS) throw new PartyError(410, 'Kết quả trận đã hết thời hạn lưu trữ.');
+      const image = await drawingContributions().doc(imageId).get();
+      if (!image.exists || image.data().code !== code || image.data().kind !== 'drawing') throw new PartyError(404, 'Không tìm thấy ảnh vẽ.');
+      return { buffer: Buffer.from(image.data().data), mime: 'image/webp' };
     },
     async adminRooms() {
       requireReady();
@@ -587,6 +723,8 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
       const at = now();
       const expired = await rooms().where('purchaseDeadline', '<', at).limit(50).get();
       for (const doc of expired.docs) await refundExpiredPurchase(doc.data().code, at);
+      const staleDrawings = await drawingContributions().where('purgeAt', '<', at).limit(100).get();
+      for (const doc of staleDrawings.docs) await drawingContributions().doc(doc.data().id).delete();
       const deletions = await rooms().where('deleteAt', '<', at).limit(50).get();
       for (const doc of deletions.docs) await doc.ref?.delete?.();
     },

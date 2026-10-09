@@ -34,7 +34,9 @@ Trang quản trị AI ở `/ai/admin`, dùng chung `ADMIN_PASSWORD` và phiên �
 
 ## Locly Party — `/party`
 
-Locly Party là phòng chơi chung cho 3–10 người. Chủ phòng tạo mã sáu ký tự hoặc sao chép link mời; khách chỉ cần nhập biệt danh, không cần tài khoản và không tốn xu. Ba trò có sẵn là **Tòa án bạn thân**, **Ai viết câu này?** và **Kẻ nằm vùng**. Câu hỏi, vai trò bí mật, thời hạn và kết quả đều do server quản lý; trình duyệt chỉ gửi lựa chọn hoặc câu trả lời.
+Locly Party là phòng chơi chung cho 3–10 người. Chủ phòng tạo mã sáu ký tự hoặc sao chép link mời; khách chỉ cần nhập biệt danh, không cần tài khoản và không tốn xu. Bốn trò có sẵn là **Tòa án bạn thân**, **Ai viết câu này?**, **Kẻ nằm vùng** và **Vẽ chuyền tay**. Câu hỏi, vai trò bí mật, phân công, thời hạn và kết quả đều do server quản lý; trình duyệt chỉ gửi lựa chọn, câu trả lời hoặc bài vẽ.
+
+Trong **Vẽ chuyền tay**, mỗi người mở một chuỗi bằng câu tối đa 120 ký tự. Cả phòng lần lượt vẽ và đoán trên các chuỗi khác nhau; mỗi người chỉ thấy bài ngay trước mình. Canvas dùng hệ tọa độ 800 × 600, hỗ trợ chuột và cảm ứng, tám màu, ba cỡ bút, tẩy, hoàn tác và lưu bản nháp trên thiết bị. Khi trận kết thúc, thành viên được mở toàn bộ chuỗi, xem lớn từng hình và tải chuỗi thành PNG. Ảnh PNG/WebP tải lên tối đa 1 MB, được server giải mã và mã hóa lại thành WebP tối đa 128 KB; bài và ảnh tự hết quyền truy cập sau 7 ngày.
 
 Mỗi ví có một trận miễn phí. Sau đó chủ ví trả **19 xu** để mở phòng trong hai giờ; đồng hồ chỉ bắt đầu khi trận trả phí đầu tiên chạy. Gói đã mua nhưng chưa bắt đầu sẽ tự hoàn 19 xu sau 24 giờ, đúng một lần. Chủ phòng có thể khóa phòng, mời người chơi ra, trao quyền điều khiển và đóng phòng. Âm báo chuyển lượt mặc định tắt; mỗi người tự bật trên thiết bị của mình.
 
@@ -86,7 +88,7 @@ Các collection riêng của tính năng này:
 - `game_redemptions`, `game_meta`
 - `donation_requests`, `donation_tokens`, `donation_idempotency`, `donation_sepay_events`
 - `chat_sessions`, `chat_messages`, `chat_images`, `chat_meta`
-- `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`
+- `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`, `party_drawing_contributions`
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -104,6 +106,7 @@ Các API chính:
 - `POST /api/party/rooms`, `POST /api/party/rooms/:code/join`
 - `GET /api/party/rooms/:code`, `POST /api/party/rooms/:code/actions`
 - `POST /api/party/rooms/:code/purchase`
+- `POST /api/party/rooms/:code/drawings`, `GET /api/party/rooms/:code/drawings/:imageId`
 
 Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
 
@@ -114,7 +117,7 @@ npm test
 node tests/preview.js
 ```
 
-`npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần, xóa dữ liệu sau 7 ngày và quyền phòng Party.
+`npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần, xóa dữ liệu sau 7 ngày, quyền phòng Party, phân công Vẽ chuyền tay, chống gửi trùng và quyền xem ảnh theo lượt.
 
 Preview ở `http://127.0.0.1:3101/xin-tien`, `/ai` và `/party` dùng RAM, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
 

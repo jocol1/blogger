@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const path = require('node:path');
 const express = require('express');
+const multer = require('multer');
 const { createPartyService, PartyError } = require('./service');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -11,6 +12,7 @@ function createPartyRouter(options) {
   const assets = path.join(__dirname, '../../public/party');
   const attempts = new Map();
   const loginAttempts = new Map();
+  const drawingUpload = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: 1024 * 1024, fields: 5 } });
   const asyncRoute = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
   const limiter = (map, limit, windowMs) => (req, res, next) => {
     const at = Date.now();
@@ -41,7 +43,7 @@ function createPartyRouter(options) {
 
   router.use('/assets/party', express.static(assets, { index: false }));
   router.get('/party', (req, res) => {
-    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
+    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
     res.sendFile(path.join(assets, 'index.html'));
   });
 
@@ -73,9 +75,16 @@ function createPartyRouter(options) {
   router.get('/api/party/rooms/:code', asyncRoute(async (req, res) => res.json(await service.state(req.params.code, partyToken(req)))));
   router.post('/api/party/rooms/:code/purchase', actionLimiter, express.json({ limit: '8kb' }), asyncRoute(async (req, res) => res.json(await service.purchase(req.params.code, partyToken(req), walletToken(req), req.body))));
   router.post('/api/party/rooms/:code/actions', actionLimiter, express.json({ limit: '8kb' }), asyncRoute(async (req, res) => res.json(await service.action(req.params.code, partyToken(req), req.body))));
+  router.post('/api/party/rooms/:code/drawings', actionLimiter, drawingUpload.single('drawing'), asyncRoute(async (req, res) => res.json(await service.submitDrawing(req.params.code, partyToken(req), req.body, req.file))));
+  router.get('/api/party/rooms/:code/drawings/:imageId', asyncRoute(async (req, res) => {
+    const image = await service.drawingImage(req.params.code, partyToken(req), req.params.imageId);
+    res.set({ 'Content-Type': image.mime, 'Cache-Control': 'private, no-store', 'Content-Disposition': 'inline' });
+    res.send(image.buffer);
+  }));
 
   router.use((error, req, res, next) => {
     if (error instanceof PartyError) return res.status(error.status).json({ error: error.message });
+    if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Ảnh vẽ tối đa 1 MB.' : 'Không thể nhận ảnh vẽ.' });
     if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON không hợp lệ.' });
     console.error('Party operation failed:', error.code || error.name);
     res.status(503).json({ error: 'Kết nối phòng chơi đang gián đoạn. Hãy thử lại.' });

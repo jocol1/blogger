@@ -4,7 +4,7 @@
   const walletKey = 'locly-game-wallet';
   const sessionPrefix = 'locly-party-session-';
   const requestId = () => crypto.randomUUID?.() || `${Date.now().toString(16)}-${crypto.getRandomValues(new Uint32Array(4)).join('-')}`;
-  const gameRounds = { court: 5, writer: 5, undercover: 3 };
+  const gameRounds = { court: '5 vòng', writer: '5 vòng', undercover: '3 vòng', drawing: 'đi qua cả nhóm' };
   let walletToken = localStorage.getItem(walletKey);
   let wallet = null;
   let config = null;
@@ -19,6 +19,8 @@
   let showSummary = true;
   let soundEnabled = localStorage.getItem('locly-party-sound') === 'on';
   let lastSoundCue = null;
+  let lastDrawingRenderKey = null;
+  const drawingObjectUrls = new Set();
 
   async function api(url, options = {}, headers = {}) {
     const response = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...headers }, cache: 'no-store', signal: AbortSignal.timeout(15_000) });
@@ -39,6 +41,17 @@
     $('toast').classList.add('show');
     toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2300);
   }
+  function clearDrawingUrls() {
+    for (const url of drawingObjectUrls) URL.revokeObjectURL(url);
+    drawingObjectUrls.clear();
+  }
+  async function drawingImageUrl(imageId) {
+    const response = await fetch(`/api/party/rooms/${roomCode}/drawings/${encodeURIComponent(imageId)}`, { headers: partyHeaders(), cache: 'no-store', signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) { const body = await response.json().catch(() => ({})); throw new Error(body.error || 'Không tải được bức vẽ.'); }
+    const url = URL.createObjectURL(await response.blob());
+    drawingObjectUrls.add(url);
+    return url;
+  }
   function setBusy(button, busy, label) {
     if (!button) return;
     if (busy) { button.dataset.old = button.innerHTML; button.disabled = true; if (label) button.querySelector('span') ? button.querySelector('span').textContent = label : button.textContent = label; }
@@ -49,6 +62,7 @@
     history.replaceState({}, '', `/party?room=${encodeURIComponent(code)}`);
   }
   function clearSession() {
+    clearDrawingUrls(); lastDrawingRenderKey = null;
     room = null; roomCode = null; partyToken = null; clearTimeout(pollTimer); clearTimeout(clockTimer);
     history.replaceState({}, '', '/party');
     $('room-shell').hidden = true; $('landing').hidden = false;
@@ -145,8 +159,8 @@
     $('ready-button').disabled = room.status !== 'lobby';
     $('lock-room').hidden = !room.self.isHost;
     $('lock-room').textContent = room.locked ? 'Mở khóa phòng' : 'Khóa phòng';
-    $('close-room').hidden = !room.self.isBillingOwner;
-    const canPurchase = room.self.isBillingOwner && room.entitlement.trialUsed && !['paid', 'active'].includes(room.entitlement.packageStatus);
+    $('close-room').hidden = !room.self.isBillingOwner || room.status !== 'lobby';
+    const canPurchase = room.self.isBillingOwner && room.status === 'lobby' && room.entitlement.trialUsed && !['paid', 'active'].includes(room.entitlement.packageStatus);
     $('purchase-button').hidden = !canPurchase;
     document.querySelectorAll('[data-party-game]').forEach(button => {
       button.classList.toggle('active', button.dataset.partyGame === room.selectedGame);
@@ -156,7 +170,7 @@
     const entitlement = room.entitlement.trialAvailable || room.entitlement.packageStatus === 'paid' || (room.entitlement.packageStatus === 'active' && room.entitlement.activeUntil > now());
     $('start-button').disabled = !room.self.isHost || !allReady || !entitlement;
     $('start-label').textContent = room.players.length < config.minPlayers ? `Cần thêm ${config.minPlayers - room.players.length} người` : !room.players.every(player => player.ready) ? 'Đang chờ mọi người sẵn sàng' : !entitlement ? 'Cần mở khóa phòng để chơi tiếp' : 'Cả nhóm đã sẵn sàng';
-    $('selected-game-label').textContent = `${room.selectedGameLabel} · tối đa ${gameRounds[room.selectedGame]} vòng`;
+    $('selected-game-label').textContent = `${room.selectedGameLabel} · ${gameRounds[room.selectedGame]}`;
   }
   function acceptRoom(next) {
     const soundCue = next.game ? `${next.game.gameNumber}:${next.game.round}:${next.game.phase}:${next.game.status}` : `room:${next.status}`;
@@ -164,6 +178,7 @@
     lastSoundCue = soundCue;
     if (lastGameStatus === 'active' && next.game?.status === 'finished') showSummary = true;
     lastGameStatus = next.game?.status || null;
+    if (room?.game?.gameId && room.game.gameId !== next.game?.gameId) { clearDrawingUrls(); lastDrawingRenderKey = null; }
     room = next; clockOffset = next.serverNow - Date.now();
     $('landing').hidden = true; $('room-shell').hidden = false; $('room-code').textContent = next.code; $('connection-dot').classList.add('online'); $('room-error').textContent = '';
     renderMembers(); renderLobby();
@@ -249,7 +264,156 @@
       if (!game.hasActed) bindChoices(targetId => postAction('game_action', { targetId }).catch(() => {}));
     }
   }
+  const drawingDraftKey = game => `locly-party-draft-${roomCode}-${game.gameId}-${game.turn}`;
+  const drawingRequestKey = game => `locly-party-drawing-request-${roomCode}-${game.gameId}-${game.turn}`;
+
+  async function submitDrawingText(game, text) {
+    const key = drawingRequestKey(game);
+    const id = localStorage.getItem(key) || requestId(); localStorage.setItem(key, id);
+    try {
+      const next = await api(`/api/party/rooms/${roomCode}/actions`, json({ requestId: id, type: 'game_action', gameId: game.gameId, turn: game.turn, text }), partyHeaders());
+      localStorage.removeItem(key); localStorage.removeItem(drawingDraftKey(game)); acceptRoom(next);
+    } catch (error) { $('room-error').textContent = error.message; throw error; }
+  }
+
+  async function submitDrawingCanvas(game, canvas) {
+    const key = drawingRequestKey(game);
+    const id = localStorage.getItem(key) || requestId(); localStorage.setItem(key, id);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.82));
+    if (!blob) throw new Error('Không xuất được bức vẽ.');
+    const form = new FormData();
+    form.append('requestId', id); form.append('gameId', game.gameId); form.append('turn', String(game.turn)); form.append('drawing', blob, 've-chuyen-tay.webp');
+    const response = await fetch(`/api/party/rooms/${roomCode}/drawings`, { method: 'POST', headers: partyHeaders(), body: form, cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) { $('room-error').textContent = body.error || 'Không gửi được bức vẽ.'; throw new Error(body.error || 'Không gửi được bức vẽ.'); }
+    localStorage.removeItem(key); localStorage.removeItem(drawingDraftKey(game)); acceptRoom(body);
+  }
+
+  function openDrawingLightbox(url) {
+    $('drawing-lightbox-image').src = url;
+    $('drawing-lightbox').showModal();
+  }
+
+  async function hydrateDrawingImages(root = document) {
+    const images = [...root.querySelectorAll('[data-drawing-image]:not([data-loaded])')];
+    await Promise.all(images.map(async element => {
+      element.dataset.loaded = 'loading';
+      try {
+        const url = await drawingImageUrl(element.dataset.drawingImage);
+        element.src = url; element.dataset.loaded = 'yes';
+        element.addEventListener('click', () => openDrawingLightbox(url));
+      } catch {
+        element.alt = 'Không tải được bức vẽ'; element.dataset.loaded = 'error';
+      }
+    }));
+  }
+
+  function setupDrawingCanvas(game) {
+    const canvas = $('drawing-board');
+    if (!canvas) return;
+    const context = canvas.getContext('2d', { alpha: false });
+    context.fillStyle = '#ffffff'; context.fillRect(0, 0, canvas.width, canvas.height);
+    context.lineCap = 'round'; context.lineJoin = 'round';
+    let color = '#17121f'; let size = 7; let drawing = false; let last = null; const undo = [];
+    const draftKey = drawingDraftKey(game);
+    const saved = localStorage.getItem(draftKey);
+    if (saved?.startsWith('data:image/')) {
+      const image = new Image(); image.onload = () => context.drawImage(image, 0, 0, canvas.width, canvas.height); image.src = saved;
+    }
+    const point = event => { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; };
+    const snapshot = () => { undo.push(canvas.toDataURL('image/webp', .58)); if (undo.length > 12) undo.shift(); };
+    const save = () => { try { localStorage.setItem(draftKey, canvas.toDataURL('image/webp', .7)); } catch {} };
+    canvas.addEventListener('pointerdown', event => { event.preventDefault(); canvas.setPointerCapture(event.pointerId); snapshot(); drawing = true; last = point(event); });
+    canvas.addEventListener('pointermove', event => { if (!drawing) return; event.preventDefault(); const next = point(event); context.strokeStyle = color; context.lineWidth = size; context.beginPath(); context.moveTo(last.x, last.y); context.lineTo(next.x, next.y); context.stroke(); last = next; });
+    const finish = event => { if (!drawing) return; event?.preventDefault(); drawing = false; last = null; save(); };
+    canvas.addEventListener('pointerup', finish); canvas.addEventListener('pointercancel', finish);
+    document.querySelectorAll('.drawing-color').forEach(button => button.addEventListener('click', () => { color = button.dataset.color; document.querySelectorAll('.drawing-color').forEach(item => item.classList.toggle('active', item === button)); $('drawing-eraser').classList.remove('active'); }));
+    document.querySelectorAll('.drawing-size').forEach(button => button.addEventListener('click', () => { size = Number(button.dataset.size); document.querySelectorAll('.drawing-size').forEach(item => item.classList.toggle('active', item === button)); }));
+    $('drawing-eraser').addEventListener('click', () => { color = '#ffffff'; $('drawing-eraser').classList.add('active'); document.querySelectorAll('.drawing-color').forEach(item => item.classList.remove('active')); });
+    $('drawing-undo').addEventListener('click', () => { const value = undo.pop(); if (!value) return; const image = new Image(); image.onload = () => { context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); context.drawImage(image, 0, 0, canvas.width, canvas.height); save(); }; image.src = value; });
+    $('drawing-clear').addEventListener('click', () => { if (!confirm('Xóa toàn bộ nét vẽ?')) return; snapshot(); context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height); save(); });
+    $('drawing-send').addEventListener('click', async () => { const button = $('drawing-send'); button.disabled = true; button.textContent = 'Đang gửi…'; try { await submitDrawingCanvas(game, canvas); } catch { button.disabled = false; button.textContent = 'Gửi bức vẽ'; } });
+  }
+
+  function renderDrawing(game) {
+    const renderKey = `${game.gameId}:${game.turn}:${game.status}:${game.hasActed}`;
+    const count = `${game.submittedCount}/${room.players.length} người đã gửi`;
+    if (lastDrawingRenderKey === renderKey && $('drawing-stage')) { const progress = $('drawing-submitted'); if (progress) progress.textContent = count; return; }
+    clearDrawingUrls(); lastDrawingRenderKey = renderKey;
+    const kind = game.assignment?.kind;
+    const labels = { prompt: 'Viết câu mở đầu', drawing: 'Vẽ lại điều bạn vừa đọc', guess: 'Đoán bức hình này là gì' };
+    const reference = game.previous?.kind === 'drawing' && game.previous.imageId
+      ? `<div class="drawing-reference"><span>BẠN CHỈ ĐƯỢC NHÌN BỨC NÀY</span><img data-drawing-image="${esc(game.previous.imageId)}" alt="Bức vẽ cần đoán"></div>`
+      : game.previous?.text
+        ? `<div class="drawing-reference"><span>BẠN CHỈ ĐƯỢC NHÌN CÂU NÀY</span><strong>${esc(game.previous.text)}</strong></div>`
+        : game.turn > 0 ? '<div class="drawing-reference"><span>LƯỢT TRƯỚC BỎ QUA</span><strong>Tự do sáng tác tiếp nhé!</strong></div>' : '';
+    let action = '';
+    if (game.hasActed) action = `<div class="drawing-wait">${waitCard('✓','Đã gửi bài',`Đợi những cây hài còn lại. ${count}`)}</div>`;
+    else if (kind === 'prompt' || kind === 'guess') {
+      const draft = localStorage.getItem(drawingDraftKey(game)) || '';
+      action = `<form id="drawing-text-form" class="drawing-text-form"><textarea id="drawing-text" maxlength="120" placeholder="${kind === 'prompt' ? 'Ví dụ: Con mèo đi đòi nợ bằng xe đạp…' : 'Bạn nghĩ người trước đang vẽ gì?'}" required>${esc(draft)}</textarea><div class="drawing-text-actions">${kind === 'prompt' ? '<button id="drawing-suggestion" class="drawing-suggestion" type="button">Cho tôi một câu bựa</button>' : ''}<button class="drawing-submit" type="submit">Gửi câu này</button></div></form>`;
+    } else {
+      const colors = ['#17121f','#ef4444','#f97316','#facc15','#22c55e','#38bdf8','#6366f1','#d946ef'];
+      action = `<div class="drawing-board-wrap"><canvas id="drawing-board" class="drawing-board" width="800" height="600" aria-label="Bảng vẽ"></canvas></div><div class="drawing-toolbar"><div class="drawing-colors">${colors.map((value,index) => `<button class="drawing-color${index===0?' active':''}" type="button" data-color="${value}" aria-label="Màu ${index+1}"></button>`).join('')}</div><div class="drawing-sizes"><button class="drawing-size" data-size="3" type="button">Mảnh</button><button class="drawing-size active" data-size="7" type="button">Vừa</button><button class="drawing-size" data-size="15" type="button">Đậm</button></div><button id="drawing-eraser" class="drawing-tool" type="button">Tẩy</button><button id="drawing-undo" class="drawing-tool" type="button">Hoàn tác</button><button id="drawing-clear" class="drawing-tool" type="button">Xóa</button><button id="drawing-send" class="drawing-send" type="button">Gửi bức vẽ</button></div>`;
+    }
+    $('game-content').innerHTML = `<div id="drawing-stage" class="drawing-stage"><div class="drawing-progress"><b>${esc(labels[kind] || 'Vẽ chuyền tay')}</b><span id="drawing-submitted">${esc(count)}</span></div>${reference}${action}</div>`;
+    hydrateDrawingImages($('game-content'));
+    if (!game.hasActed && (kind === 'prompt' || kind === 'guess')) {
+      const textarea = $('drawing-text');
+      textarea.addEventListener('input', () => localStorage.setItem(drawingDraftKey(game), textarea.value));
+      if ($('drawing-suggestion')) $('drawing-suggestion').addEventListener('click', () => { textarea.value = game.suggestion || ''; textarea.dispatchEvent(new Event('input')); textarea.focus(); });
+      $('drawing-text-form').addEventListener('submit', async event => { event.preventDefault(); const button = event.submitter; button.disabled = true; try { await submitDrawingText(game, textarea.value.trim()); } catch { button.disabled = false; } });
+    } else if (!game.hasActed && kind === 'drawing') setupDrawingCanvas(game);
+  }
+
+  function renderDrawingFinished(game) {
+    const renderKey = `${game.gameId}:finished:${game.expired ? 'expired' : 'ready'}`;
+    if (lastDrawingRenderKey === renderKey && ($('game-content').querySelector('.chain-results') || $('game-content').querySelector('.drawing-expired'))) return;
+    clearDrawingUrls(); lastDrawingRenderKey = renderKey;
+    if (game.expired) { $('game-content').innerHTML = '<div class="drawing-expired"><h3>Kết quả đã hết hạn</h3><p>Nội dung Vẽ chuyền tay được giữ trong 7 ngày sau khi trận kết thúc.</p></div>'; return; }
+    const chains = game.chains || [];
+    $('game-content').innerHTML = `<div class="chain-results"><div class="result-card"><div class="result-emoji">🎨</div><span class="phase-kicker">MỞ XÍCH · ${chains.length} CHUỖI</span><h3>Xem nó đã biến thành cái gì!</h3><p>Mỗi người tự mở từng chuỗi. Không có thắng thua, chỉ có bằng chứng.</p></div>${chains.map((chain,index) => `<article class="chain-card" data-chain-index="${index}"><header><div><span>CHUỖI ${index+1}</span><b>Khởi đầu bởi ${esc(chain.ownerName)}</b></div><button type="button" data-reveal-chain="${index}">Mở chuỗi</button></header><div class="chain-body" hidden>${chain.contributions.map((item,step) => `<div class="chain-step" data-step="${step+1}"><small>${esc(item.authorName)} · ${item.kind === 'drawing' ? 'vẽ' : item.kind === 'prompt' ? 'câu gốc' : 'đoán'}</small>${item.skipped ? '<p class="chain-skip">Bỏ lượt</p>' : item.kind === 'drawing' ? `<img data-drawing-image="${esc(item.imageId)}" alt="Bức vẽ ở bước ${step+1}">` : `<p>${esc(item.text)}</p>`}</div>`).join('')}<button class="chain-download" type="button" data-download-chain="${index}">Tải chuỗi này</button></div></article>`).join('')}<button id="back-lobby" class="advance-button">Chọn trò tiếp</button></div>`;
+    document.querySelectorAll('[data-reveal-chain]').forEach(button => button.addEventListener('click', () => { const body = button.closest('.chain-card').querySelector('.chain-body'); body.hidden = !body.hidden; button.textContent = body.hidden ? 'Mở chuỗi' : 'Thu lại'; if (!body.hidden) hydrateDrawingImages(body); }));
+    document.querySelectorAll('[data-download-chain]').forEach(button => button.addEventListener('click', () => downloadDrawingChain(chains[Number(button.dataset.downloadChain)], Number(button.dataset.downloadChain) + 1).catch(error => showToast(error.message))));
+    $('back-lobby').addEventListener('click', () => { showSummary = false; $('game-area').hidden = true; $('lobby-controls').hidden = false; renderLobby(); });
+  }
+
+  function wrapCanvasText(context, text, x, y, maxWidth, lineHeight) {
+    const words = String(text).split(/\s+/); let line = ''; let currentY = y;
+    for (const word of words) { const test = line ? `${line} ${word}` : word; if (context.measureText(test).width > maxWidth && line) { context.fillText(line, x, currentY); line = word; currentY += lineHeight; } else line = test; }
+    if (line) context.fillText(line, x, currentY);
+    return currentY + lineHeight;
+  }
+
+  async function loadBitmap(imageId) {
+    const response = await fetch(`/api/party/rooms/${roomCode}/drawings/${encodeURIComponent(imageId)}`, { headers: partyHeaders(), cache: 'no-store' });
+    if (!response.ok) throw new Error('Không tải đủ ảnh để xuất kết quả.');
+    return createImageBitmap(await response.blob());
+  }
+
+  async function downloadDrawingChain(chain, chainNumber) {
+    const chunks = [];
+    for (let index = 0; index < chain.contributions.length; index += 3) chunks.push(chain.contributions.slice(index, index + 3));
+    for (let page = 0; page < chunks.length; page++) {
+      const canvas = document.createElement('canvas'); canvas.width = 1080; canvas.height = 1350; const context = canvas.getContext('2d');
+      const gradient = context.createLinearGradient(0,0,1080,1350); gradient.addColorStop(0,'#201332'); gradient.addColorStop(1,'#ff7052'); context.fillStyle = gradient; context.fillRect(0,0,1080,1350);
+      context.fillStyle = '#ffd35a'; context.font = '900 34px Segoe UI, Arial'; context.fillText('LOCLY.PARTY · VẼ CHUYỀN TAY', 65, 72);
+      context.fillStyle = '#fff8ee'; context.font = '900 52px Segoe UI, Arial'; context.fillText(`Chuỗi ${chainNumber} · ${chain.ownerName}`, 65, 135);
+      let y = 190;
+      for (const item of chunks[page]) {
+        context.fillStyle = '#ffffff12'; context.fillRect(55,y,970,340); context.fillStyle = '#d9cede'; context.font = '700 23px Segoe UI, Arial'; context.fillText(`${item.authorName} · ${item.kind === 'drawing' ? 'vẽ' : item.kind === 'prompt' ? 'câu gốc' : 'đoán'}`,80,y+38);
+        if (item.skipped) { context.fillStyle='#a99fb9'; context.font='italic 30px Segoe UI, Arial'; context.fillText('Bỏ lượt',80,y+105); }
+        else if (item.kind === 'drawing') { const bitmap = await loadBitmap(item.imageId); const ratio=Math.min(880/bitmap.width,255/bitmap.height); context.drawImage(bitmap,80,y+58,bitmap.width*ratio,bitmap.height*ratio); bitmap.close?.(); }
+        else { context.fillStyle='#fff8ee'; context.font='800 34px Segoe UI, Arial'; wrapCanvasText(context,item.text,80,y+105,880,46); }
+        y += 365;
+      }
+      context.fillStyle='#ffffffaa'; context.font='500 22px Segoe UI, Arial'; context.fillText(`locly.lol/party · Trang ${page+1}/${chunks.length}`,65,1305);
+      const link=document.createElement('a'); link.download=`locly-party-chuoi-${chainNumber}-${page+1}.png`; link.href=canvas.toDataURL('image/png'); link.click();
+    }
+  }
+
   function renderFinished(game) {
+    if (game.key === 'drawing') return renderDrawingFinished(game);
     const sorted = [...room.players].sort((a, b) => (game.scores?.[b.id] || 0) - (game.scores?.[a.id] || 0));
     let heading = 'Trận đấu đã xong!';
     if (game.key === 'undercover') {
@@ -269,6 +433,7 @@
     if (game.status === 'finished') return renderFinished(game);
     if (game.key === 'court') renderCourt(game);
     else if (game.key === 'writer') renderWriter(game);
+    else if (game.key === 'drawing') renderDrawing(game);
     else renderUndercover(game);
   }
   function downloadResult() {
@@ -313,6 +478,8 @@
     updateSoundButton();
     playSound();
   });
+  $('drawing-lightbox-close').addEventListener('click', () => $('drawing-lightbox').close());
+  $('drawing-lightbox').addEventListener('click', event => { if (event.target === $('drawing-lightbox')) $('drawing-lightbox').close(); });
   $('leave-view').addEventListener('click', clearSession);
   $('join-code').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase().replace(/[^A-Z2-9]/g, '').slice(0, 6); });
 
