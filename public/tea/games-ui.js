@@ -1,0 +1,34 @@
+window.TeaGamesUI = function ({api,t,toast,id,myId,myTable,isVisible}) {
+  const $=s=>document.querySelector(s),box=$('#mini-game-stage');let key=null,game=null,botCount=1,busy=false,offset=0,fingerprint='',fetching=false;
+  const symbols={tea:'🥤',cake:'🍰',leaf:'🍃',sun:'☀',flower:'🌸',moon:'☾',rock:'✊',paper:'✋',scissors:'✌',missed:'—'};
+  function update(value){if(value&&game?.id===value.id&&(game.version||0)>(value.version||0))return;game=value;if(value?.serverNow)offset=value.serverNow-Date.now();render()}
+  async function refresh(){if(!key||!myTable()||fetching)return;fetching=true;try{const data=await api('/api/tea/games/'+key);update(data.game)}catch(error){toast(error.message)}finally{fetching=false}}
+  async function action(input){if(busy||!game)return;busy=true;try{const data=await api('/api/tea/games/'+key+'/action',{method:'POST',body:JSON.stringify({...input,gameId:game.id,requestId:id(),round:game.round})});update(data.game)}catch(error){toast(error.message);await refresh()}finally{busy=false}}
+  async function start(){if(busy)return;busy=true;try{const data=await api('/api/tea/games',{method:'POST',body:JSON.stringify({key,botCount,requestId:id()})});update(data.game)}catch(error){toast(error.message)}finally{busy=false}}
+  function timer(){if(!game||game.status!=='active')return;const el=$('#mini-clock');if(el)el.textContent=t('secondsLeft',{seconds:Math.max(0,Math.ceil((game.deadline-(Date.now()+offset))/1000))})}
+  function render(force=false){
+    if(!key){box.innerHTML='<div class="mini-welcome"><span>✦</span><h3>'+t('pickOne')+'</h3><p>'+t('miniIntro')+'</p></div>';return}
+    document.querySelectorAll('[data-mini-game]').forEach(button=>button.classList.toggle('active',button.dataset.miniGame===key));
+    const next=JSON.stringify({key,game:game?{...game,serverNow:undefined}:null,table:myTable()?.id,locale:document.documentElement.lang});if(!force&&next===fingerprint){timer();return}fingerprint=next;
+    const name=t(key+'Name'),rules=t(key+'Rules');
+    if(!game){box.innerHTML=`<div class="mini-lobby"><h3>${name}</h3><p>${rules}</p><label>${t('bots')} <select id="mini-bots"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><button id="mini-start" class="primary">${t('startGame')}</button><p>${myTable()?t('hostStarts'):t('notSeated')}</p></div>`;$('#mini-bots').value=String(botCount);$('#mini-bots').onchange=e=>botCount=Number(e.target.value);$('#mini-start').disabled=!myTable();$('#mini-start').onclick=start;return}
+    box.innerHTML=`<div class="mini-playing"><div class="mini-scorebar"><h3>${name}</h3><b id="mini-clock"></b></div><p class="mini-turn" id="mini-turn"></p><div class="mini-players" id="mini-players"></div><div id="mini-board" class="mini-board"></div><div id="mini-result" class="mini-result" hidden></div><p class="mini-rules">${rules}</p></div>`;
+    const players=$('#mini-players');for(const player of game.players){const badge=document.createElement('div');badge.className='mini-player'+(player.id===game.turn?' turn':'');const name=document.createElement('b'),score=document.createElement('span');name.textContent=(player.bot?'🤖 ':'')+player.name;score.textContent=t('points',{score:player.score});badge.append(name,score);players.append(badge)}
+    const mine=game.turn===myId(),active=game.status==='active';$('#mini-turn').textContent=!game.member?t('spectator'):key==='rps'?t('secretChoice'):(mine?t('yourTurn'):t('theirTurn',{name:game.players.find(p=>p.id===game.turn)?.name||'…'}));
+    const board=$('#mini-board');
+    if(key==='dice'){
+      board.classList.add('dice-board');for(const player of game.players){const lane=document.createElement('div'),name=document.createElement('b'),track=document.createElement('span'),runner=document.createElement('i');lane.className='dice-lane';name.textContent=player.name;runner.textContent=player.bot?'🤖':'☺';runner.style.left=Math.min(95,player.score/20*95)+'%';track.append(runner);lane.append(name,track);board.append(lane)}
+      const roll=document.createElement('button');roll.className='dice-roll';roll.textContent=game.last?.roll?['⚀','⚁','⚂','⚃','⚄','⚅'][game.last.roll-1]:'⚄';roll.setAttribute('aria-label',t('rollDice'));roll.disabled=!active||!mine;roll.onclick=()=>action({});board.append(roll);const hint=document.createElement('p');hint.textContent=t('rollDice');board.append(hint);
+    }else if(key==='rps'){
+      board.classList.add('rps-board');const round=document.createElement('b');round.textContent=t('roundOf',{round:Math.min(5,game.round)});board.append(round);const choices=document.createElement('div');choices.className='rps-choices';for(const choice of ['rock','paper','scissors']){const button=document.createElement('button'),icon=document.createElement('span'),label=document.createElement('b');icon.textContent=symbols[choice];label.textContent=t(choice);button.append(icon,label);button.disabled=!active||!game.member||Boolean(game.myChoice);button.classList.toggle('selected',game.myChoice===choice);button.onclick=()=>action({choice});choices.append(button)}board.append(choices);
+      const status=document.createElement('p');status.textContent=game.myChoice?t('choiceLocked'):t('chooseSign');board.append(status);
+      if(game.last?.choices){const last=document.createElement('div');last.className='rps-last';for(const player of game.players){const line=document.createElement('span');line.textContent=player.name+' '+symbols[game.last.choices[player.id]];last.append(line)}board.append(last)}
+    }else{
+      board.classList.add('memory-board');for(const tile of game.tiles){const button=document.createElement('button');button.className='memory-tile'+(tile.symbol?' revealed':'')+(tile.matched?' matched':'');button.textContent=tile.symbol?symbols[tile.symbol]:'?';button.setAttribute('aria-label',tile.symbol?t('tileRevealed')+' '+tile.symbol:t('hiddenTile')+' '+(tile.index+1));button.disabled=!active||!mine||tile.matched||Boolean(game.revealUntil)||Boolean(tile.symbol);button.onclick=()=>action({index:tile.index});board.append(button)}
+    }
+    if(!active){const result=$('#mini-result');result.hidden=false;const label=document.createElement('b');label.textContent=game.last?.canceled?t('gameCanceled'):game.winnerIds.includes(myId())?t('youWon'):game.winnerIds.length?t('winners',{names:game.players.filter(p=>game.winnerIds.includes(p.id)).map(p=>p.name).join(', ')}):t('gameEnded');const again=document.createElement('button');again.className='primary';again.textContent=t('playAgain');again.onclick=start;result.append(label,again)}timer();
+  }
+  document.querySelectorAll('[data-mini-game]').forEach(button=>button.onclick=()=>{key=button.dataset.miniGame;game=null;fingerprint='';render();refresh()});
+  setInterval(()=>{if(isVisible()&&key){timer();refresh()}},1200);
+  render();return {refresh,render:()=>render(true)};
+};

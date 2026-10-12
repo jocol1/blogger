@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { createTableGames } = require('./table-games');
 
 const ROOM_ID = 'main';
 const MAX_GUESTS = 32;
@@ -14,20 +15,13 @@ class TeaError extends Error {
   constructor(status, message, code = 'tea_error') { super(message); this.status = status; this.code = code; }
 }
 
-const TABLES = [
-  { id: 't1', x: 235, y: 205 }, { id: 't2', x: 480, y: 205 }, { id: 't3', x: 725, y: 205 },
-  { id: 't4', x: 235, y: 440 }, { id: 't5', x: 480, y: 440 }, { id: 't6', x: 725, y: 440 },
-].map(table => ({ ...table, seats: [
-  { id: `${table.id}-n`, x: table.x, y: table.y - 72 },
-  { id: `${table.id}-e`, x: table.x + 88, y: table.y },
-  { id: `${table.id}-s`, x: table.x, y: table.y + 72 },
-  { id: `${table.id}-w`, x: table.x - 88, y: table.y },
-] }));
+const { TABLES, blocked } = require('../../public/tea/world');
 
 function emptyRoom() {
   return {
     id: ROOM_ID,
-    tables: TABLES.map(table => ({ id: table.id, ownerId: null, locked: false, inviteHash: null, invited: [], seats: table.seats.map(seat => ({ ...seat, walletId: null, seatedAt: null })) })),
+    layoutVersion: 2,
+    tables: TABLES.map(table => ({ ...table, ownerId: null, seats: table.seats.map(seat => ({ ...seat, walletId: null, seatedAt: null })) })),
     updatedAt: iso(Date.now()),
   };
 }
@@ -55,6 +49,7 @@ function cardMatches(card, top, activeColor) {
 }
 
 function createTeaService({ db, config, now = () => Date.now() }) {
+  const tableGames=db?createTableGames({db,now}):null;
   const col = name => db?.collection(name);
   const rooms = () => col('tea_rooms');
   const profiles = () => col('tea_profiles');
@@ -71,6 +66,9 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   const presence = new Map();
   const sockets = new Map();
   const chatRate = new Map();
+  const socialRate = new Map();
+  const seatRequests = new Map();
+  const fights = new Map();
   let io = null;
 
   const paymentReady = () => Boolean(db && config?.bank && config?.account && config?.accountName && config?.webhookKey);
@@ -85,7 +83,8 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   async function ensureRoom(tx) {
     const ref = rooms().doc(ROOM_ID);
     const snapshot = await tx.get(ref);
-    return { ref, row: snapshot.exists ? snapshot.data() : emptyRoom(), exists: snapshot.exists };
+    const stored = snapshot.exists ? snapshot.data() : null;
+    return { ref, row: stored?.layoutVersion === 2 ? stored : emptyRoom(), exists: snapshot.exists };
   }
   function tableBySeat(room, seatId) {
     for (const table of room.tables || []) { const seat = table.seats.find(value => value.id === seatId); if (seat) return { table, seat }; }
@@ -96,7 +95,32 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     return null;
   }
   function publicRoom(room) {
-    return { ...room, tables: room.tables.map(table => ({ ...table, inviteHash: undefined, invited: undefined })) };
+    return { ...room, tables: room.tables.map(({ inviteHash, invited, locked, ...table }) => table) };
+  }
+  const requestView = row => ({ id: row.id, requesterId: row.requesterId, requesterName: row.requesterName, tableId: row.tableId, seatId: row.seatId, status: row.status, expiresAt: row.expiresAt });
+  function socialLimit(walletId) { const recent=(socialRate.get(walletId)||[]).filter(at=>now()-at<30_000); if(recent.length>=4)throw new TeaError(429,'Give people a moment before asking again.','social_rate'); recent.push(now());socialRate.set(walletId,recent); }
+  function fightFor(walletId) { return [...fights.values()].find(row => row.players.includes(walletId) && ['pending', 'active'].includes(resolveFight(row).status)) || null; }
+  function fightView(row) {
+    if (!row) return null;
+    return { id: row.id, version: row.version || 0, tableId: row.tableId, status: row.status, challengerId: row.challengerId, targetId: row.targetId, players: row.players.map(id => ({ id, name: row.names[id], health: row.health?.[id] ?? 12 })), startsAt: row.startsAt || null, endsAt: row.endsAt || row.expiresAt, winnerId: row.winnerId || null, reason: row.reason || null, serverNow: now() };
+  }
+  function emitFight(row, attackerId = null) {
+    row.version=(row.version||0)+1;
+    const payload = { fight: fightView(row), attackerId };
+    for (const id of row.players) io?.to(`wallet:${id}`).emit('tea:fight-state', payload);
+  }
+  function finishFight(row, reason, winnerId = null) {
+    if (!row || row.status === 'finished') return row;
+    Object.assign(row, { status: 'finished', reason, winnerId, finishedAt: now() }); emitFight(row); return row;
+  }
+  function resolveFight(row) {
+    if (!row) return null;
+    if (row.status === 'pending' && now() >= row.expiresAt) return finishFight(row, 'expired');
+    if (row.status === 'active' && now() >= row.endsAt) {
+      const [one, two] = row.players; const winner = row.health[one] === row.health[two] ? null : row.health[one] > row.health[two] ? one : two;
+      return finishFight(row, winner ? 'time' : 'draw', winner);
+    }
+    return row;
   }
   async function menu() {
     requireDb();
@@ -196,7 +220,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       return { walletId, profile: await profileFor(walletId) };
     },
     async publicState() {
-      requireDb(); const roomSnapshot = await rooms().doc(ROOM_ID).get(); const room = roomSnapshot.exists ? roomSnapshot.data() : emptyRoom();
+      requireDb(); const roomSnapshot = await rooms().doc(ROOM_ID).get(); const stored = roomSnapshot.exists ? roomSnapshot.data() : null; const room = stored?.layoutVersion === 2 ? stored : emptyRoom();
       return { room: publicRoom(room), guests: [...presence.values()].map(({ walletId, nickname, hair, clothes, shoes, x, y, connected, tableId, seatId }) => ({ walletId, nickname, hair, clothes, shoes, x, y, connected, tableId, seatId })), maxGuests: MAX_GUESTS, serverNow: now() };
     },
     async connect(token, socket) {
@@ -207,34 +231,74 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       const current = presence.get(walletId) || { walletId, x: 90 + Math.random() * 100, y: 560, tableId: null, seatId: null };
       Object.assign(current, profile, { connected: true, socketId: socket.id, disconnectedAt: null }); presence.set(walletId, current); sockets.set(walletId, socket);
       socket.join(`wallet:${walletId}`); socket.data.walletId = walletId;
-      const roomSnapshot = await rooms().doc(ROOM_ID).get(); const seated = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId);
+      const roomSnapshot = await rooms().doc(ROOM_ID).get(); const room = roomSnapshot.exists && roomSnapshot.data()?.layoutVersion === 2 ? roomSnapshot.data() : emptyRoom(); const seated = tableForWallet(room, walletId);
       if (seated) { Object.assign(current, { tableId: seated.table.id, seatId: seated.seat.id, x: seated.seat.x, y: seated.seat.y }); socket.join(`table:${seated.table.id}`); }
       return { walletId, state: await service.publicState() };
     },
     move(walletId, input) {
       const player = presence.get(walletId); if (!player || player.seatId) return;
-      const dx = Math.max(-1, Math.min(1, Number(input?.dx) || 0)); const dy = Math.max(-1, Math.min(1, Number(input?.dy) || 0)); const length = Math.hypot(dx, dy) || 1;
-      const elapsed = Math.max(16, Math.min(140, now() - (player.movedAt || now() - 50))); const step = 145 * elapsed / 1000;
-      const blocked = (x, y) => TABLES.some(table => Math.abs(x - table.x) < 74 && Math.abs(y - table.y) < 58) || x < 32 || x > 928 || y < 76 || y > 606 || (x > 350 && x < 610 && y < 135);
+      const dx = Number(input?.dx) || 0; const dy = Number(input?.dy) || 0; if(!Number.isFinite(dx)||!Number.isFinite(dy))return; const length = Math.hypot(dx, dy) || 1;
+      const elapsed = Math.min(140, now() - (player.movedAt ?? now() - 50)); if(elapsed<16)return; const maximum=145*elapsed/1000; const distance=Number(input?.distance); const step=Number.isFinite(distance)&&distance>=0?Math.min(maximum,distance):maximum;
       const vectors = [[dx / length, dy / length], [dx ? Math.sign(dx) : 0, 0], [0, dy ? Math.sign(dy) : 0], [-dy / length, dx / length], [dy / length, -dx / length]];
       for (const [vx, vy] of vectors) { if (!vx && !vy) continue; const nx = player.x + vx * step, ny = player.y + vy * step; if (!blocked(nx, ny)) { player.x = nx; player.y = ny; break; } }
       player.movedAt = now(); io?.emit('tea:move', { walletId, x: player.x, y: player.y });
     },
     disconnect(walletId, socketId) { const player = presence.get(walletId); if (!player || player.socketId !== socketId) return; player.connected = false; player.disconnectedAt = now(); sockets.delete(walletId); setTimeout(() => service.releaseDisconnected(walletId).catch(() => {}), 45_100).unref?.(); },
     async releaseDisconnected(walletId) { const player = presence.get(walletId); if (!player || player.connected || now() - player.disconnectedAt < 45_000) return; await service.leaveByWallet(walletId, 'disconnect'); presence.delete(walletId); io?.emit('tea:state', await service.publicState()); },
-    async seat(token, seatId, inviteToken) {
+    async seat(token, seatId) {
       const walletId = await walletIdFor(token); const player = presence.get(walletId); const definition = TABLES.flatMap(t => t.seats).find(s => s.id === seatId);
       if (!player || !definition || Math.hypot(player.x - definition.x, player.y - definition.y) > 96) throw new TeaError(409, 'Walk closer to this chair first.', 'too_far');
       const result = await db.runTransaction(async tx => {
         const { ref, row: room, exists } = await ensureRoom(tx); if (tableForWallet(room, walletId)) throw new TeaError(409, 'You are already seated.', 'already_seated');
         const found = tableBySeat(room, seatId); if (!found || found.seat.walletId) throw new TeaError(409, 'That chair was just taken.', 'seat_taken');
-        const invited = inviteToken && found.table.inviteHash && hash(inviteToken) === found.table.inviteHash;
-        if (found.table.locked && found.table.ownerId !== walletId && !found.table.invited.includes(walletId) && !invited) throw new TeaError(403, 'This table is private.', 'table_private');
-        if (invited && !found.table.invited.includes(walletId)) found.table.invited.push(walletId);
         found.seat.walletId = walletId; found.seat.seatedAt = now(); if (!found.table.ownerId) found.table.ownerId = walletId;
         room.updatedAt = iso(now()); exists ? tx.update(ref, room) : tx.create(ref, room); return { tableId: found.table.id, seatId };
       });
       Object.assign(player, result, { x: definition.x, y: definition.y }); sockets.get(walletId)?.join(`table:${result.tableId}`); await prepareDelivery(walletId); io?.emit('tea:state', await service.publicState()); return result;
+    },
+    async askToSit(token, seatId) {
+      const walletId = await walletIdFor(token); const player = presence.get(walletId); const definition = TABLES.flatMap(table => table.seats).find(seat => seat.id === seatId);
+      if (!player || !definition || player.seatId || Math.hypot(player.x - definition.x, player.y - definition.y) > 96) throw new TeaError(409, 'Walk closer to this chair first.', 'too_far');
+      const snapshot = await rooms().doc(ROOM_ID).get(); const room = snapshot.exists && snapshot.data()?.layoutVersion === 2 ? snapshot.data() : emptyRoom(); const found = tableBySeat(room, seatId);
+      if (!found || found.seat.walletId) throw new TeaError(409, 'That chair was just taken.', 'seat_taken');
+      if (!found.table.seats.some(seat => seat.walletId)) throw new TeaError(409, 'This table is empty. You can sit right down.', 'table_empty');
+      socialLimit(walletId);
+      for (const request of seatRequests.values()) if (request.requesterId === walletId && request.status === 'pending') request.status = 'replaced';
+      const row = { id: crypto.randomUUID(), requesterId: walletId, requesterName: player.nickname, tableId: found.table.id, seatId, status: 'pending', expiresAt: now() + 20_000 };
+      seatRequests.set(row.id, row); io?.to(`table:${row.tableId}`).emit('tea:seat-request', requestView(row)); return requestView(row);
+    },
+    async seatRequestsFor(token) {
+      const walletId = await walletIdFor(token); const snapshot = await rooms().doc(ROOM_ID).get(); const current = snapshot.exists && tableForWallet(snapshot.data(), walletId); if (!current) return { requests: [] };
+      const rows = [...seatRequests.values()].filter(row => row.tableId === current.table.id && row.status === 'pending' && row.expiresAt > now()); return { requests: rows.map(requestView) };
+    },
+    async respondSeatRequest(token, requestId, accepted) {
+      const walletId = await walletIdFor(token); const row = seatRequests.get(requestId); if (!row || row.status !== 'pending' || row.expiresAt <= now()) throw new TeaError(404, 'This request has expired.', 'request_expired');
+      const snapshot = await rooms().doc(ROOM_ID).get(); const current = snapshot.exists && tableForWallet(snapshot.data(), walletId); if (!current || current.table.id !== row.tableId) throw new TeaError(403, 'Only someone at this table can answer.', 'wrong_table');
+      if(row.status!=='pending'||row.expiresAt<=now())throw new TeaError(409,'Someone already answered this request.','request_expired');
+      row.status = accepted ? 'accepted' : 'declined'; row.respondedBy = walletId; row.respondedAt = now(); io?.to(`wallet:${row.requesterId}`).emit('tea:seat-response', requestView(row)); return requestView(row);
+    },
+    async fightState(token) { const walletId = await walletIdFor(token); return { fight: fightView(resolveFight(fightFor(walletId))) }; },
+    async challengeFight(token, opponentId) {
+      const walletId = await walletIdFor(token); if (walletId === opponentId) throw new TeaError(400, 'Choose someone else.', 'bad_opponent');
+      const snapshot = await rooms().doc(ROOM_ID).get(); const room = snapshot.exists ? snapshot.data() : emptyRoom(); const mine = tableForWallet(room, walletId), theirs = tableForWallet(room, opponentId);
+      if (!mine || !theirs || mine.table.id !== theirs.table.id || !presence.get(opponentId)?.connected) throw new TeaError(409, 'Choose someone sitting at your table.', 'opponent_unavailable');
+      if (fightFor(walletId) || fightFor(opponentId)) throw new TeaError(409, 'One of you is already in a brawl.', 'fight_busy');
+      socialLimit(walletId);
+      const row = { id: crypto.randomUUID(), tableId: mine.table.id, challengerId: walletId, targetId: opponentId, players: [walletId, opponentId], names: { [walletId]: presence.get(walletId)?.nickname || 'Guest', [opponentId]: presence.get(opponentId)?.nickname || 'Guest' }, status: 'pending', expiresAt: now() + 20_000, actionIds: new Set() };
+      fights.set(row.id, row); emitFight(row); io?.to(`wallet:${opponentId}`).emit('tea:fight-challenge', fightView(row)); return fightView(row);
+    },
+    async respondFight(token, fightId, accepted) {
+      const walletId = await walletIdFor(token); const row = resolveFight(fights.get(fightId)); if (!row) throw new TeaError(404, 'This challenge has expired.', 'fight_expired'); if (row.targetId !== walletId && !(row.challengerId===walletId&&!accepted)) throw new TeaError(403, 'Only the challenged player can accept.', 'not_target'); if(row.status!=='pending')return fightView(row);
+      if (!accepted) return fightView(finishFight(row, 'declined'));
+      const snapshot = await rooms().doc(ROOM_ID).get(); const room = snapshot.exists ? snapshot.data() : emptyRoom(); const one = tableForWallet(room, row.players[0]), two = tableForWallet(room, row.players[1]); if (!one || !two || one.table.id !== two.table.id) throw new TeaError(409, 'Both players must still be at the same table.', 'fight_moved');
+      if(resolveFight(row).status!=='pending')return fightView(row);
+      row.status = 'active'; row.startsAt = now(); row.endsAt = now() + 12_000; row.health = Object.fromEntries(row.players.map(id => [id, 12])); row.lastHit = {}; emitFight(row); return fightView(row);
+    },
+    async hitFight(token, fightId, input) {
+      const walletId = await walletIdFor(token); const requestId = cleanRequestId(input?.requestId); const row = resolveFight(fights.get(fightId)); if (!requestId) throw new TeaError(400, 'Invalid hit.', 'bad_request'); if (!row || !row.players.includes(walletId)) throw new TeaError(409, 'This brawl is over.', 'fight_over');
+      const actionId=`${walletId}:${requestId}`;if (row.actionIds.has(actionId)) return fightView(row);if(row.status!=='active')throw new TeaError(409,'This brawl is over.','fight_over'); if (now() - (row.lastHit[walletId] ?? -Infinity) < 260) throw new TeaError(429, 'Too fast. Time your bonks!', 'hit_rate');
+      const opponentId = row.players.find(id => id !== walletId); row.actionIds.add(actionId); row.lastHit[walletId] = now(); row.health[opponentId] = Math.max(0, row.health[opponentId] - 1);
+      if (!row.health[opponentId]) finishFight(row, 'knockout', walletId); else emitFight(row, walletId); return fightView(row);
     },
     async leave(token) { const walletId = await walletIdFor(token); return service.leaveByWallet(walletId, 'stood_up'); },
     async leaveByWallet(walletId, reason) {
@@ -243,23 +307,12 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         const gameRef = games().doc(current.table.id); const gameSnapshot = await tx.get(gameRef);
         current.seat.walletId = null; current.seat.seatedAt = null;
         if (current.table.ownerId === walletId) { const occupied = current.table.seats.filter(s => s.walletId).sort((a, b) => a.seatedAt - b.seatedAt); current.table.ownerId = occupied[0]?.walletId || null; }
-        if (!current.table.ownerId) Object.assign(current.table, { locked: false, inviteHash: null, invited: [] });
         room.updatedAt = iso(now()); exists ? tx.update(ref, room) : tx.create(ref, room);
         if (gameSnapshot.exists && gameSnapshot.data().status === 'active' && gameSnapshot.data().players.includes(walletId)) tx.update(gameRef, { ...gameSnapshot.data(), status: 'finished', reason: reason === 'disconnect' ? 'player_disconnected' : 'player_left', winnerId: null, finishedAt: iso(now()) });
         return { tableId: current.table.id };
       });
+      const fight = fightFor(walletId); if (fight) finishFight(fight, reason === 'disconnect' ? 'player_disconnected' : 'player_left', fight.players.find(id => id !== walletId));
       const player = presence.get(walletId); if (player) Object.assign(player, { tableId: null, seatId: null }); if (result) sockets.get(walletId)?.leave(`table:${result.tableId}`); io?.emit('tea:state', await service.publicState()); return result;
-    },
-    async setTableLock(token, locked) {
-      const walletId = await walletIdFor(token); const result = await db.runTransaction(async tx => {
-        const { ref, row: room } = await ensureRoom(tx); const current = tableForWallet(room, walletId); if (!current || current.table.ownerId !== walletId) throw new TeaError(403, 'Only the table host can change privacy.', 'not_host');
-        current.table.locked = Boolean(locked); if (!locked) { current.table.inviteHash = null; current.table.invited = []; } tx.set(ref, room); return { tableId: current.table.id, locked: current.table.locked };
-      }); io?.emit('tea:state', await service.publicState()); return result;
-    },
-    async invite(token) {
-      const walletId = await walletIdFor(token); const inviteToken = crypto.randomBytes(18).toString('hex');
-      const tableId = await db.runTransaction(async tx => { const { ref, row: room } = await ensureRoom(tx); const current = tableForWallet(room, walletId); if (!current || current.table.ownerId !== walletId) throw new TeaError(403, 'Only the table host can invite.', 'not_host'); current.table.locked = true; current.table.inviteHash = hash(inviteToken); tx.set(ref, room); return current.table.id; });
-      return { tableId, inviteToken };
     },
     async chat(token, input) {
       const walletId = await walletIdFor(token); const text = String(input?.text || '').replace(/[\p{Cc}\p{Cf}]/gu, ' ').trim();
@@ -345,21 +398,28 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         else throw new TeaError(400, 'Unknown action.', 'bad_action'); settleBots(game); const view = cardPublic(game, walletId); tx.update(ref, game); tx.create(attemptRef, { result: view, createdAt: iso(now()) }); return view;
       }); io?.emit('tea:card', { tableId: result.tableId }); return result;
     },
+    async startTableGame(token,input){const result=await tableGames.start(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
+    async tableGameState(token,key){return tableGames.state(await walletIdFor(token),key)},
+    async tableGameAction(token,input){const result=await tableGames.action(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
     async adminOrders() { requireDb(); const snapshot = await orders().where('createdMs', '>', 0).orderBy('createdMs').limit(200).get(); return snapshot.docs.map(doc => doc.data()).sort((a, b) => b.createdMs - a.createdMs); },
     async updatePrices(input) { const tea = Number(input.tea), snack = Number(input.snack); if (![tea, snack].every(v => Number.isSafeInteger(v) && v >= 1000 && v <= 1_000_000)) throw new TeaError(400, 'Prices must be whole VND amounts.', 'bad_price'); const value = { tea, snack, updatedAt: iso(now()) }; await settings().set(value); return value; },
     async redeliver(orderId) { const snapshot = await items().doc(`tea-${orderId}`).get(); if (!snapshot.exists) throw new TeaError(404, 'Item not found.', 'item_not_found'); await items().doc(`tea-${orderId}`).set({ ...snapshot.data(), status: 'waiting', deliverAt: null, updatedAt: iso(now()) }); await prepareDelivery(snapshot.data().walletId); },
     async maintenance() {
       if (!db) return; const expired = await messages().where('purgeAt', '<', now()).limit(200).get(); for (const doc of expired.docs) await messages().doc(doc.data().id).delete();
       for (const [walletId, player] of presence) if (!player.connected && now() - player.disconnectedAt >= 45_000) await service.releaseDisconnected(walletId);
+      for (const [id, row] of seatRequests) if (row.expiresAt <= now() || (row.respondedAt && now() - row.respondedAt > 30_000)) seatRequests.delete(id);
+      for (const [id, row] of fights) { resolveFight(row); if (row.finishedAt && now() - row.finishedAt > 60_000) fights.delete(id); }
+      for(const [id,times] of socialRate)if(times.every(at=>now()-at>30_000))socialRate.delete(id);
     },
     async recoverAfterRestart() {
       if (!db) return;
       await db.runTransaction(async tx => {
         const roomRef = rooms().doc(ROOM_ID); const roomSnapshot = await tx.get(roomRef); const gameRows = [];
         for (const table of TABLES) gameRows.push([games().doc(table.id), await tx.get(games().doc(table.id))]);
-        if (roomSnapshot.exists) { const room = roomSnapshot.data(); for (const table of room.tables || []) { table.ownerId = null; table.locked = false; table.inviteHash = null; table.invited = []; for (const seat of table.seats || []) { seat.walletId = null; seat.seatedAt = null; } } room.updatedAt = iso(now()); tx.set(roomRef, room); }
+        if (roomSnapshot.exists) tx.set(roomRef, emptyRoom());
         for (const [ref, snapshot] of gameRows) if (snapshot.exists && snapshot.data().status === 'active') tx.update(ref, { ...snapshot.data(), status: 'finished', reason: 'server_restart', winnerId: null, finishedAt: iso(now()) });
       });
+      await tableGames.cancelAfterRestart();
     },
   };
   return service;

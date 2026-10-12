@@ -14,11 +14,21 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 
 ## Pixel Tea Café — `/tra-da`
 
-Quán là không gian 2D nhìn từ trên xuống, mặc định tiếng Anh và có nút chuyển sang Tiếng Việt. Khách dùng chung mã ví hiện tại để lưu biệt danh, tóc, quần áo và giày; vào quán miễn phí. Máy tính dùng WASD/phím mũi tên hoặc bấm điểm muốn đến, điện thoại chạm để đi và có cụm phím ảo. Khách phải tự đi tới ghế trống rồi bấm **Sit/Ngồi**. Sáu bàn có bốn ghế, hỗ trợ khóa bàn, link mời, chuyển chủ bàn, chat riêng và bong bóng trò chuyện.
+Quán là sân trà 2D có tranh pixel gốc: sân gạch, cây và hoa, quầy trà mái ngói, bàn gỗ và đủ ghế có lưng tựa. Mặc định tiếng Anh, có nút Tiếng Việt. Khách dùng chung mã ví hiện tại để lưu biệt danh, tóc, quần áo và giày; vào quán miễn phí. Máy tính dùng WASD/phím mũi tên hoặc bấm điểm muốn đến; đường đi tự vòng vật cản. Điện thoại có camera theo nhân vật và cụm phím ảo. Khách tự đi tới ghế trống rồi bấm **Sit/Ngồi**. Tám bàn có sức chứa 2, 4 hoặc 8 người, tổng 34 ghế cho tối đa 32 khách. Bàn đều công cộng; bàn có người cho chọn hỏi trước, bỏ đi hoặc ngồi luôn. Hỏi trước không giữ ghế; server vẫn quyết định ai giành ghế trước bằng transaction. Chủ bàn chuyển cho người ngồi lâu nhất khi chủ rời đi.
+
+Người cùng bàn có thể thách **đánh nhau pixel**. Hai bên đồng ý mới bắt đầu trận 12 giây; server giữ 12 máu mỗi người, giới hạn một cú mỗi 260ms và chống xử lý trùng. Hết giờ so máu; người đứng dậy hoặc mất kết nối quá 45 giây bỏ trận. Kèo chờ nhận có thể hủy, tự hết hạn sau 20 giây; trò vui không dùng tiền hoặc xu.
 
 Người đang ngồi có thể gọi **trà đá 5.000đ** hoặc **đĩa bánh 10.000đ**. Mỗi đơn tạo một QR VietQR riêng với mã `DH`; webhook SePay hiện tại phân biệt đơn quán và lượt nạp xu. Thanh toán thiếu giữ đơn chờ, đủ tiền tạo đúng một món, còn tiền dư hoặc tiền gửi sau khi hủy được cộng vào ví theo quy tắc 1.000đ = 1 xu và giữ phần lẻ. Nhân viên pixel mang món tới bàn hiện tại; nếu khách đứng dậy thì món chờ đến khi khách ngồi lại. Mỗi món có ba lần bấm Uống/Ăn và chỉ chủ món sử dụng được.
 
 Người cùng bàn có thể chơi **Color Cards / Bài đổi màu** miễn phí cho 2–4 người, thêm tối đa hai bot. Server giữ bài kín, kiểm tra lượt và luật đánh cùng màu/số/loại, lá bỏ lượt, `+2`, đổi màu, tự rút khi hết 30 giây và xáo lại chồng bài khi cần. Không có cược hoặc phần thưởng quy đổi tiền.
+
+Chọn **Đánh bài** mở một bàn bài lớn với người chơi, chồng rút, lá đang đánh, đồng hồ và hàng bài có thể vuốt ngang. Mục **Trò chơi** có ba trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
+
+- **Đua xúc xắc:** server tung 1–6, ai đạt 20 trước thắng; mỗi lượt 15 giây.
+- **Oẳn tù tì:** 5 vòng chọn bí mật, loại thắng trong vòng hai loại được 1 điểm; cùng loại hoặc đủ ba loại thì hòa. Không chọn kịp được tính bỏ lượt.
+- **Lật cặp trí nhớ:** 12 ô, 6 cặp; đúng cặp được 1 điểm và thêm lượt, sai cặp hiện 1,8 giây rồi ẩn và qua lượt. Bot nhớ những ô đã được lật công khai.
+
+Người ngồi đầu tiên bắt đầu ván; người vào sau xem ván hiện tại. Các thao tác có ID chống trùng, bài/ô/lựa chọn bí mật do server giữ. Người rời bàn khiến ván trò mới kết thúc; khởi động lại server hủy ván cũ. Món đã mua được lưu riêng.
 
 Quán dùng Socket.IO để đồng bộ chuyển động, ghế, tin nhắn và trạng thái món. Phiên bản này chạy một tiến trình Node; không tăng số replica nếu chưa bổ sung Socket.IO adapter và kho trạng thái dùng chung. Trang quản trị `/tra-da/admin` dùng phiên đăng nhập hiện có để xem đơn, sửa giá cho đơn mới và gửi lại nhân viên khi cần.
 
@@ -103,6 +113,7 @@ Các collection riêng của tính năng này:
 - `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`, `party_drawing_contributions`
 - `tea_profiles`, `tea_rooms`, `tea_messages`, `tea_orders`, `tea_order_attempts`
 - `tea_items`, `tea_consume_attempts`, `tea_settings`, `tea_card_games`, `tea_card_attempts`
+- `tea_social_games`, `tea_social_actions` (ba trò bàn mới)
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -124,6 +135,9 @@ Các API chính:
 - `/api/tea/profile`, `/api/tea/state`, `/api/tea/seats/*`, `/api/tea/chat`
 - `/api/tea/orders`, `/api/tea/order`, `/api/tea/items/consume`
 - `/api/tea/cards`, `/api/tea/cards/current`, `/api/tea/cards/action`
+- `POST /api/tea/seats/:seatId/ask`, `GET /api/tea/seat-requests`, `POST /api/tea/seat-requests/:id/respond`
+- `/api/tea/fights`, `/api/tea/fights/current`, `/api/tea/fights/:id/respond`, `/api/tea/fights/:id/hit`
+- `POST /api/tea/games`, `GET /api/tea/games/:key`, `POST /api/tea/games/:key/action` (`dice`, `rps`, `memory`)
 
 Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
 

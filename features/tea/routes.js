@@ -31,10 +31,11 @@ function createTeaRouter({ service, isAdmin }) {
   router.get('/api/tea/profile', asyncRoute(async (req, res) => res.json(await service.profile(token(req)))));
   router.put('/api/tea/profile', json, asyncRoute(async (req, res) => res.json(await service.saveProfile(token(req), req.body))));
   router.get('/api/tea/state', asyncRoute(async (req, res) => { await service.walletIdFor(token(req)); res.json(await service.publicState()); }));
-  router.post('/api/tea/seats/:seatId', json, asyncRoute(async (req, res) => res.json(await service.seat(token(req), req.params.seatId, req.body.inviteToken))));
+  router.post('/api/tea/seats/:seatId', json, asyncRoute(async (req, res) => res.json(await service.seat(token(req), req.params.seatId))));
+  router.post('/api/tea/seats/:seatId/ask', json, asyncRoute(async (req, res) => res.status(201).json(await service.askToSit(token(req), req.params.seatId))));
+  router.get('/api/tea/seat-requests', asyncRoute(async (req, res) => res.json(await service.seatRequestsFor(token(req)))));
+  router.post('/api/tea/seat-requests/:id/respond', json, asyncRoute(async (req, res) => res.json(await service.respondSeatRequest(token(req), req.params.id, req.body.accepted === true))));
   router.delete('/api/tea/seat', asyncRoute(async (req, res) => res.json(await service.leave(token(req)))));
-  router.post('/api/tea/table/lock', json, asyncRoute(async (req, res) => res.json(await service.setTableLock(token(req), req.body.locked))));
-  router.post('/api/tea/table/invite', json, asyncRoute(async (req, res) => res.json(await service.invite(token(req)))));
   router.get('/api/tea/chat', asyncRoute(async (req, res) => res.json(await service.chats(token(req), req.query.after))));
   router.post('/api/tea/chat', json, asyncRoute(async (req, res) => res.status(201).json(await service.chat(token(req), req.body))));
   router.post('/api/tea/orders', json, asyncRoute(async (req, res) => res.status(201).json(await service.order(token(req), req.body))));
@@ -44,6 +45,13 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/api/tea/cards', json, asyncRoute(async (req, res) => res.status(201).json(await service.startCard(token(req), req.body))));
   router.get('/api/tea/cards/current', asyncRoute(async (req, res) => res.json(await service.cardState(token(req)))));
   router.post('/api/tea/cards/action', json, asyncRoute(async (req, res) => res.json(await service.cardAction(token(req), req.body))));
+  router.post('/api/tea/games', json, asyncRoute(async (req,res)=>res.status(201).json({game:await service.startTableGame(token(req),req.body)})));
+  router.get('/api/tea/games/:key', asyncRoute(async (req,res)=>res.json(await service.tableGameState(token(req),req.params.key))));
+  router.post('/api/tea/games/:key/action', json, asyncRoute(async (req,res)=>res.json({game:await service.tableGameAction(token(req),{...req.body,key:req.params.key})})));
+  router.get('/api/tea/fights/current', asyncRoute(async (req, res) => res.json(await service.fightState(token(req)))));
+  router.post('/api/tea/fights', json, asyncRoute(async (req, res) => res.status(201).json({ fight: await service.challengeFight(token(req), req.body.opponentId) })));
+  router.post('/api/tea/fights/:id/respond', json, asyncRoute(async (req, res) => res.json({ fight: await service.respondFight(token(req), req.params.id, req.body.accepted === true) })));
+  router.post('/api/tea/fights/:id/hit', json, asyncRoute(async (req, res) => res.json({ fight: await service.hitFight(token(req), req.params.id, req.body) })));
 
   router.get('/tra-da/admin', adminOnly, asyncRoute(async (req, res) => {
     const [rows, prices] = await Promise.all([service.adminOrders(), service.menu()]); const key = csrf(req);
@@ -54,7 +62,7 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/tra-da/admin/orders/:id/redeliver', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.redeliver(req.params.id); res.redirect('/tra-da/admin'); }));
 
   router.use((error, req, res, next) => {
-    if (error instanceof TeaError) return res.status(error.status).json({ error: error.message, code: error.code });
+    if (error instanceof TeaError || error.tableGameError) return res.status(error.status).json({ error: error.message, code: error.code });
     if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.', code: 'bad_json' });
     console.error('Tea café operation failed:', error.code || error.name);
     res.status(503).json({ error: 'The café connection is taking a break. Please try again.', code: 'storage_error' });
