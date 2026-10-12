@@ -1,6 +1,6 @@
-# Blogger Vault / Tiệm game trà sữa
+# Locly Pixel Tea Café / Tiệm game trà sữa
 
-Ứng dụng Express dùng Firebase Admin và Firestore. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), ba trang công khai là `/xin-tien`, `/ai` và `/party`; phần blog cũ vẫn còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
+Ứng dụng Express dùng Firebase Admin và Firestore. Trang chính `/` chuyển tới **Pixel Tea Café** ở `/tra-da`. Khi `PAYMENT_PAGE_ONLY=true` (mặc định), quán cùng `/xin-tien`, `/ai` và `/party` vẫn hoạt động; phần blog cũ còn trong mã nguồn nhưng tạm trả về 404. `/an-xin` và `/tra-tien` chuyển hướng sang `/xin-tien`.
 
 ## Chạy local
 
@@ -10,7 +10,17 @@ Copy-Item .env.example .env
 npm start
 ```
 
-Mở `http://localhost:3000/xin-tien`. Không commit `.env`, thư mục `data/`, `uploads/` hoặc thông tin Firebase thật.
+Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `uploads/` hoặc thông tin Firebase thật.
+
+## Pixel Tea Café — `/tra-da`
+
+Quán là không gian 2D nhìn từ trên xuống, mặc định tiếng Anh và có nút chuyển sang Tiếng Việt. Khách dùng chung mã ví hiện tại để lưu biệt danh, tóc, quần áo và giày; vào quán miễn phí. Máy tính dùng WASD/phím mũi tên hoặc bấm điểm muốn đến, điện thoại chạm để đi và có cụm phím ảo. Khách phải tự đi tới ghế trống rồi bấm **Sit/Ngồi**. Sáu bàn có bốn ghế, hỗ trợ khóa bàn, link mời, chuyển chủ bàn, chat riêng và bong bóng trò chuyện.
+
+Người đang ngồi có thể gọi **trà đá 5.000đ** hoặc **đĩa bánh 10.000đ**. Mỗi đơn tạo một QR VietQR riêng với mã `DH`; webhook SePay hiện tại phân biệt đơn quán và lượt nạp xu. Thanh toán thiếu giữ đơn chờ, đủ tiền tạo đúng một món, còn tiền dư hoặc tiền gửi sau khi hủy được cộng vào ví theo quy tắc 1.000đ = 1 xu và giữ phần lẻ. Nhân viên pixel mang món tới bàn hiện tại; nếu khách đứng dậy thì món chờ đến khi khách ngồi lại. Mỗi món có ba lần bấm Uống/Ăn và chỉ chủ món sử dụng được.
+
+Người cùng bàn có thể chơi **Color Cards / Bài đổi màu** miễn phí cho 2–4 người, thêm tối đa hai bot. Server giữ bài kín, kiểm tra lượt và luật đánh cùng màu/số/loại, lá bỏ lượt, `+2`, đổi màu, tự rút khi hết 30 giây và xáo lại chồng bài khi cần. Không có cược hoặc phần thưởng quy đổi tiền.
+
+Quán dùng Socket.IO để đồng bộ chuyển động, ghế, tin nhắn và trạng thái món. Phiên bản này chạy một tiến trình Node; không tăng số replica nếu chưa bổ sung Socket.IO adapter và kho trạng thái dùng chung. Trang quản trị `/tra-da/admin` dùng phiên đăng nhập hiện có để xem đơn, sửa giá cho đơn mới và gửi lại nhân viên khi cần.
 
 ## Luật chơi
 
@@ -64,7 +74,7 @@ Sinh khóa ngẫu nhiên bằng:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-Firebase chỉ cần kết nối được tới Firestore, không cần bật Firebase Storage hay nâng cấp gói để dùng ảnh chat. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. Server chỉ cho mua giờ chat khi Firestore hoạt động. Thiếu Firestore hoặc cấu hình nhận tiền, trang báo chưa sẵn sàng và không tạo ví/QR. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
+Firebase chỉ cần kết nối được tới Firestore, không cần bật Firebase Storage hay nâng cấp gói để dùng ảnh chat. Có thể dùng ba biến `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`, hoặc `FIREBASE_SERVICE_ACCOUNT_BASE64` như mô tả trong `.env.example`. Thiếu Firestore thì không tạo được ví hoặc hồ sơ. Thiếu cấu hình nhận tiền vẫn vào quán và trò chuyện được nhưng nút gọi món và tạo QR bị khóa. Giao dịch tiền không dùng cơ chế JSON dự phòng của blog.
 
 Trang quản trị ở `/xin-tien/admin`, dùng `ADMIN_PASSWORD`. Phiên đăng nhập nằm ở server, cookie `httpOnly`, thao tác thay đổi trạng thái có CSRF token và đăng nhập bị giới hạn số lần thử. Trang này hiển thị thông tin liên hệ cùng lịch sử xu gần đây của ví.
 
@@ -91,6 +101,8 @@ Các collection riêng của tính năng này:
 - `donation_requests`, `donation_tokens`, `donation_idempotency`, `donation_sepay_events`
 - `chat_sessions`, `chat_messages`, `chat_images`, `chat_meta`
 - `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`, `party_drawing_contributions`
+- `tea_profiles`, `tea_rooms`, `tea_messages`, `tea_orders`, `tea_order_attempts`
+- `tea_items`, `tea_consume_attempts`, `tea_settings`, `tea_card_games`, `tea_card_attempts`
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -109,6 +121,9 @@ Các API chính:
 - `GET /api/party/rooms/:code`, `POST /api/party/rooms/:code/actions`
 - `POST /api/party/rooms/:code/purchase`
 - `POST /api/party/rooms/:code/drawings`, `GET /api/party/rooms/:code/drawings/:imageId`
+- `/api/tea/profile`, `/api/tea/state`, `/api/tea/seats/*`, `/api/tea/chat`
+- `/api/tea/orders`, `/api/tea/order`, `/api/tea/items/consume`
+- `/api/tea/cards`, `/api/tea/cards/current`, `/api/tea/cards/action`
 
 Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
 
@@ -121,7 +136,7 @@ node tests/preview.js
 
 `npm test` dùng Firestore test double. Ngoài hồi quy game và SePay, bộ kiểm thử kiểm tra giới hạn ba phiên chat, chống trừ xu trùng, quyền đọc tin/ảnh, nén WebP, khóa gửi khi hết giờ, hoàn 10 xu đúng một lần, xóa dữ liệu sau 7 ngày, quyền phòng Party, phân công Vẽ chuyền tay, chống gửi trùng và quyền xem ảnh theo lượt.
 
-Preview ở `http://127.0.0.1:3101/xin-tien`, `/ai` và `/party` dùng RAM, tài khoản `0000000000` và có nhãn **KHÔNG CHUYỂN TIỀN**. Mật khẩu quản trị local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
+Preview ở `http://127.0.0.1:3101/tra-da`, `/xin-tien`, `/ai` và `/party` dùng RAM với tài khoản `0000000000`; tuyệt đối không chuyển tiền thật vào QR preview. Mật khẩu quản trị local là `local-admin`. Sau khi tạo QR trên preview, có thể gửi webhook giả:
 
 ```powershell
 $testPayload = @{

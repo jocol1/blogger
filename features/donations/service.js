@@ -67,9 +67,10 @@ function publicGame(row, now) {
   return { ...base, ...rules, phase: row.phase };
 }
 
-function createDonationService({ db, config = readConfig(), now = () => Date.now() }) {
+function createDonationService({ db, config = readConfig(), now = () => Date.now(), teaService = null }) {
   const ready = () => Boolean(db && /^[A-Za-z0-9]+$/.test(config.bank) && /^\d+$/.test(config.account) && config.accountName && config.webhookKey);
   const requireReady = () => { if (!ready()) throw new DonationError(503, 'Trang chưa sẵn sàng nhận tiền. Vui lòng quay lại sau.'); };
+  const requireDb = () => { if (!db) throw new DonationError(503, 'Kết nối dữ liệu đang gián đoạn. Vui lòng thử lại sau.'); };
   const col = name => db.collection(name);
   const requests = () => col('donation_requests');
   const tokens = () => col('donation_tokens');
@@ -89,7 +90,7 @@ function createDonationService({ db, config = readConfig(), now = () => Date.now
     return mapping.data().walletId;
   }
   async function walletView(token) {
-    requireReady();
+    requireDb();
     const walletId = await walletIdFor(token);
     const snapshot = await wallets().doc(walletId).get();
     if (!snapshot.exists) throw new DonationError(404, 'Không tìm thấy ví.');
@@ -112,7 +113,7 @@ function createDonationService({ db, config = readConfig(), now = () => Date.now
     config,
     publicConfig() { return { ready: ready(), rewardCost: REWARD_COST, difficulties: DIFFICULTIES, games: Object.fromEntries(Object.entries(GAMES).map(([key, value]) => [key, { label: value.label }])), ...(ready() ? { bank: config.bank, account: config.account, accountName: config.accountName } : {}) }; },
     async createWallet() {
-      requireReady();
+      requireDb();
       const token = crypto.randomBytes(32).toString('hex');
       const walletId = crypto.randomUUID();
       const createdAt = iso(now());
@@ -145,7 +146,8 @@ function createDonationService({ db, config = readConfig(), now = () => Date.now
           }
           const ref = requests().doc(code);
           const existing = await tx.get(ref);
-          if (existing.exists) return null;
+          const teaCollision = teaService ? await teaService.codeExistsInTransaction(tx, code) : false;
+          if (existing.exists || teaCollision) return null;
           const createdAt = iso(now());
           const value = { walletId, name, amount, code, account: config.account, bank: config.bank, createdAt, status: 'pending', paidAmount: 0, paymentCount: 0 };
           tx.create(ref, value);
@@ -172,21 +174,25 @@ function createDonationService({ db, config = readConfig(), now = () => Date.now
     async receive(payload) {
       requireReady();
       if (!payload || !Number.isSafeInteger(payload.id) || payload.id <= 0) throw new DonationError(400, 'ID giao dịch không hợp lệ.');
-      return db.runTransaction(async tx => {
+      const outcome = await db.runTransaction(async tx => {
         const receiptRef = receipts().doc(String(payload.id));
         if ((await tx.get(receiptRef)).exists) return { success: true, result: 'duplicate' };
         const code = extractCode(payload);
-        let result; let request; let requestRef; let wallet; let walletRef;
+        let result; let request; let requestRef; let wallet; let walletRef; let tea = null;
         if (payload.transferType !== 'in') result = 'ignored_out';
         else if (String(payload.accountNumber || '') !== config.account) result = 'wrong_account';
         else if (!Number.isSafeInteger(payload.transferAmount) || payload.transferAmount < 1 || payload.transferAmount > MAX_AMOUNT) result = 'invalid_amount';
         else if (!code) result = 'unmatched';
         else {
-          requestRef = requests().doc(code);
-          const requestSnapshot = await tx.get(requestRef);
-          request = requestSnapshot.exists ? requestSnapshot.data() : null;
-          if (request?.walletId && request.account === config.account) { walletRef = wallets().doc(request.walletId); const walletSnapshot = await tx.get(walletRef); wallet = walletSnapshot.exists ? walletSnapshot.data() : null; }
-          result = request && wallet ? 'matched_paid' : 'unmatched';
+          tea = teaService ? await teaService.receiveInTransaction({ tx, code, payload, createdAt: iso(now()) }) : null;
+          if (tea?.matched) result = tea.result;
+          else {
+            requestRef = requests().doc(code);
+            const requestSnapshot = await tx.get(requestRef);
+            request = requestSnapshot.exists ? requestSnapshot.data() : null;
+            if (request?.walletId && request.account === config.account) { walletRef = wallets().doc(request.walletId); const walletSnapshot = await tx.get(walletRef); wallet = walletSnapshot.exists ? walletSnapshot.data() : null; }
+            result = request && wallet ? 'matched_paid' : 'unmatched';
+          }
         }
         const at = now(); const createdAt = iso(at);
         if (result === 'matched_paid') {
@@ -199,8 +205,10 @@ function createDonationService({ db, config = readConfig(), now = () => Date.now
           tx.update(walletRef, { balance, remainder: milli % 1000, totalDeposited: wallet.totalDeposited + payload.transferAmount, updatedAt: createdAt, history: appendHistory(wallet, { id: `deposit-${payload.id}`, type: 'deposit', amount: credited, money: payload.transferAmount, balance, createdAt }) });
         }
         tx.create(receiptRef, { sepayId: payload.id, code, result, createdAt, amount: Number.isFinite(payload.transferAmount) ? payload.transferAmount : null, account: String(payload.accountNumber || '').slice(0, 100), content: String(payload.content || '').slice(0, 2000), reference: String(payload.referenceCode || '').slice(0, 200), transferType: String(payload.transferType || '').slice(0, 20) });
-        return { success: true, result };
+        return { success: true, result, tea };
       });
+      if (outcome.tea?.matched) await teaService.afterPayment(outcome.tea);
+      return { success: outcome.success, result: outcome.result };
     },
     async startGame(walletToken, input) {
       requireReady();

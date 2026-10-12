@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="/assets/party/style.css">
   <link rel="stylesheet" href="/assets/party/mobile.css">
   <link rel="stylesheet" href="/assets/party/drawing.css">
+  <link rel="stylesheet" href="/assets/party/locale.css">
+  <script src="/assets/party/i18n.js" defer></script>
   <script src="/assets/party/app.js" defer></script>
 </head>
 <body>
@@ -16,10 +18,12 @@
   <header class="topbar">
     <a class="brand" href="/party"><i>✦</i>locly<span>.party</span></a>
     <nav><a href="/xin-tien">Trò chơi</a><a href="/ai">AI</a><a class="active" href="/party">Party</a></nav>
+    <label class="party-language"><span class="sr-only">Language</span><select id="party-language" aria-label="Language"><option value="en">English</option><option value="vi">Tiếng Việt</option></select></label>
     <a class="wallet" href="/xin-tien"><span>VÍ CỦA BẠN</span><strong><b id="wallet-balance">0</b> xu</strong></a>
   </header>
 
   <main>
+    <p class="international-note">Thanh toán hiện qua chuyển khoản ngân hàng Việt Nam (VND). 19 xu = 19.000đ. Chưa hỗ trợ thẻ quốc tế.</p>
     <section id="landing">
       <section class="hero">
         <div class="hero-copy"><span class="eyebrow">PHÒNG CHƠI CHO HỘI BẠN THÂN</span><h1>Càng thân,<br><em>càng dễ bị réo.</em></h1><p>Một người mở phòng, cả nhóm vào bằng điện thoại. Không có bạn online thì gọi bot vào tấu hài cùng — không cần cài ứng dụng hay đăng nhập.</p><div class="hero-facts"><span>3–10 người hoặc bot</span><span>1 trận miễn phí</span><span>Khách vào không tốn xu</span></div></div>
@@ -28,7 +32,7 @@
       <p id="availability" class="notice" role="status">Đang kết nối phòng chơi…</p>
 
       <section class="entry-grid">
-        <article class="entry-card create-card"><span class="card-number">01</span><div class="card-kicker">LÀM CHỦ CUỘC VUI</div><h2>Tạo phòng mới</h2><p>Mời bạn bè bằng mã sáu ký tự. Bạn chọn trò và điều khiển nhịp trận.</p><form id="create-form"><label for="create-name">Biệt danh của bạn</label><input id="create-name" maxlength="30" placeholder="Ví dụ: Chúa tể đi trễ" required><button id="create-room" class="primary"><span>Tạo phòng miễn phí</span><i>→</i></button></form></article>
+        <article class="entry-card create-card"><span class="card-number">01</span><div class="card-kicker">LÀM CHỦ CUỘC VUI</div><h2>Tạo phòng mới</h2><p>Mời bạn bè bằng mã sáu ký tự. Bạn chọn trò và điều khiển nhịp trận.</p><p class="room-language-note">Ngôn ngữ phòng được chọn khi tạo và giữ nguyên cho cả nhóm.</p><form id="create-form"><label for="create-name">Biệt danh của bạn</label><input id="create-name" maxlength="30" placeholder="Ví dụ: Chúa tể đi trễ" required><button id="create-room" class="primary"><span>Tạo phòng miễn phí</span><i>→</i></button></form></article>
         <article class="entry-card join-card"><span class="card-number">02</span><div class="card-kicker">ĐÃ CÓ MÃ PHÒNG</div><h2>Vào réo bạn bè</h2><p>Nhập mã chủ phòng gửi. Người tham gia không cần ví xu.</p><form id="join-form"><label for="join-code">Mã phòng</label><input id="join-code" class="room-code-input" maxlength="6" autocomplete="off" placeholder="ABC123" required><label for="join-name">Biệt danh của bạn</label><input id="join-name" maxlength="30" placeholder="Đừng dùng tên thật cũng được" required><button id="join-room" class="primary coral"><span>Vào phòng</span><i>→</i></button></form></article>
       </section>
 

@@ -2,6 +2,7 @@ require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const http = require('node:http');
 const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
@@ -11,10 +12,16 @@ const sanitizeHtml = require('sanitize-html');
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
 const { createDonationRouter } = require('./features/donations/routes');
+const { readConfig } = require('./features/donations/service');
 const { createChatRouter } = require('./features/chat/routes');
 const { createPartyRouter } = require('./features/party/routes');
+const { createTeaService } = require('./features/tea/service');
+const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
+const { Server: SocketServer } = require('socket.io');
 
 const app = express();
+const httpServer = http.createServer(app);
+const io = new SocketServer(httpServer, { serveClient: true, transports: ['websocket', 'polling'], maxHttpBufferSize: 32 * 1024 });
 const PORT = Number(process.env.PORT || 3000);
 const root = __dirname;
 const dataDir = path.join(root, 'data');
@@ -81,14 +88,17 @@ const editorialCss = `body{background:#f7f7f5;color:#181818}.editorial-header{he
 // The donation router has its own bounded JSON parsers and never uses the blog's JSON store.
 app.set('trust proxy', 1);
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
-app.use(createDonationRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+const donationConfig = readConfig();
+const teaService = createTeaService({ db: firestore, config: donationConfig });
+attachTeaSockets(io, teaService);
+app.use(createTeaRouter({ service: teaService, isAdmin: req => req.session.user === 'admin' }));
+app.use(createDonationRouter({ db: firestore, config: donationConfig, teaService, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
-// Keep the former blog in place, but make only the public payment page reachable while this switch is on.
+// Keep the former blog in place while exposing the current public product routes mounted above.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {
-  app.get('/', (req, res) => res.redirect(302, '/xin-tien'));
-  app.use((req, res) => res.status(404).type('text/plain').send('Trang này đang tạm ẩn. Vào /xin-tien nhé.'));
+  app.use((req, res) => res.status(404).type('text/plain').send('This page is hidden. Visit /tra-da.'));
 }
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
@@ -117,6 +127,7 @@ app.post('/notes/:id',auth,(req,res)=>{const n=store.notes.find(x=>x.id===req.pa
 app.use((err,req,res,next)=>{console.error(err);res.status(500).send(layout('Lỗi','<div class="card"><h1>Có lỗi xảy ra</h1><p>Kiểm tra log server để biết chi tiết.</p></div>',req));});
 async function start() {
   try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
-  app.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
+  if (firestore) { try { await teaService.recoverAfterRestart(); } catch (error) { console.error('Tea restart recovery failed:', error.message); } teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)); setInterval(() => teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)), 60_000).unref(); }
+  httpServer.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
 }
 start();

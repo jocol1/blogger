@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const { COURT_QUESTIONS, WRITER_QUESTIONS, WORD_PAIRS, CHALLENGES, DRAWING_PROMPTS } = require('./content');
+const englishContent = require('./content.en');
 const {
   DRAWING_RETENTION_MS,
   beginDrawingGame,
@@ -24,6 +25,8 @@ const BOT_WRITER_LINES = ['Tôi xin từ chối trả lời vì danh dự đang 
 const BOT_DEFENSES = ['Tôi có bằng chứng ngoại phạm: lúc đó đang sạc pin.', 'Xin hội đồng nhẹ tay, tôi chỉ là vài dòng mã ngây thơ.', 'Camera ghi lại một người giống tôi, nhưng đẹp trai hơn.', 'Tôi phản đối vì câu hỏi làm tổn thương bộ vi xử lý.'];
 const BOT_CLUES = ['Nghe quen lắm nhưng nói ra là lộ liền.', 'Thường thấy, đôi khi dùng, nhìn kỹ hơi đáng ngờ.', 'Có liên quan đến đời sống và một chút hỗn loạn.', 'Tôi biết đáp án nhưng CPU bảo giữ bí mật.'];
 const BOT_GUESSES = ['Một sinh vật đang làm chuyện rất đáng ngờ', 'Ai đó đi mua trà sữa nhưng quên mang ví', 'Một chiếc bánh biết đi và đang nổi giận', 'Con mèo làm nghề tay trái sau nửa đêm', 'Tác phẩm này vượt quá khả năng xử lý của bot'];
+const vietnameseContent = { COURT_QUESTIONS, WRITER_QUESTIONS, WORD_PAIRS, CHALLENGES, DRAWING_PROMPTS, GAME_LABELS, BOT_NAMES, BOT_WRITER_LINES, BOT_DEFENSES, BOT_CLUES, BOT_GUESSES };
+const contentFor = room => room.language === 'en' ? englishContent : vietnameseContent;
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 const iso = value => new Date(value).toISOString();
 const cleanToken = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value) ? value : null;
@@ -73,6 +76,7 @@ function winnerIds(votes, eligibleIds) {
 }
 
 function beginGame(room, key, at) {
+  const { COURT_QUESTIONS, WRITER_QUESTIONS, WORD_PAIRS, DRAWING_PROMPTS, GAME_LABELS } = contentFor(room);
   if (key === 'drawing') return beginDrawingGame(room, at, DRAWING_PROMPTS);
   const gameNumber = (room.gameNumber || 0) + 1;
   const seed = `${room.code}:${gameNumber}:${at}`;
@@ -95,12 +99,14 @@ function finishGame(room, at, extra = {}) {
   if (room.packageStatus === 'active' && at >= room.activeUntil) room.packageStatus = 'expired';
 }
 function nextCourtRound(room, at) {
+  const { COURT_QUESTIONS } = contentFor(room);
   if (room.game.round >= room.game.maxRounds) return finishGame(room, at);
   const round = room.game.round + 1;
   const index = pickIndex(`${room.code}:court:${room.game.gameNumber}:${round}`, COURT_QUESTIONS.length);
   room.game = { ...room.game, round, phase: 'vote', phaseEndsAt: at + 20_000, questionIndex: index, question: COURT_QUESTIONS[index], votes: {}, verdicts: {}, defense: '', accusedId: null, challenge: null, outcome: null };
 }
 function nextWriterRound(room, at) {
+  const { WRITER_QUESTIONS } = contentFor(room);
   if (room.game.round >= room.game.maxRounds) return finishGame(room, at);
   const round = room.game.round + 1;
   const index = pickIndex(`${room.code}:writer:${room.game.gameNumber}:${round}`, WRITER_QUESTIONS.length);
@@ -110,13 +116,14 @@ function resolveCourtVote(room, at) {
   const ids = room.players.map(player => player.id);
   const tied = winnerIds(room.game.votes, ids);
   if (!tied.length) {
-    room.game = { ...room.game, phase: 'result', phaseEndsAt: at + 10_000, outcome: 'Không ai bị réo ở vòng này.', accusedId: null };
+    room.game = { ...room.game, phase: 'result', phaseEndsAt: at + 10_000, outcome: room.language === 'en' ? 'Nobody was called out this round.' : 'Không ai bị réo ở vòng này.', accusedId: null };
     return;
   }
   const accusedId = tied[pickIndex(`${room.code}:court-tie:${room.game.round}`, tied.length)];
   room.game = { ...room.game, phase: 'defense', phaseEndsAt: at + 30_000, accusedId, defense: '' };
 }
 function resolveCourtVerdict(room, at) {
+  const { CHALLENGES } = contentFor(room);
   const values = Object.values(room.game.verdicts || {});
   const punish = values.filter(value => value === 'punish').length;
   const forgive = values.filter(value => value === 'forgive').length;
@@ -251,11 +258,12 @@ function publicRoom(room, playerId, at) {
   }
   return {
     code: room.code,
+    language: room.language || 'vi',
     status: room.status,
     version: room.version,
     locked: room.locked,
     selectedGame: room.selectedGame,
-    selectedGameLabel: GAME_LABELS[room.selectedGame],
+    selectedGameLabel: contentFor(room).GAME_LABELS[room.selectedGame],
     players,
     self: { id: self.id, name: self.name, isHost: self.id === room.hostPlayerId, isBillingOwner: self.id === room.billingPlayerId },
     game,
@@ -290,7 +298,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
 
   function fallbackContribution(room, game, chainId, turn) {
     const authorId = game.playerOrder[(game.playerOrder.indexOf(chainId) + turn) % game.playerOrder.length];
-    if (turn === 0) return { kind: 'prompt', text: suggestionFor(game, chainId, DRAWING_PROMPTS), skipped: false, authorId, authorName: playerName(room, authorId), automatic: true };
+    if (turn === 0) return { kind: 'prompt', text: suggestionFor(game, chainId, contentFor(room).DRAWING_PROMPTS), skipped: false, authorId, authorName: playerName(room, authorId), automatic: true };
     return { kind: turn % 2 ? 'drawing' : 'guess', skipped: true, authorId, authorName: playerName(room, authorId) };
   }
 
@@ -314,7 +322,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
     if (game.status === 'active') {
       const assignment = assignmentFor(game, playerId);
       output.game.assignment = { kind: assignment.kind, chainId: assignment.chainId };
-      output.game.suggestion = assignment.kind === 'prompt' ? suggestionFor(game, assignment.chainId, DRAWING_PROMPTS) : null;
+      output.game.suggestion = assignment.kind === 'prompt' ? suggestionFor(game, assignment.chainId, contentFor(room).DRAWING_PROMPTS) : null;
       output.game.previous = game.turn > 0 ? await contributionView(room, game, assignment.chainId, game.turn - 1, false) : null;
     } else if (game.status === 'finished') {
       if (at >= game.finishedAt + DRAWING_RETENTION_MS) {
@@ -453,6 +461,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
   }
 
   function nextBotMove(room) {
+    const { BOT_WRITER_LINES, BOT_DEFENSES, BOT_CLUES } = contentFor(room);
     const game = room.game;
     if (!game || game.status !== 'active') return null;
     const bots = room.players.filter(player => player.isBot === true);
@@ -531,12 +540,12 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
             kind: assignment.kind, playerId: move.bot.id, isBot: true, createdAt: at, purgeAt: current.game.purgeAt,
           };
           if (assignment.kind === 'drawing') {
-            const data = await createBotDrawing(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}:${move.bot.id}`);
+            const data = await createBotDrawing(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}:${move.bot.id}`, current.language);
             tx.create(drawingContributions().doc(id), { ...base, data, mime: 'image/webp', size: data.length });
           } else {
             const text = assignment.kind === 'prompt'
-              ? suggestionFor(current.game, assignment.chainId, DRAWING_PROMPTS)
-              : chooseBotValue(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}`, BOT_GUESSES);
+              ? suggestionFor(current.game, assignment.chainId, contentFor(current).DRAWING_PROMPTS)
+              : chooseBotValue(`${current.game.gameId}:${assignment.chainId}:${current.game.turn}`, contentFor(current).BOT_GUESSES);
             tx.create(drawingContributions().doc(id), { ...base, text });
           }
           current.game.submittedIds.push(move.bot.id);
@@ -559,12 +568,14 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
   }
 
   return {
-    publicConfig() { return { ready: ready(), cost: ROOM_COST, durationMs: PAID_DURATION_MS, holdMs: PURCHASE_HOLD_MS, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, games: Object.entries(GAME_LABELS).map(([key, label]) => ({ key, label })) }; },
+    publicConfig() { return { ready: ready(), languages: ['en', 'vi'], cost: ROOM_COST, durationMs: PAID_DURATION_MS, holdMs: PURCHASE_HOLD_MS, minPlayers: MIN_PLAYERS, maxPlayers: MAX_PLAYERS, games: Object.entries(GAME_LABELS).map(([key, label]) => ({ key, label })) }; },
     async createRoom(walletToken, input) {
       requireReady();
       const walletId = await walletIdFor(walletToken);
       const requestId = cleanRequestId(input?.requestId);
       const name = cleanName(input?.name);
+      const language = input?.language === undefined ? 'vi' : input.language;
+      if (!['en', 'vi'].includes(language)) throw new PartyError(400, 'Ngôn ngữ không hợp lệ.');
       if (!requestId) throw new PartyError(400, 'Yêu cầu tạo phòng không hợp lệ.');
       const playerId = hash(`owner:${walletId}:${requestId}`).slice(0, 24);
       const partyToken = deterministicToken(secret, `party-owner:${walletId}:${requestId}`);
@@ -588,7 +599,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
           const roomRef = rooms().doc(code);
           if ((await tx.get(roomRef)).exists) return null;
           const at = now();
-          const row = { code, ownerWalletId: walletId, billingPlayerId: playerId, hostPlayerId: playerId, status: 'lobby', locked: false, selectedGame: 'court', players: [{ id: playerId, name, ready: false, joinedAt: at }], trialUsed: Boolean(wallet.partyTrialUsed), packageStatus: 'none', purchaseDeadline: null, activeUntil: null, purchaseId: null, game: null, gameNumber: 0, version: 1, createdAt: at, updatedAt: at, deleteAt: null };
+          const row = { code, language, ownerWalletId: walletId, billingPlayerId: playerId, hostPlayerId: playerId, status: 'lobby', locked: false, selectedGame: 'court', players: [{ id: playerId, name, ready: false, joinedAt: at }], trialUsed: Boolean(wallet.partyTrialUsed), packageStatus: 'none', purchaseDeadline: null, activeUntil: null, purchaseId: null, game: null, gameNumber: 0, version: 1, createdAt: at, updatedAt: at, deleteAt: null };
           tx.create(roomRef, row);
           tx.create(tokenRef, { code, playerId, createdAt: at });
           tx.update(walletRef, { activePartyCode: code, updatedAt: iso(at) });
@@ -694,7 +705,7 @@ function createPartyService({ db, secret = process.env.SESSION_SECRET || 'dev-pa
           if (current.status !== 'lobby') throw new PartyError(409, 'Chỉ thêm bot ở phòng chờ.');
           if (current.players.length >= MAX_PLAYERS) throw new PartyError(409, 'Phòng đã đủ 10 người.');
           const usedNames = new Set(current.players.map(item => item.name.toLocaleLowerCase('vi')));
-          const name = BOT_NAMES.find(value => !usedNames.has(value.toLocaleLowerCase('vi')));
+          const name = contentFor(current).BOT_NAMES.find(value => !usedNames.has(value.toLocaleLowerCase('vi')));
           if (!name) throw new PartyError(409, 'Phòng đã đủ bot vui tính.');
           current.players.push({ id: crypto.randomBytes(12).toString('hex'), name, ready: true, isBot: true, joinedAt: at });
         } else if (type === 'select_game') {

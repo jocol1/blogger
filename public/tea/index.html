@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#2b1d17">
+  <link rel="icon" href="data:,">
+  <title>Locly Pixel Tea Café</title>
+  <link rel="stylesheet" href="/assets/tea/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/tra-da"><span class="brand-cup">▰</span><span>LOC<span>LY</span></span><small data-i18n="brandSub">PIXEL TEA CAFÉ</small></a>
+    <div class="online-pill"><i></i><b id="online-count">0</b> <span data-i18n="online">online</span></div>
+    <div class="top-actions">
+      <button class="icon-button" id="backup-button" title="Wallet backup">▣</button>
+      <button class="language-button" id="language-button">VI</button>
+      <button class="sound-button" id="sound-button" aria-pressed="false">♪</button>
+    </div>
+  </header>
+
+  <main class="cafe-shell">
+    <section class="world-card" aria-label="Pixel tea café">
+      <div class="world-status"><span id="connection-dot"></span><span id="connection-text" data-i18n="connecting">Entering the café…</span></div>
+      <canvas id="cafe-canvas" width="960" height="640"></canvas>
+      <div id="speech-layer" aria-live="polite"></div>
+      <div class="controls-hint"><span class="desktop-only">WASD / ↑↓←→</span><span data-i18n="tapWalk">Tap anywhere to walk</span></div>
+      <button id="interact-button" class="interact-button" hidden><span>●</span> <b data-i18n="sit">Sit</b></button>
+      <div class="dpad" aria-label="Movement controls">
+        <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
+      </div>
+    </section>
+
+    <aside class="side-panel" id="side-panel">
+      <nav class="panel-tabs" aria-label="Café activities">
+        <button class="active" data-tab="cafe"><span>☕</span><b data-i18n="cafe">Café</b></button>
+        <button data-tab="table"><span>☺</span><b data-i18n="table">Table</b><i id="chat-badge" hidden></i></button>
+        <button data-tab="cards"><span>▤</span><b data-i18n="cards">Cards</b></button>
+      </nav>
+
+      <section class="panel-view active" data-view="cafe">
+        <div class="panel-heading"><div><small data-i18n="todayMenu">TODAY'S MENU</small><h1 data-i18n="whatOrder">What can we get you?</h1></div><span class="pixel-steam">⌁</span></div>
+        <p class="panel-copy" data-i18n="sitFirst">Find an empty chair and sit down before ordering. Everything here is pixel art, made for fun.</p>
+        <div class="menu-grid">
+          <button class="menu-item" data-order="tea"><span class="menu-art tea-art">▥<i>⌁</i></span><span><b data-i18n="icedTea">Iced tea</b><small data-i18n="threeSips">3 cool sips</small></span><strong id="tea-price">5,000đ</strong></button>
+          <button class="menu-item" data-order="snack"><span class="menu-art snack-art">◆◆</span><span><b data-i18n="snackPlate">Snack plate</b><small data-i18n="threeBites">3 crunchy bites</small></span><strong id="snack-price">10,000đ</strong></button>
+        </div>
+        <div id="order-empty" class="empty-state"><span>↳</span><p data-i18n="orderHint">Your order and payment status will appear here.</p></div>
+        <div id="order-card" class="order-card" hidden></div>
+        <div id="item-card" class="item-card" hidden></div>
+        <p class="payment-note"><span>ⓘ</span><span data-i18n="bankOnly">Vietnamese bank transfer only. International cards are not supported yet.</span></p>
+      </section>
+
+      <section class="panel-view table-view" data-view="table">
+        <div id="table-empty" class="big-empty"><span>▱</span><h2 data-i18n="pullChair">Pull up a chair</h2><p data-i18n="tableEmpty">Walk to an empty chair and tap Sit. People at the same table can chat here.</p></div>
+        <div id="table-room" hidden>
+          <div class="table-header"><div><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div><div class="table-tools"><button id="lock-button">♙ <span data-i18n="lock">Lock</span></button><button id="invite-button">↗ <span data-i18n="invite">Invite</span></button><button id="leave-button" class="danger"><span data-i18n="standUp">Stand up</span></button></div></div>
+          <div class="chat-list" id="chat-list" aria-live="polite"></div>
+          <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
+          <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>
+        </div>
+      </section>
+
+      <section class="panel-view cards-view" data-view="cards">
+        <div id="cards-empty" class="big-empty"><span class="cards-stack">▥</span><h2 data-i18n="colorCards">Color Cards</h2><p data-i18n="cardsIntro">A free 2–4 player table game. Match the color, number, or symbol. No betting and no cash prizes.</p><label><span data-i18n="bots">Bots</span><select id="bot-count"><option value="0">0</option><option value="1">1</option><option value="2">2</option></select></label><button id="start-card" class="primary" data-i18n="startGame">Start game</button></div>
+        <div id="card-game" hidden><div id="card-players" class="card-players"></div><div class="card-stage"><div id="draw-pile" class="playing-card back">LOC</div><div id="top-card" class="playing-card">0</div><p id="turn-label"></p></div><div id="hand" class="hand"></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button><div id="color-picker" class="color-picker" hidden><button data-color="red"></button><button data-color="yellow"></button><button data-color="green"></button><button data-color="blue"></button></div></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="ticker"><span data-i18n="tickerOne">OPEN ALL DAY IN PIXEL TIME</span><i>✦</i><span data-i18n="tickerTwo">SIT ANYWHERE WITH AN EMPTY CHAIR</span><i>✦</i><span data-i18n="tickerThree">TEA 5K · SNACKS 10K · GOOD CHAT FREE</span></footer>
+
+  <dialog id="profile-dialog" class="modal profile-modal">
+    <form method="dialog" id="profile-form">
+      <button class="close-modal" value="cancel" aria-label="Close">×</button><small data-i18n="newRegular">A NEW REGULAR</small><h2 data-i18n="makeCharacter">Make your pixel character</h2><p data-i18n="profileCopy">No account needed. Your wallet backup code keeps this character and anything you buy.</p>
+      <label><span data-i18n="nickname">Nickname</span><input id="nickname" maxlength="24" minlength="2" required placeholder="Your café name"></label>
+      <div class="avatar-preview"><canvas id="avatar-preview" width="120" height="140"></canvas></div>
+      <fieldset><legend data-i18n="hair">Hair</legend><div class="swatches" data-style="hair"></div></fieldset>
+      <fieldset><legend data-i18n="clothes">Clothes</legend><div class="swatches" data-style="clothes"></div></fieldset>
+      <fieldset><legend data-i18n="shoes">Shoes</legend><div class="swatches" data-style="shoes"></div></fieldset>
+      <button class="primary wide" value="default" data-i18n="enterCafe">Enter the café</button>
+    </form>
+  </dialog>
+
+  <dialog id="wallet-dialog" class="modal wallet-modal"><form method="dialog" id="wallet-form"><button class="close-modal" value="cancel">×</button><small data-i18n="walletBackup">WALLET BACKUP</small><h2 data-i18n="keepCode">Keep this code safe</h2><p data-i18n="walletCopy">It restores your character, coins and purchases if browser data is cleared.</p><textarea id="wallet-code" readonly></textarea><div class="button-row"><button type="button" id="copy-wallet" class="primary" data-i18n="copyCode">Copy code</button><button type="button" id="show-restore" data-i18n="restoreAnother">Restore another</button></div><div id="restore-box" hidden><input id="restore-code" placeholder="Paste a 64-character code"><button type="button" id="restore-wallet" data-i18n="restore">Restore</button></div></form></dialog>
+  <dialog id="qr-dialog" class="modal qr-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><small data-i18n="yourOrder">YOUR ORDER</small><h2 id="qr-title">Iced tea</h2><div class="qr-wrap"><img id="qr-image" alt="Bank transfer QR"></div><div class="payment-status"><i></i><span id="qr-status" data-i18n="unpaid">Not paid yet</span></div><dl><div><dt data-i18n="bankAccount">Bank account</dt><dd id="qr-bank"></dd></div><div><dt data-i18n="amount">Amount</dt><dd id="qr-amount"></dd></div><div><dt data-i18n="transferNote">Transfer note</dt><dd><code id="qr-code"></code><button type="button" id="copy-code">Copy</button></dd></div></dl><p data-i18n="keepOpen">You can close this window. The café will keep checking your payment.</p><button type="button" id="cancel-order" class="text-danger" data-i18n="cancelOrder">Cancel this unpaid order</button></form></dialog>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/assets/tea/app.js"></script>
+</body>
+</html>

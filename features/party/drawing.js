@@ -41,7 +41,7 @@ function beginDrawingGame(room, at, prompts) {
   const promptIndexes = Object.fromEntries(playerOrder.map((id, index) => [id, pickIndex(`${gameId}:prompt:${index}`, prompts.length)]));
   return {
     key: 'drawing',
-    label: 'Vẽ chuyền tay',
+    label: room.language === 'en' ? 'Draw & Pass' : 'Vẽ chuyền tay',
     status: 'active',
     phase: 'contribute',
     round: 1,
@@ -129,7 +129,7 @@ async function processDrawing(file) {
   return output;
 }
 
-async function createBotDrawing(seed) {
+async function createBotDrawing(seed, language = 'vi') {
   const palette = ['#ff7052', '#ffd35a', '#65e6c3', '#a882ff', '#38bdf8', '#f472b6'];
   const first = pickIndex(`${seed}:first`, palette.length);
   const second = pickIndex(`${seed}:second`, palette.length);
@@ -145,7 +145,7 @@ async function createBotDrawing(seed) {
       <path d="M205 320 L95 250 M595 320 L705 250 M320 475 L275 555 M480 475 L525 555" fill="none"/>
       <path d="M355 285 L400 245 L445 285 Z" fill="${palette[second]}"/>
     </g>
-    <text x="400" y="70" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#24152f">BOT VẼ BẰNG CẢ TÂM HỒN</text>
+    <text x="400" y="70" text-anchor="middle" font-family="Arial,sans-serif" font-size="30" font-weight="700" fill="#24152f">${language === 'en' ? 'BOT ART, STRAIGHT FROM THE HEART' : 'BOT VẼ BẰNG CẢ TÂM HỒN'}</text>
   </svg>`);
   return sharp(svg, { limitInputPixels: 4_000_000 }).webp({ quality: 76, smartSubsample: true }).toBuffer();
 }

@@ -21,8 +21,8 @@ async function setup() {
   const party = createPartyService({ db, secret: 'party-test-secret', now: () => at });
   return { db, donations, wallet, party, tick(ms) { at += ms; }, now: () => at };
 }
-async function makeRoom(state, game = 'court', playerCount = 3) {
-  const created = await state.party.createRoom(state.wallet.token, { name: 'Chủ phòng', requestId: reqId(1) });
+async function makeRoom(state, game = 'court', playerCount = 3, language) {
+  const created = await state.party.createRoom(state.wallet.token, { name: 'Chủ phòng', requestId: reqId(1), ...(language ? { language } : {}) });
   const code = created.room.code;
   const joins = [];
   for (let index = 2; index <= playerCount; index++) joins.push(await state.party.join(code, { name: `Bạn ${index}`, requestId: reqId(index) }));
@@ -38,6 +38,75 @@ test('party ships the promised content library', () => {
   assert.equal(WORD_PAIRS.length, 40);
   assert.equal(CHALLENGES.length, 30);
   assert.equal(DRAWING_PROMPTS.length, 60);
+  const english = require('../features/party/content.en');
+  for (const [key, count] of Object.entries({ COURT_QUESTIONS: 60, WRITER_QUESTIONS: 60, WORD_PAIRS: 40, CHALLENGES: 30, DRAWING_PROMPTS: 60 })) {
+    assert.equal(english[key].length, count);
+    assert.equal(new Set(english[key].map(item => JSON.stringify(item))).size, count);
+  }
+  assert(english.DRAWING_PROMPTS.every(text => text.length <= 120));
+});
+
+test('English rooms persist one language across joins, retries and later rounds', async () => {
+  const english = require('../features/party/content.en');
+  for (const game of ['court', 'writer', 'undercover']) {
+    const state = await setup();
+    const { code, actors } = await makeRoom(state, game, 3, 'en');
+    let view = await state.party.action(code, actors[0].token, { requestId: reqId(30), type: 'start_game', language: 'vi' });
+    assert.equal(view.language, 'en');
+    assert.equal(view.game.label, english.GAME_LABELS[game]);
+    for (const actor of actors) assert.equal((await state.party.state(code, actor.token)).language, 'en');
+    if (game === 'undercover') {
+      const pairs = english.WORD_PAIRS;
+      const words = await Promise.all(actors.map(async actor => (await state.party.state(code, actor.token)).game.secretWord));
+      assert(pairs.some(pair => words.every(word => pair.includes(word))));
+    } else {
+      const prompts = game === 'court' ? english.COURT_QUESTIONS : english.WRITER_QUESTIONS;
+      assert(prompts.includes(view.game.question));
+      for (let step = 0; step < 4 && view.game.round === 1; step++) {
+        state.tick(view.game.phaseEndsAt - state.now() + 1);
+        view = await state.party.state(code, actors[0].token);
+      }
+      assert.equal(view.game.round, 2);
+      assert(prompts.includes(view.game.question));
+    }
+    const retry = await state.party.createRoom(state.wallet.token, { name: 'Changed', requestId: reqId(1), language: 'vi' });
+    assert.equal(retry.room.code, code);
+    assert.equal(retry.room.language, 'en');
+  }
+});
+
+test('English drawing uses English suggestions, bot writing and timeout fallback without rewriting player text', async () => {
+  const english = require('../features/party/content.en');
+  const state = await setup();
+  const created = await state.party.createRoom(state.wallet.token, { name: 'Tòa án bạn thân', requestId: reqId(1), language: 'en' });
+  const code = created.room.code;
+  await state.party.action(code, created.token, { requestId: reqId(2), type: 'add_bot' });
+  await state.party.action(code, created.token, { requestId: reqId(3), type: 'add_bot' });
+  await state.party.action(code, created.token, { requestId: reqId(4), type: 'select_game', game: 'drawing' });
+  await state.party.action(code, created.token, { requestId: reqId(5), type: 'ready', ready: true });
+  let view = await state.party.action(code, created.token, { requestId: reqId(6), type: 'start_game' });
+  assert.equal(view.self.name, 'Tòa án bạn thân');
+  assert.equal(view.game.label, 'Draw & Pass');
+  assert(english.DRAWING_PROMPTS.includes(view.game.suggestion));
+  assert(view.players.filter(player => player.isBot).every(player => english.BOT_NAMES.includes(player.name)));
+  // Let the human skip every turn. Catch-up must use the room's language.
+  state.tick(120_001);
+  view = await state.party.state(code, created.token);
+  assert.equal(view.game.status, 'finished');
+  assert.equal(view.game.chains.length, 3);
+  for (const chain of view.game.chains) assert(english.DRAWING_PROMPTS.includes(chain.contributions[0].text));
+  const botGuesses = view.game.chains.flatMap(chain => chain.contributions).filter(item => item.kind === 'guess' && !item.skipped);
+  assert(botGuesses.every(item => english.BOT_GUESSES.includes(item.text)));
+});
+
+test('room language validates explicitly and old rooms remain Vietnamese', async () => {
+  const state = await setup();
+  await assert.rejects(() => state.party.createRoom(state.wallet.token, { name: 'Host', requestId: reqId(1), language: 'fr' }), /ngôn ngữ/i);
+  const created = await state.party.createRoom(state.wallet.token, { name: 'Host', requestId: reqId(2) });
+  assert.equal(created.room.language, 'vi');
+  const stored = state.db.rows.get(`party_rooms/${created.room.code}`);
+  delete stored.language;
+  assert.equal((await state.party.state(created.room.code, created.token)).language, 'vi');
 });
 
 test('drawing assignments pass every chain through every player exactly once for 3, 4 and 10 people', () => {

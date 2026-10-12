@@ -3,6 +3,7 @@ const path = require('node:path');
 const express = require('express');
 const multer = require('multer');
 const { createPartyService, PartyError } = require('./service');
+const { translate } = require('./i18n');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -14,13 +15,14 @@ function createPartyRouter(options) {
   const loginAttempts = new Map();
   const drawingUpload = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: 1024 * 1024, fields: 5 } });
   const asyncRoute = fn => (req, res, next) => Promise.resolve().then(() => fn(req, res)).catch(next);
+  const messageFor = (req, message) => translate(message, req.get('X-Party-Language') === 'en' ? 'en' : 'vi');
   const limiter = (map, limit, windowMs) => (req, res, next) => {
     const at = Date.now();
     for (const [key, value] of map) if (at >= value.until) map.delete(key);
     const bucket = map.get(req.ip) || { count: 0, until: at + windowMs };
     if (bucket.count >= limit || (!map.has(req.ip) && map.size >= 10_000)) {
       res.set('Retry-After', String(Math.max(1, Math.ceil((bucket.until - at) / 1000))));
-      return res.status(429).json({ error: 'Bạn thao tác quá nhanh. Hãy thử lại sau.' });
+      return res.status(429).json({ error: messageFor(req, 'Bạn thao tác quá nhanh. Hãy thử lại sau.') });
     }
     bucket.count++;
     map.set(req.ip, bucket);
@@ -41,6 +43,7 @@ function createPartyRouter(options) {
   };
   const adminPage = body => `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Quản trị Locly Party</title><style>body{margin:0;background:#100c1d;color:#f7f3ff;font:15px/1.6 "Segoe UI",Arial,sans-serif}.wrap{width:min(1040px,calc(100% - 32px));margin:40px auto}a{color:#f7b955}.top{display:flex;justify-content:space-between;align-items:center}.card{padding:18px;margin:12px 0;border:1px solid #ffffff18;border-radius:16px;background:#1a142b}.meta{color:#a99fb9}.badge{display:inline-block;padding:3px 8px;border-radius:99px;background:#ffffff12;color:#ffca78;font-size:11px}input,button{font:inherit;padding:9px 11px;border-radius:8px}input{border:1px solid #ffffff22;background:#0e0a19;color:#fff}button{border:0;background:#f26d50;color:#fff;font-weight:800}form{display:flex;gap:8px;flex-wrap:wrap}</style></head><body><main class="wrap">${body}</main></body></html>`;
 
+  router.get('/assets/party/i18n.js', (req, res) => res.sendFile(path.join(__dirname, 'i18n.js')));
   router.use('/assets/party', express.static(assets, { index: false }));
   router.get('/party', (req, res) => {
     res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'");
@@ -83,11 +86,11 @@ function createPartyRouter(options) {
   }));
 
   router.use((error, req, res, next) => {
-    if (error instanceof PartyError) return res.status(error.status).json({ error: error.message });
-    if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'Ảnh vẽ tối đa 1 MB.' : 'Không thể nhận ảnh vẽ.' });
-    if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'JSON không hợp lệ.' });
+    if (error instanceof PartyError) return res.status(error.status).json({ error: messageFor(req, error.message) });
+    if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ error: messageFor(req, error.code === 'LIMIT_FILE_SIZE' ? 'Ảnh vẽ tối đa 1 MB.' : 'Không thể nhận ảnh vẽ.') });
+    if (error.type === 'entity.parse.failed') return res.status(400).json({ error: messageFor(req, 'JSON không hợp lệ.') });
     console.error('Party operation failed:', error.code || error.name);
-    res.status(503).json({ error: 'Kết nối phòng chơi đang gián đoạn. Hãy thử lại.' });
+    res.status(503).json({ error: messageFor(req, 'Kết nối phòng chơi đang gián đoạn. Hãy thử lại.') });
   });
 
   router.partyService = service;
