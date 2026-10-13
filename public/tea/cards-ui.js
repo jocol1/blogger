@@ -15,13 +15,13 @@ window.TeaCardsUI=function({api,t,id,myId,myTable}){
   function render(){
     const table=myTable(),seated=Boolean(table);if(game&&game.tableId!==table?.id)return clear();if(!seated){game=null;wild=null;retry=null}
     $('#cards-empty').hidden=Boolean(game);$('#card-game').hidden=!game;$('#cards-seat-warning').hidden=seated;
-    const humans=table?.seats.filter(s=>s.walletId).length||0,host=meta.hostId||table?.ownerId,canStart=seated&&host===myId()&&humans<=4;
+    const humans=table?.seats.filter(s=>s.walletId).length||0,host=meta.hostId||table?.ownerId,tienLenActive=Boolean(meta.tienLenActive||game?.tienLenActive),canStart=seated&&host===myId()&&humans<=4&&!tienLenActive;
     const bots=$('#bot-count'),maximum=Math.min(2,Math.max(0,4-humans));for(const option of bots.options)option.disabled=Number(option.value)>maximum;
     bots.disabled=busy||Boolean(startRequest);
     if(!botsTouched)bots.value=humans===1?'1':'0';else if(Number(bots.value)>maximum)bots.value=String(maximum);
     $('#start-card').disabled=busy||!canStart||humans+Number(bots.value)<2;
     setText($('#start-card'),startRequest&&!busy?t('retryCard'):t('startGame'));
-    setText($('#cards-lobby-status'),errorText||(!seated?t('cardWait'):humans>4?t('cardsTooMany'):!canStart?t('cardsHostWait'):t('cardsReady')));$('#cards-lobby-status').classList.toggle('error',Boolean(errorText));
+    setText($('#cards-lobby-status'),errorText||(!seated?t('cardWait'):tienLenActive?t('colorTienlenBusy'):humans>4?t('cardsTooMany'):!canStart?t('cardsHostWait'):t('cardsReady')));$('#cards-lobby-status').classList.toggle('error',Boolean(errorText));
     $('#new-card').disabled=busy||!canStart;
     setText($('#new-card'),startRequest&&!busy?t('retryCard'):t('startGame'));
     if(!game){$('#color-picker').hidden=true;return}

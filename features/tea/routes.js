@@ -45,6 +45,9 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/api/tea/cards', json, asyncRoute(async (req, res) => res.status(201).json(await service.startCard(token(req), req.body))));
   router.get('/api/tea/cards/current', asyncRoute(async (req, res) => res.json(await service.cardState(token(req)))));
   router.post('/api/tea/cards/action', json, asyncRoute(async (req, res) => res.json(await service.cardAction(token(req), req.body))));
+  router.post('/api/tea/tienlen', json, asyncRoute(async (req, res) => res.status(201).json(await service.startTienLen(token(req), req.body))));
+  router.get('/api/tea/tienlen/current', asyncRoute(async (req, res) => res.json(await service.tienLenState(token(req)))));
+  router.post('/api/tea/tienlen/action', json, asyncRoute(async (req, res) => res.json(await service.tienLenAction(token(req), req.body))));
   router.post('/api/tea/games', json, asyncRoute(async (req,res)=>res.status(201).json({game:await service.startTableGame(token(req),req.body)})));
   router.get('/api/tea/games/:key', asyncRoute(async (req,res)=>res.json(await service.tableGameState(token(req),req.params.key))));
   router.post('/api/tea/games/:key/action', json, asyncRoute(async (req,res)=>res.json({game:await service.tableGameAction(token(req),{...req.body,key:req.params.key})})));
@@ -62,7 +65,7 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/tra-da/admin/orders/:id/redeliver', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.redeliver(req.params.id); res.redirect('/tra-da/admin'); }));
 
   router.use((error, req, res, next) => {
-    if (error instanceof TeaError || error.tableGameError) return res.status(error.status).json({ error: error.message, code: error.code });
+    if (error instanceof TeaError || error.tableGameError || error.tienLenError) return res.status(error.status).json({ error: error.message, code: error.code });
     if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.', code: 'bad_json' });
     console.error('Tea café operation failed:', error.code || error.name);
     res.status(503).json({ error: 'The café connection is taking a break. Please try again.', code: 'storage_error' });
