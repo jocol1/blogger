@@ -83,7 +83,7 @@
   function renderFight(){
     const dialog=$('#fight-dialog'),hud=$('#fight-hud'),fight=fightData,phase=fight?`${fight.id}:${fight.status}`:'';
     const showing=Boolean(fight&&fight.status!=='pending'&&fight.startsAt);
-    hud.hidden=!showing;$('.world-card').classList.toggle('fighting',showing);
+    hud.hidden=!showing;$('.world-card').classList.toggle('fighting',showing);$('#cafe-shell').classList.toggle('brawl-mode',showing);
     $$('.panel-tabs [data-tab=cards],.panel-tabs [data-tab=games]').forEach(button=>button.disabled=showing);
     if(!fight){if(dialog.open)dialog.close();renderedFightPhase='';renderFightPicker();return}
     if(fight.status==='finished'&&!fight.startsAt){toast(t('fightCanceled'));dismissFight();return}
