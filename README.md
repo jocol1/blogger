@@ -22,6 +22,8 @@ Người đang ngồi có thể gọi **trà đá 5.000đ** hoặc **đĩa bánh
 
 Người cùng bàn có thể chơi **Color Cards / Bài đổi màu** miễn phí cho 2–4 người, thêm tối đa hai bot. Server giữ bài kín, kiểm tra lượt và luật đánh cùng màu/số/loại, lá bỏ lượt, `+2`, đổi màu, tự rút khi hết 30 giây và xáo lại chồng bài khi cần. Không có cược hoặc phần thưởng quy đổi tiền.
 
+Lá hợp lệ có viền sáng; chạm lá đổi màu rồi chọn một trong bốn màu. Hàng bài và lựa chọn giữ nguyên khi cập nhật trạng thái. Đánh/rút khóa trong lúc gửi; lỗi kết nối có nút thử lại dùng đúng ID yêu cầu. Thao tác gửi `gameId`, `expectedVersion` và `requestId`; server chống tác động vào ván/lượt cũ và lưu ID gửi trùng riêng từng ví, không lưu tay bài trong document thao tác. Chủ bàn chia bài cho mọi người; bot mặc định tắt khi có từ hai người thật.
+
 Chọn **Đánh bài** mở một bàn bài lớn với người chơi, chồng rút, lá đang đánh, đồng hồ và hàng bài có thể vuốt ngang. Mục **Trò chơi** có ba trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
 
 - **Đua xúc xắc:** server tung 1–6, ai đạt 20 trước thắng; mỗi lượt 15 giây.
@@ -113,6 +115,7 @@ Các collection riêng của tính năng này:
 - `party_rooms`, `party_tokens`, `party_actions`, `party_purchases`, `party_drawing_contributions`
 - `tea_profiles`, `tea_rooms`, `tea_messages`, `tea_orders`, `tea_order_attempts`
 - `tea_items`, `tea_consume_attempts`, `tea_settings`, `tea_card_games`, `tea_card_attempts`
+- `tea_card_start_attempts` (chống chia bài trùng qua các lần chơi lại)
 - `tea_social_games`, `tea_social_actions` (ba trò bàn mới)
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.

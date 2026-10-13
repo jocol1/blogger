@@ -63,6 +63,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   const settings = () => col('tea_settings').doc('menu');
   const games = () => col('tea_card_games');
   const cardAttempts = () => col('tea_card_attempts');
+  const cardStartAttempts = () => col('tea_card_start_attempts');
   const presence = new Map();
   const sockets = new Map();
   const chatRate = new Map();
@@ -165,14 +166,22 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     if (result) io?.to(`wallet:${walletId}`).emit('tea:item', result);
     return result;
   }
-  function cardPublic(game, walletId) {
+  function cardMetadata(table, game, walletId) {
+    const seatedPlayers = table?.seats.filter(seat => seat.walletId).map(seat => seat.walletId) || [];
+    return { hostId: table?.ownerId || null, seatedPlayers, member: Boolean(game?.players.includes(walletId)), canStart: Boolean(table?.ownerId === walletId && seatedPlayers.length <= 4 && game?.status !== 'active') };
+  }
+  function cardPublic(game, walletId, table) {
     if (!game) return null;
     const hand = game.hands?.[walletId] || [];
     return {
       id: game.id, tableId: game.tableId, status: game.status, players: game.players.map(id => ({ id, bot: id.startsWith('bot:'), name: game.names[id], cards: game.hands[id]?.length || 0 })),
       turn: game.players[game.turnIndex], top: game.discard.at(-1), activeColor: game.activeColor, turnEndsAt: game.turnEndsAt, winnerId: game.winnerId || null,
-      reason: game.reason || null, hand, serverNow: now(),
+      reason: game.reason || null, hand, serverNow: now(), version: game.version || 1, lastAction: game.lastAction || null, ...cardMetadata(table, game, walletId),
     };
+  }
+  function recordCardAction(game, playerId, type, card = null, at = now()) {
+    game.version = (game.version || 1) + 1;
+    game.lastAction = { playerId, type, card, color: game.activeColor, at };
   }
   function drawCards(game, playerId, count) {
     for (let i = 0; i < count; i++) {
@@ -185,19 +194,20 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     }
   }
   function advance(game, amount = 1, startsAt = now()) { game.turnIndex = (game.turnIndex + amount) % game.players.length; game.turnEndsAt = startsAt + 30_000; }
-  function settleBots(game) {
+  function settleBots(game, startsAt = now()) {
     for (let guard = 0; guard < 12 && game.status === 'active'; guard++) {
       const playerId = game.players[game.turnIndex]; if (!playerId.startsWith('bot:')) break;
       const top = game.discard.at(-1); const hand = game.hands[playerId]; const card = hand.find(value => cardMatches(value, top, game.activeColor));
-      if (!card) { drawCards(game, playerId, 1); advance(game); continue; }
+      if (!card) { drawCards(game, playerId, 1); recordCardAction(game, playerId, 'draw', null, startsAt); advance(game, 1, startsAt); continue; }
       hand.splice(hand.indexOf(card), 1); game.discard.push(card); game.activeColor = card.kind === 'wild' ? COLORS[crypto.randomInt(COLORS.length)] : card.color;
+      recordCardAction(game, playerId, 'play', card, startsAt);
       if (!hand.length) { game.status = 'finished'; game.winnerId = playerId; game.finishedAt = iso(now()); break; }
-      if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2); }
-      else if (card.kind === 'skip') advance(game, 2); else advance(game);
+      if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2, startsAt); }
+      else if (card.kind === 'skip') advance(game, 2, startsAt); else advance(game, 1, startsAt);
     }
   }
   function applyTimeout(game) {
-    for (let guard = 0; guard < 16 && game.status === 'active' && now() >= game.turnEndsAt; guard++) { const expiredAt = game.turnEndsAt; drawCards(game, game.players[game.turnIndex], 1); advance(game, 1, expiredAt); settleBots(game); }
+    for (let guard = 0; guard < 128 && game.status === 'active' && now() >= game.turnEndsAt; guard++) { const expiredAt = game.turnEndsAt; const playerId = game.players[game.turnIndex]; drawCards(game, playerId, 1); recordCardAction(game, playerId, 'timeout', null, expiredAt); advance(game, 1, expiredAt); settleBots(game, expiredAt); }
   }
   function orderView(row) {
     return { id: row.id, code: row.code, kind: row.kind, price: row.price, paidAmount: row.paidAmount, remaining: Math.max(0, row.price - row.paidAmount), status: row.status, qrUrl: row.qrUrl, createdAt: row.createdAt };
@@ -308,7 +318,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         current.seat.walletId = null; current.seat.seatedAt = null;
         if (current.table.ownerId === walletId) { const occupied = current.table.seats.filter(s => s.walletId).sort((a, b) => a.seatedAt - b.seatedAt); current.table.ownerId = occupied[0]?.walletId || null; }
         room.updatedAt = iso(now()); exists ? tx.update(ref, room) : tx.create(ref, room);
-        if (gameSnapshot.exists && gameSnapshot.data().status === 'active' && gameSnapshot.data().players.includes(walletId)) tx.update(gameRef, { ...gameSnapshot.data(), status: 'finished', reason: reason === 'disconnect' ? 'player_disconnected' : 'player_left', winnerId: null, finishedAt: iso(now()) });
+        if (gameSnapshot.exists && gameSnapshot.data().status === 'active' && gameSnapshot.data().players.includes(walletId)) tx.update(gameRef, { ...gameSnapshot.data(), version: (gameSnapshot.data().version || 1) + 1, status: 'finished', reason: reason === 'disconnect' ? 'player_disconnected' : 'player_left', winnerId: null, finishedAt: iso(now()) });
         return { tableId: current.table.id };
       });
       const fight = fightFor(walletId); if (fight) finishFight(fight, reason === 'disconnect' ? 'player_disconnected' : 'player_left', fight.players.find(id => id !== walletId));
@@ -376,27 +386,59 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     async codeExistsInTransaction(tx, code) { return (await tx.get(orders().doc(code))).exists; },
     async afterPayment(info) { if (!info?.matched) return; io?.to(`wallet:${info.walletId}`).emit('tea:payment', info); if (info.itemId) await prepareDelivery(info.walletId); },
     async startCard(token, input) {
-      const walletId = await walletIdFor(token); const requestId = cleanRequestId(input?.requestId); const botCount = Math.max(0, Math.min(2, Number(input?.botCount) || 0)); if (!requestId) throw new TeaError(400, 'Invalid request.', 'bad_request');
-      return db.runTransaction(async tx => {
+      const walletId = await walletIdFor(token); const requestId = cleanRequestId(input?.requestId); const botCount = input?.botCount ?? 0;
+      if (!requestId) throw new TeaError(400, 'Invalid request.', 'bad_request');
+      if (!Number.isInteger(botCount) || botCount < 0 || botCount > 2) throw new TeaError(400, 'Choose 0, 1 or 2 bots.', 'bad_bot_count');
+      const result = await db.runTransaction(async tx => {
         const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId); if (!current) throw new TeaError(409, 'Sit at a table first.', 'not_seated'); if (current.table.ownerId !== walletId) throw new TeaError(403, 'Only the table host can start.', 'not_host');
-        const ref = games().doc(current.table.id); const old = await tx.get(ref); if (old.exists && (old.data().status === 'active' || old.data().requestId === requestId)) return cardPublic(old.data(), walletId);
+        const ref = games().doc(current.table.id); const old = await tx.get(ref);
+        const attemptRef = cardStartAttempts().doc(hash(`${walletId}:${requestId}`)); const prior = await tx.get(attemptRef);
+        if (prior.exists && (!old.exists || prior.data().gameId !== old.data().id || prior.data().tableId !== current.table.id)) throw new TeaError(409, 'That earlier game has already ended. Start with a new request.', 'stale_start');
+        if (old.exists && (old.data().status === 'active' || old.data().requestId === requestId || prior.exists)) {
+          const game = old.data(), before = JSON.stringify(game); applyTimeout(game); if (before !== JSON.stringify(game)) tx.update(ref, game);
+          if (!prior.exists) tx.create(attemptRef, { gameId: game.id, tableId: game.tableId, walletId, createdAt: iso(now()) });
+          return cardPublic(game, walletId, current.table);
+        }
         const humans = current.table.seats.filter(s => s.walletId).map(s => s.walletId); if (humans.length + botCount < 2 || humans.length + botCount > 4) throw new TeaError(400, 'A game needs 2–4 players.', 'bad_player_count');
         const profileRows = {}; for (const id of humans) { const snap = await tx.get(profiles().doc(id)); profileRows[id] = snap.exists ? snap.data().nickname : 'Guest'; }
         const players = [...humans, ...Array.from({ length: botCount }, (_, i) => `bot:${i + 1}`)]; const names = { ...profileRows }; players.filter(id => id.startsWith('bot:')).forEach((id, i) => { names[id] = `BOT ${i + 1}`; }); const deck = makeDeck(); const hands = Object.fromEntries(players.map(id => [id, []])); for (let n = 0; n < 7; n++) for (const id of players) hands[id].push(deck.pop()); let top = deck.pop(); while (top.kind !== 'number') { deck.unshift(top); top = deck.pop(); }
-        const at = now(); const game = { id: crypto.randomUUID(), tableId: current.table.id, status: 'active', players, names, hands, deck, discard: [top], activeColor: top.color, turnIndex: 0, turnEndsAt: at + 30_000, createdAt: iso(at), requestId }; settleBots(game); tx.set(ref, game); return cardPublic(game, walletId);
+        const at = now(); const game = { id: crypto.randomUUID(), version: 1, tableId: current.table.id, status: 'active', players, names, hands, deck, discard: [top], activeColor: top.color, turnIndex: 0, turnEndsAt: at + 30_000, createdAt: iso(at), requestId }; settleBots(game); tx.set(ref, game); tx.create(attemptRef, { gameId: game.id, tableId: game.tableId, walletId, createdAt: game.createdAt }); return cardPublic(game, walletId, current.table);
       });
+      io?.to(`table:${result.tableId}`).emit('tea:card', { tableId: result.tableId }); return result;
     },
     async cardState(token) {
-      const walletId = await walletIdFor(token); return db.runTransaction(async tx => { const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId); if (!current) return { game: null }; const ref = games().doc(current.table.id); const snapshot = await tx.get(ref); if (!snapshot.exists) return { game: null }; const game = snapshot.data(), before = JSON.stringify(game); applyTimeout(game); if (before !== JSON.stringify(game)) tx.update(ref, game); return { game: cardPublic(game, walletId) }; });
+      const walletId = await walletIdFor(token); return db.runTransaction(async tx => { const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId); if (!current) return { game: null, ...cardMetadata(null, null, walletId) }; const ref = games().doc(current.table.id); const snapshot = await tx.get(ref); if (!snapshot.exists) return { game: null, ...cardMetadata(current.table, null, walletId) }; const game = snapshot.data(), before = JSON.stringify(game); applyTimeout(game); if (before !== JSON.stringify(game)) tx.update(ref, game); return { game: cardPublic(game, walletId, current.table), ...cardMetadata(current.table, game, walletId) }; });
     },
     async cardAction(token, input) {
-      const walletId = await walletIdFor(token); const requestId = cleanRequestId(input?.requestId); if (!requestId) throw new TeaError(400, 'Invalid request.', 'bad_request'); const result = await db.runTransaction(async tx => {
+      const walletId = await walletIdFor(token); const requestId = cleanRequestId(input?.requestId);
+      if (!requestId || typeof input?.gameId !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(input.gameId)) throw new TeaError(400, 'A game ID and request ID are required.', 'bad_request');
+      if (input.expectedVersion !== undefined && (!Number.isSafeInteger(input.expectedVersion) || input.expectedVersion < 1)) throw new TeaError(400, 'Invalid game version.', 'bad_version');
+      const result = await db.runTransaction(async tx => {
         const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId); if (!current) throw new TeaError(409, 'Sit at a table first.', 'not_seated'); const ref = games().doc(current.table.id); const snapshot = await tx.get(ref); if (!snapshot.exists) throw new TeaError(404, 'Game not found.', 'game_not_found'); const game = snapshot.data();
-        const attemptRef = cardAttempts().doc(hash(`${game.id}:${requestId}`)); const prior = await tx.get(attemptRef); if (prior.exists) return prior.data().result; applyTimeout(game); if (game.status !== 'active') { const view = cardPublic(game, walletId); tx.update(ref, game); tx.create(attemptRef, { result: view, createdAt: iso(now()) }); return view; } if (game.players[game.turnIndex] !== walletId) throw new TeaError(409, 'Wait for your turn.', 'not_turn');
-        if (input.action === 'draw') { drawCards(game, walletId, 1); advance(game); }
-        else if (input.action === 'play') { const hand = game.hands[walletId]; const card = hand.find(value => value.id === input.cardId); const top = game.discard.at(-1); if (!card || !cardMatches(card, top, game.activeColor)) throw new TeaError(400, 'That card cannot be played.', 'invalid_card'); if (card.kind === 'wild' && !COLORS.includes(input.color)) throw new TeaError(400, 'Choose a color.', 'color_required'); hand.splice(hand.indexOf(card), 1); game.discard.push(card); game.activeColor = card.kind === 'wild' ? input.color : card.color; if (!hand.length) { game.status = 'finished'; game.winnerId = walletId; game.finishedAt = iso(now()); } else if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2); } else if (card.kind === 'skip') advance(game, 2); else advance(game); }
-        else throw new TeaError(400, 'Unknown action.', 'bad_action'); settleBots(game); const view = cardPublic(game, walletId); tx.update(ref, game); tx.create(attemptRef, { result: view, createdAt: iso(now()) }); return view;
-      }); io?.emit('tea:card', { tableId: result.tableId }); return result;
+        if (input.gameId !== game.id) throw new TeaError(409, 'This game has changed. Refresh the table.', 'stale_game');
+        if (!game.players.includes(walletId)) throw new TeaError(403, 'You are watching this game. Join the next one.', 'not_player');
+        const attemptRef = cardAttempts().doc(hash(`${walletId}:${game.id}:${requestId}`)); const prior = await tx.get(attemptRef);
+        const before = JSON.stringify(game); applyTimeout(game); const timeoutChanged = before !== JSON.stringify(game);
+        if (prior.exists) { if (timeoutChanged) tx.update(ref, game); return cardPublic(game, walletId, current.table); }
+        const reject = (status, message, code) => { if (timeoutChanged) tx.update(ref, game); return { error: { status, message, code }, tableId: game.tableId }; };
+        if (input.expectedVersion !== undefined && input.expectedVersion !== (game.version || 1)) return reject(409, 'The turn has changed. Refresh the table.', 'stale_game_version');
+        if (game.status !== 'active') return reject(409, 'This game has ended.', 'game_finished');
+        if (game.players[game.turnIndex] !== walletId) return reject(409, 'Wait for your turn.', 'not_turn');
+        if (input.action === 'draw') { drawCards(game, walletId, 1); recordCardAction(game, walletId, 'draw'); advance(game); }
+        else if (input.action === 'play') {
+          const hand = game.hands[walletId]; const card = hand.find(value => value.id === input.cardId); const top = game.discard.at(-1);
+          if (!card || !cardMatches(card, top, game.activeColor)) return reject(400, 'That card cannot be played.', 'invalid_card');
+          if (card.kind === 'wild' && !COLORS.includes(input.color)) return reject(400, 'Choose a color.', 'color_required');
+          hand.splice(hand.indexOf(card), 1); game.discard.push(card); game.activeColor = card.kind === 'wild' ? input.color : card.color; recordCardAction(game, walletId, 'play', card);
+          if (!hand.length) { game.status = 'finished'; game.winnerId = walletId; game.finishedAt = iso(now()); }
+          else if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2); }
+          else if (card.kind === 'skip') advance(game, 2); else advance(game);
+        }
+        else return reject(400, 'Unknown action.', 'bad_action');
+        settleBots(game); const view = cardPublic(game, walletId, current.table); tx.update(ref, game); tx.create(attemptRef, { walletId, gameId: game.id, createdAt: iso(now()) }); return view;
+      });
+      io?.to(`table:${result.tableId}`).emit('tea:card', { tableId: result.tableId });
+      if (result.error) throw new TeaError(result.error.status, result.error.message, result.error.code); return result;
     },
     async startTableGame(token,input){const result=await tableGames.start(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
     async tableGameState(token,key){return tableGames.state(await walletIdFor(token),key)},
@@ -417,7 +459,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         const roomRef = rooms().doc(ROOM_ID); const roomSnapshot = await tx.get(roomRef); const gameRows = [];
         for (const table of TABLES) gameRows.push([games().doc(table.id), await tx.get(games().doc(table.id))]);
         if (roomSnapshot.exists) tx.set(roomRef, emptyRoom());
-        for (const [ref, snapshot] of gameRows) if (snapshot.exists && snapshot.data().status === 'active') tx.update(ref, { ...snapshot.data(), status: 'finished', reason: 'server_restart', winnerId: null, finishedAt: iso(now()) });
+        for (const [ref, snapshot] of gameRows) if (snapshot.exists && snapshot.data().status === 'active') tx.update(ref, { ...snapshot.data(), version: (snapshot.data().version || 1) + 1, status: 'finished', reason: 'server_restart', winnerId: null, finishedAt: iso(now()) });
       });
       await tableGames.cancelAfterRestart();
     },
