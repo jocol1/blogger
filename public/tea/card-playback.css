@@ -1,0 +1,12 @@
+.tl-top,.color-play-pile{position:relative;isolation:isolate}
+.tl-top>.card-pile-layer{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:5px;width:100%;min-height:inherit}
+.card-pile-layer.current{position:relative;z-index:2}
+.card-pile-layer.previous{position:absolute;inset:0;z-index:1;transform:translate(-4px,3px) rotate(-4deg);opacity:.5;pointer-events:none}
+.color-play-pile{width:77px;height:110px}
+.color-play-pile .card-pile-layer{width:100%;height:100%}
+.card-flight{position:fixed!important;z-index:1000!important;pointer-events:none!important;margin:0!important;min-width:0!important;min-height:0!important;max-height:none!important;aspect-ratio:auto!important;opacity:1!important}
+.card-flight.tl-card{display:block}.card-flight.tl-card .tl-card-corner{font-size:15px}.card-flight.tl-card .tl-card-symbol{font-size:27px}
+.card-flight.playing-card{display:flex;justify-content:center;align-items:center;font-size:29px}
+.tl-hand .tl-card:disabled{opacity:1}.tl-top .tl-card{opacity:1}
+@media(max-width:900px){.tl-top>.card-pile-layer{gap:4px}.color-play-pile{width:46px;height:70px}.card-flight.tl-card .tl-card-corner.bottom{display:none}}
+@media(max-width:380px){.color-play-pile{width:42px;height:64px}}

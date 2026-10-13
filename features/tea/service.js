@@ -10,6 +10,8 @@ const CHAT_LIMIT = 500;
 const MAX_BALANCE = 9_999_999;
 const MENU_DEFAULTS = { tea: 5000, snack: 10000 };
 const COLORS = ['red', 'yellow', 'green', 'blue'];
+const CARD_HOLD_MS = 2000;
+const CARD_HISTORY_LIMIT = 48;
 const hash = value => crypto.createHash('sha256').update(String(value)).digest('hex');
 const iso = value => new Date(value).toISOString();
 const cleanRequestId = value => typeof value === 'string' && /^[a-zA-Z0-9-]{12,80}$/.test(value) ? value : null;
@@ -180,13 +182,16 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     const hand = game.hands?.[walletId] || [];
     return {
       id: game.id, tableId: game.tableId, status: game.status, players: game.players.map(id => ({ id, bot: id.startsWith('bot:'), name: game.names[id], cards: game.hands[id]?.length || 0 })),
-      turn: game.players[game.turnIndex], top: game.discard.at(-1), activeColor: game.activeColor, turnEndsAt: game.turnEndsAt, winnerId: game.winnerId || null,
+      turn: game.players[game.turnIndex], top: game.discard.at(-1), activeColor: game.activeColor, turnEndsAt: game.turnEndsAt, nextActionAt: game.nextActionAt || 0, winnerId: game.winnerId || null,
+      actionHistory: (game.actionHistory || []).slice(-CARD_HISTORY_LIMIT).map(({ version, playerId, type, card, color, at }) => ({ version, playerId, type, card: type === 'play' ? card : null, cards: type === 'play' && card ? [card] : [], color, at })),
       reason: game.reason || null, hand, serverNow: now(), version: game.version || 1, lastAction: game.lastAction || null, ...cardMetadata(table, game, walletId, otherGame),
     };
   }
   function recordCardAction(game, playerId, type, card = null, at = now()) {
     game.version = (game.version || 1) + 1;
-    game.lastAction = { playerId, type, card, color: game.activeColor, at };
+    game.lastAction = { version: game.version, playerId, type, card, cards: card ? [card] : [], color: game.activeColor, at };
+    game.actionHistory = [...(game.actionHistory || []), game.lastAction].slice(-CARD_HISTORY_LIMIT);
+    game.nextActionAt = at + CARD_HOLD_MS;
   }
   function drawCards(game, playerId, count) {
     for (let i = 0; i < count; i++) {
@@ -198,21 +203,29 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       const card = game.deck.pop(); if (card) game.hands[playerId].push(card);
     }
   }
-  function advance(game, amount = 1, startsAt = now()) { game.turnIndex = (game.turnIndex + amount) % game.players.length; game.turnEndsAt = startsAt + 30_000; }
-  function settleBots(game, startsAt = now()) {
-    for (let guard = 0; guard < 12 && game.status === 'active'; guard++) {
-      const playerId = game.players[game.turnIndex]; if (!playerId.startsWith('bot:')) break;
-      const top = game.discard.at(-1); const hand = game.hands[playerId]; const card = hand.find(value => cardMatches(value, top, game.activeColor));
-      if (!card) { drawCards(game, playerId, 1); recordCardAction(game, playerId, 'draw', null, startsAt); advance(game, 1, startsAt); continue; }
-      hand.splice(hand.indexOf(card), 1); game.discard.push(card); game.activeColor = card.kind === 'wild' ? COLORS[crypto.randomInt(COLORS.length)] : card.color;
-      recordCardAction(game, playerId, 'play', card, startsAt);
-      if (!hand.length) { game.status = 'finished'; game.winnerId = playerId; game.finishedAt = iso(now()); break; }
-      if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2, startsAt); }
-      else if (card.kind === 'skip') advance(game, 2, startsAt); else advance(game, 1, startsAt);
-    }
+  function advance(game, amount = 1, startsAt = now()) { game.turnIndex = (game.turnIndex + amount) % game.players.length; game.nextActionAt = startsAt + CARD_HOLD_MS; game.turnEndsAt = game.nextActionAt + 30_000; }
+  function playBot(game, startsAt) {
+    const playerId = game.players[game.turnIndex];
+    const top = game.discard.at(-1); const hand = game.hands[playerId]; const card = hand.find(value => cardMatches(value, top, game.activeColor));
+    if (!card) { drawCards(game, playerId, 1); recordCardAction(game, playerId, 'draw', null, startsAt); advance(game, 1, startsAt); return; }
+    hand.splice(hand.indexOf(card), 1); game.discard.push(card); game.activeColor = card.kind === 'wild' ? COLORS[crypto.randomInt(COLORS.length)] : card.color;
+    recordCardAction(game, playerId, 'play', card, startsAt);
+    if (!hand.length) { game.status = 'finished'; game.winnerId = playerId; game.finishedAt = iso(startsAt); return; }
+    if (card.kind === 'draw2') { const next = game.players[(game.turnIndex + 1) % game.players.length]; drawCards(game, next, 2); advance(game, 2, startsAt); }
+    else if (card.kind === 'skip') advance(game, 2, startsAt); else advance(game, 1, startsAt);
   }
   function applyTimeout(game) {
-    for (let guard = 0; guard < 128 && game.status === 'active' && now() >= game.turnEndsAt; guard++) { const expiredAt = game.turnEndsAt; const playerId = game.players[game.turnIndex]; drawCards(game, playerId, 1); recordCardAction(game, playerId, 'timeout', null, expiredAt); advance(game, 1, expiredAt); settleBots(game, expiredAt); }
+    for (let guard = 0; guard < 128 && game.status === 'active'; guard++) {
+      const playerId = game.players[game.turnIndex];
+      if (playerId.startsWith('bot:')) {
+        const readyAt = game.nextActionAt ?? game.turnEndsAt - 30_000;
+        if (now() < readyAt) break;
+        playBot(game, readyAt); continue;
+      }
+      if (now() < game.turnEndsAt) break;
+      const expiredAt = game.turnEndsAt;
+      drawCards(game, playerId, 1); recordCardAction(game, playerId, 'timeout', null, expiredAt); advance(game, 1, expiredAt);
+    }
   }
   function orderView(row) {
     return { id: row.id, code: row.code, kind: row.kind, price: row.price, paidAmount: row.paidAmount, remaining: Math.max(0, row.price - row.paidAmount), status: row.status, qrUrl: row.qrUrl, createdAt: row.createdAt };
@@ -412,7 +425,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         const humans = current.table.seats.filter(s => s.walletId).map(s => s.walletId); if (humans.length + botCount < 2 || humans.length + botCount > 4) throw new TeaError(400, 'A game needs 2–4 players.', 'bad_player_count');
         const profileRows = {}; for (const id of humans) { const snap = await tx.get(profiles().doc(id)); profileRows[id] = snap.exists ? snap.data().nickname : 'Guest'; }
         const players = [...humans, ...Array.from({ length: botCount }, (_, i) => `bot:${i + 1}`)]; const names = { ...profileRows }; players.filter(id => id.startsWith('bot:')).forEach((id, i) => { names[id] = `BOT ${i + 1}`; }); const deck = makeDeck(); const hands = Object.fromEntries(players.map(id => [id, []])); for (let n = 0; n < 7; n++) for (const id of players) hands[id].push(deck.pop()); let top = deck.pop(); while (top.kind !== 'number') { deck.unshift(top); top = deck.pop(); }
-        const at = now(); const game = { id: crypto.randomUUID(), version: 1, tableId: current.table.id, status: 'active', players, names, hands, deck, discard: [top], activeColor: top.color, turnIndex: 0, turnEndsAt: at + 30_000, createdAt: iso(at), requestId }; settleBots(game); tx.set(ref, game); tx.create(attemptRef, { gameId: game.id, tableId: game.tableId, walletId, createdAt: game.createdAt }); return cardPublic(game, walletId, current.table);
+        const at = now(); const game = { id: crypto.randomUUID(), version: 1, tableId: current.table.id, status: 'active', players, names, hands, deck, discard: [top], activeColor: top.color, turnIndex: 0, nextActionAt: at, turnEndsAt: at + 30_000, actionHistory: [], createdAt: iso(at), requestId }; tx.set(ref, game); tx.create(attemptRef, { gameId: game.id, tableId: game.tableId, walletId, createdAt: game.createdAt }); return cardPublic(game, walletId, current.table);
       });
       io?.to(`table:${result.tableId}`).emit('tea:card', { tableId: result.tableId }); return result;
     },
@@ -443,6 +456,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         if (input.expectedVersion !== undefined && input.expectedVersion !== (game.version || 1)) return reject(409, 'The turn has changed. Refresh the table.', 'stale_game_version');
         if (game.status !== 'active') return reject(409, 'This game has ended.', 'game_finished');
         if (game.players[game.turnIndex] !== walletId) return reject(409, 'Wait for your turn.', 'not_turn');
+        if (now() < (game.nextActionAt || 0)) return reject(409, 'Give everyone a moment to see the played cards.', 'turn_not_ready');
         if (input.action === 'draw') { drawCards(game, walletId, 1); recordCardAction(game, walletId, 'draw'); advance(game); }
         else if (input.action === 'play') {
           const hand = game.hands[walletId]; const card = hand.find(value => value.id === input.cardId); const top = game.discard.at(-1);
@@ -454,7 +468,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
           else if (card.kind === 'skip') advance(game, 2); else advance(game);
         }
         else return reject(400, 'Unknown action.', 'bad_action');
-        settleBots(game); const view = cardPublic(game, walletId, current.table); tx.update(ref, game); tx.create(attemptRef, { walletId, gameId: game.id, createdAt: iso(now()) }); return view;
+        applyTimeout(game); const view = cardPublic(game, walletId, current.table); tx.update(ref, game); tx.create(attemptRef, { walletId, gameId: game.id, createdAt: iso(now()) }); return view;
       });
       io?.to(`table:${result.tableId}`).emit('tea:card', { tableId: result.tableId });
       if (result.error) throw new TeaError(result.error.status, result.error.message, result.error.code); return result;

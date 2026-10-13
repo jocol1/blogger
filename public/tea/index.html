@@ -13,7 +13,8 @@
   <link rel="stylesheet" href="/assets/tea/cards-controls.css?v=cards6">
   <link rel="stylesheet" href="/assets/tea/tienlen.css?v=classic1">
   <link rel="stylesheet" href="/assets/tea/classic-cards.css?v=classic1">
-  <link rel="stylesheet" href="/assets/tea/card-table-layout.css?v=classic1">
+  <link rel="stylesheet" href="/assets/tea/card-table-layout.css?v=readable2">
+  <link rel="stylesheet" href="/assets/tea/card-playback.css?v=readable2">
 </head>
 <body>
   <header class="topbar">
@@ -165,7 +166,7 @@
 
         <div id="color-cards-mode" hidden>
         <div id="cards-empty" class="big-empty card-lobby"><span class="cards-stack">▥</span><h2 data-i18n="dealCards">Pull up a chair. Deal the cards.</h2><p data-i18n="cardsIntro">A free 2–4 player table game. Match the color, number, or symbol. No betting and no cash prizes.</p><p id="cards-seat-warning" data-i18n="notSeated">Sit at a table first.</p><label><span data-i18n="bots">Bots</span><select id="bot-count"><option value="0">0</option><option value="1" selected>1</option><option value="2">2</option></select></label><button id="start-card" class="primary" data-i18n="startGame">Start game</button><p id="cards-lobby-status" role="status"></p></div>
-        <div id="card-game" hidden><div class="card-table"><div class="card-arena color-arena"><div id="card-players" class="card-players"></div><div class="card-stage"><div class="deck-block"><small data-i18n="drawPile">DRAW PILE</small><button id="draw-pile" type="button" class="playing-card back" aria-label="Draw one and pass">LOC</button></div><div class="deck-block"><small data-i18n="inPlay">IN PLAY</small><div id="top-card" class="playing-card">0</div></div><div class="turn-sign"><b id="turn-label"></b><span id="card-clock"></span><span id="active-color"></span></div></div></div><div class="hand-area"><div class="hand-sort-row"><small data-i18n="yourHand">Your hand</small><button id="sort-color-hand" type="button" data-i18n="sortDealt">Deal order</button></div><small data-i18n="yourHand">YOUR HAND · TAP A CARD TO PLAY</small><div id="hand" class="hand"></div></div></div><div class="card-action-bar"><p id="card-feedback" role="status"></p><div id="color-picker" class="color-picker" hidden><span data-i18n="chooseColor">Choose the next color</span><button data-color="red" aria-label="Red"></button><button data-color="yellow" aria-label="Yellow"></button><button data-color="green" aria-label="Green"></button><button data-color="blue" aria-label="Blue"></button><button id="cancel-wild" data-i18n="cancelChoice">Cancel</button></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="card-retry" class="primary" data-i18n="retryCard" hidden>Retry action</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button></div></div>
+        <div id="card-game" hidden><div class="card-table"><div class="card-arena color-arena"><div id="card-players" class="card-players"></div><div class="card-stage"><div class="deck-block"><small data-i18n="drawPile">DRAW PILE</small><button id="draw-pile" type="button" class="playing-card back" aria-label="Draw one and pass">LOC</button></div><div class="deck-block"><small data-i18n="inPlay">IN PLAY</small><div id="top-card" class="color-play-pile"></div></div><div class="turn-sign"><b id="turn-label"></b><span id="card-clock"></span><span id="active-color"></span></div></div></div><div class="hand-area"><div class="hand-sort-row"><small data-i18n="yourHand">Your hand</small><button id="sort-color-hand" type="button" data-i18n="sortDealt">Deal order</button></div><small data-i18n="yourHand">YOUR HAND · TAP A CARD TO PLAY</small><div id="hand" class="hand"></div></div></div><div class="card-action-bar"><p id="card-feedback" role="status"></p><div id="color-picker" class="color-picker" hidden><span data-i18n="chooseColor">Choose the next color</span><button data-color="red" aria-label="Red"></button><button data-color="yellow" aria-label="Yellow"></button><button data-color="green" aria-label="Green"></button><button data-color="blue" aria-label="Blue"></button><button id="cancel-wild" data-i18n="cancelChoice">Cancel</button></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="card-retry" class="primary" data-i18n="retryCard" hidden>Retry action</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button></div></div>
         </div>
       </section>
        <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="dice"><span>⚄</span><b data-i18n="diceName">Dice Dash</b><small data-i18n="diceShort">Race to 20</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button></div><div id="mini-game-stage"></div></section>
@@ -200,11 +201,12 @@
   <script src="/assets/tea/brawl-view.js?v=brawl4"></script>
   <script src="/assets/tea/card-view.js?v=cards6"></script>
   <script src="/assets/tea/card-table-layout.js?v=classic1"></script>
-  <script src="/assets/tea/card-layout-words.js?v=classic1"></script>
-  <script src="/assets/tea/cards-ui.js?v=classic1"></script>
+  <script src="/assets/tea/card-layout-words.js?v=readable2"></script>
+  <script src="/assets/tea/card-playback.js?v=readable2"></script>
+  <script src="/assets/tea/cards-ui.js?v=readable2"></script>
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
-  <script src="/assets/tea/tienlen-ui.js?v=classic1"></script>
-  <script src="/assets/tea/classic-cards-ui.js?v=classic1"></script>
+  <script src="/assets/tea/tienlen-ui.js?v=readable2"></script>
+  <script src="/assets/tea/classic-cards-ui.js?v=readable2"></script>
   <script src="/assets/tea/app.js?v=classic1"></script>
 </body>
 </html>

@@ -114,12 +114,17 @@ test('play validates ownership and combinations, removes only selected cards, an
 test('passing locks a player out until everyone else passes and the last player leads a fresh trick', async () => {
   const f = await fixture(4); f.game.hands[f.players[0].id] = [c(7), c(10)]; f.game.hands[f.players[2].id] = [c(8), c(3, 3)]; await f.save();
   let view = await f.tea.tienLenAction(f.players[0].token, action(f, { cardIds: [c(7).id] }));
+  f.tick(2000);
   view = await f.tea.tienLenAction(f.players[1].token, action(f, { action: 'pass', expectedVersion: view.version }));
+  f.tick(2000);
   view = await f.tea.tienLenAction(f.players[2].token, action(f, { cardIds: [c(8).id], expectedVersion: view.version }));
+  f.tick(2000);
   await assert.rejects(f.tea.tienLenAction(f.players[1].token, action(f, { cardIds: [c(9).id], expectedVersion: view.version })));
   view = await f.tea.tienLenAction(f.players[3].token, action(f, { action: 'pass', expectedVersion: view.version })); assert.equal(view.turn, f.players[0].id);
+  f.tick(2000);
   view = await f.tea.tienLenAction(f.players[0].token, action(f, { action: 'pass', expectedVersion: view.version }));
   assert.equal(view.turn, f.players[2].id); assert.equal(view.top, null); assert.deepEqual((await f.stored()).passed, []);
+  f.tick(2000);
   await assert.rejects(f.tea.tienLenAction(f.players[2].token, action(f, { action: 'pass', expectedVersion: view.version })));
   const won = await f.tea.tienLenAction(f.players[2].token, action(f, { cardIds: [c(3, 3).id], expectedVersion: view.version })); assert.equal(won.winnerId, f.players[2].id);
 });
@@ -166,6 +171,7 @@ test('duplicates and concurrent retries execute one play and retry returns curre
   const f = await fixture(); const input = action(f);
   const [first, second] = await Promise.all([f.tea.tienLenAction(f.players[0].token, input), f.tea.tienLenAction(f.players[0].token, input)]);
   assert.deepEqual(first, second); assert.equal((await f.stored()).version, 2); assert.equal((await f.stored()).hands[f.players[0].id].length, 2);
+  f.tick(2000);
   const peer = await f.tea.tienLenAction(f.players[1].token, action(f, { cardIds: [c(4).id], expectedVersion: first.version }));
   const retry = await f.tea.tienLenAction(f.players[0].token, input); assert.equal(retry.version, peer.version); assert.deepEqual(retry.hand.map(card => card.id), [c(8).id, c(12).id]);
 });
@@ -173,6 +179,7 @@ test('duplicates and concurrent retries execute one play and retry returns curre
 test('request IDs are scoped to player and match, so another player cannot replay a private hand', async () => {
   const f = await fixture(), sharedId = 'same-request-different-player';
   const first = await f.tea.tienLenAction(f.players[0].token, action(f, { requestId: sharedId }));
+  f.tick(2000);
   const second = await f.tea.tienLenAction(f.players[1].token, action(f, { requestId: sharedId, cardIds: [c(4).id], expectedVersion: first.version }));
   assert.deepEqual(second.hand.map(card => card.id), [c(9).id, c(13).id]); assert.equal(second.hand.some(card => first.hand.some(other => other.id === card.id)), false);
   assert.equal((await f.stored()).version, 3);
@@ -191,14 +198,15 @@ test('an elapsed opening turn plays the lowest card and stale actions still pers
   const f = await fixture(); f.game.openingCardId = c(3).id; await f.save(); f.tick(30_000);
   await assert.rejects(f.tea.tienLenAction(f.players[0].token, action(f)), error => error.code === 'stale_game_version');
   const stored = await f.stored(); assert.equal(stored.version, 2); assert.equal(stored.top.cards[0].id, c(3).id); assert.equal(stored.hands[f.players[0].id].length, 2); assert.equal(stored.turnIndex, 1);
-  assert.equal(stored.turnEndsAt, f.now() + 30_000); assert.equal(stored.openingCardId, null);
+  assert.equal(stored.nextActionAt, f.now() + 2000); assert.equal(stored.turnEndsAt, f.now() + 32_000); assert.equal(stored.openingCardId, null);
   assert.equal((await f.tea.tienLenState(f.players[0].token)).game.version, 2);
 });
 
 test('missed response turns auto-pass on original deadlines and polling does not prolong the match', async () => {
   const f = await fixture(4); f.game.openingCardId = c(3).id; await f.save(); f.tick(95_000);
   const view = (await f.tea.tienLenState(f.players[0].token)).game;
-  assert.equal(view.version, 4); assert.equal(view.turn, f.players[3].id); assert.equal(view.turnEndsAt, f.now() + 25_000);
+  assert.equal(view.version, 4); assert.equal(view.turn, f.players[3].id); assert.equal(view.turnEndsAt, f.now() + 31_000);
+  assert.deepEqual(view.actionHistory.map(row => row.at), [f.now() - 65_000, f.now() - 33_000, f.now() - 1000]);
   assert.deepEqual((await f.stored()).passed, [f.players[1].id, f.players[2].id]);
   assert.equal((await f.tea.tienLenState(f.players[0].token)).game.turnEndsAt, view.turnEndsAt);
 });
@@ -221,11 +229,15 @@ test('start retries deduplicate across simultaneous calls and old start IDs cann
   await assert.rejects(f.tea.startTienLen(f.players[0].token, input), error => error.code === 'stale_start'); assert.equal((await f.stored()).id, next.id);
 });
 
-test('bots choose legal cards and return control to the human instead of leaking their hands', async () => {
+test('bots preserve the human play for two seconds before their legal response', async () => {
   const f = await fixture(1); const bot = 'bot:tl:1'; f.game.players.push(bot); f.game.names[bot] = 'BOT 1'; f.game.hands[bot] = [c(4), c(10)]; await f.save();
   const view = await f.tea.tienLenAction(f.players[0].token, action(f));
-  assert.equal(view.top.cards[0].id, c(4).id); assert.equal(view.turn, f.players[0].id); assert.equal(view.version, 3);
-  assert.equal(view.players.find(player => player.id === bot).cards, 1); assert.equal('hands' in view, false);
+  assert.equal(view.top.cards[0].id, c(3).id); assert.equal(view.turn, bot); assert.equal(view.version, 2);
+  f.tick(1999); assert.equal((await f.tea.tienLenState(f.players[0].token)).game.version, 2);
+  f.tick(1); const next = (await f.tea.tienLenState(f.players[0].token)).game;
+  assert.equal(next.top.cards[0].id, c(4).id); assert.equal(next.turn, f.players[0].id); assert.equal(next.version, 3);
+  assert.equal(next.players.find(player => player.id === bot).cards, 1); assert.equal('hands' in next, false);
+  assert.deepEqual(next.actionHistory.map(row => row.cards.map(card => card.id)), [[c(3).id], [c(4).id]]);
 });
 
 test('Firestore failures do not remove cards or create a game; retry can safely continue when storage recovers', async () => {
@@ -292,4 +304,58 @@ test('HTTP endpoints require the wallet header, validate action/version fields a
     assert.equal(played.status, 200); const result = await played.json(); assert.equal(result.status, 'active'); assert.equal(result.hand.length, 12); assert.equal('hands' in result, false);
     assert.equal(f.db.rows.get(`game_wallets/${currentId}`).balance, 73);
   } finally { await new Promise(resolve => server.close(resolve)); }
+});
+
+test('a human response waits two seconds and retains a full 30-second decision clock', async () => {
+  const f = await fixture(), input = action(f), first = await f.tea.tienLenAction(f.players[0].token, input);
+  assert.equal(first.nextActionAt, f.now() + 2000); assert.equal(first.turnEndsAt - first.nextActionAt, 30_000);
+  const response = action(f, { expectedVersion: first.version, cardIds: [c(4).id] });
+  await assert.rejects(f.tea.tienLenAction(f.players[1].token, response), error => error.code === 'turn_not_ready');
+  assert.equal((await f.stored()).version, first.version); assert.deepEqual(await f.tea.tienLenAction(f.players[0].token, input), first);
+  f.tick(1999); await assert.rejects(f.tea.tienLenAction(f.players[1].token, response), error => error.code === 'turn_not_ready');
+  f.tick(1); const second = await f.tea.tienLenAction(f.players[1].token, response);
+  assert.deepEqual(second.actionHistory.map(row => row.version), [2, 3]);
+  assert.deepEqual(second.actionHistory.map(row => row.cards[0].id), [c(3).id, c(4).id]);
+});
+
+test('four-pair out-of-turn chopping respects the visible hold without losing its exception', async () => {
+  const f = await fixture(4), actor = f.players[3], bomb = pairs(3, 4, 5, 6);
+  f.game.hands[f.players[0].id] = [c(15), c(11)]; f.game.hands[actor.id] = [...bomb, c(13)]; f.game.passed = [actor.id]; await f.save();
+  const first = await f.tea.tienLenAction(f.players[0].token, action(f, { cardIds: [c(15).id] }));
+  const response = action(f, { expectedVersion: first.version, cardIds: bomb.map(card => card.id) });
+  await assert.rejects(f.tea.tienLenAction(actor.token, response), error => error.code === 'turn_not_ready');
+  f.tick(2000); const second = await f.tea.tienLenAction(actor.token, response);
+  assert.equal(second.top.kind, 'pairs4'); assert.equal(second.top.playerId, actor.id); assert.equal(second.hand.length, 1);
+  assert.equal((await f.stored()).passed.includes(actor.id), false);
+});
+
+test('missed polls retain separate bot plays at original times and hide unplayed cards', async () => {
+  const f = await fixture(1); f.game.players.push('bot:1', 'bot:2'); Object.assign(f.game.names, { 'bot:1': 'BOT 1', 'bot:2': 'BOT 2' });
+  f.game.hands['bot:1'] = [c(4), c(10)]; f.game.hands['bot:2'] = [c(5), c(11)]; await f.save();
+  const first = await f.tea.tienLenAction(f.players[0].token, action(f)); assert.equal(first.top.cards[0].id, c(3).id);
+  f.tick(4500); const view = (await f.tea.tienLenState(f.players[0].token)).game;
+  assert.equal(view.version, 4); assert.equal(view.turn, f.players[0].id);
+  assert.deepEqual(view.actionHistory.map(row => row.cards[0].id), [c(3).id, c(4).id, c(5).id]);
+  assert.deepEqual(view.actionHistory.map(row => row.at), [f.now() - 4500, f.now() - 2500, f.now() - 500]);
+  assert.equal(view.nextActionAt, f.now() + 1500); assert.equal(view.turnEndsAt, f.now() + 31_500);
+  assert.equal(JSON.stringify(view.actionHistory).includes(c(10).id), false); assert.equal(JSON.stringify(view.actionHistory).includes(c(11).id), false);
+  assert.equal((await f.tea.tienLenState(f.players[0].token)).game.version, 4);
+});
+
+test('new tricks preserve the preceding played cards in history after passes', async () => {
+  const f = await fixture(), first = await f.tea.tienLenAction(f.players[0].token, action(f)); f.tick(2000);
+  const next = await f.tea.tienLenAction(f.players[1].token, action(f, { expectedVersion: first.version, action: 'pass' }));
+  assert.equal(next.top, null); assert.equal(next.turn, f.players[0].id);
+  assert.deepEqual(next.actionHistory[0].cards.map(card => card.id), [c(3).id]);
+  assert.deepEqual(next.actionHistory[1].cards, []); assert.equal(next.actionHistory[1].type, 'pass');
+});
+
+test('public Tiến lên history is bounded and only publishes completed plays', async () => {
+  const f = await fixture();
+  f.game.actionHistory = Array.from({ length: 70 }, (_, i) => ({ version: i + 1, playerId: f.players[0].id, type: 'pass', cards: [], at: f.now() - (70 - i) * 2000 }));
+  f.game.version = 71; await f.save();
+  const view = await f.tea.tienLenAction(f.players[0].token, action(f, { expectedVersion: 71 }));
+  assert.equal(view.actionHistory.length, 48); assert.equal((await f.stored()).actionHistory.length, 48);
+  assert.equal(view.actionHistory.at(-1).version, 72); assert.deepEqual(view.actionHistory.at(-1).cards, [c(3)]);
+  assert.equal(view.actionHistory.slice(0, -1).every(row => row.cards.length === 0), true);
 });

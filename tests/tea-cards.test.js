@@ -64,6 +64,7 @@ test('wild cards choose the next active color and the next player must match tha
   const matching = card('blue', 5); f.game.hands[f.players[1].id] = [matching, card('green', 1)]; await f.save();
   const first = await f.tea.cardAction(f.players[0].token, action(f, { action: 'play', cardId: wild.id, color: 'blue' }));
   assert.equal(first.activeColor, 'blue');
+  f.tick(2000);
   const next = await f.tea.cardAction(f.players[1].token, action(f, { action: 'play', cardId: matching.id, expectedVersion: first.version }));
   assert.equal(next.top.id, matching.id); assert.equal(next.activeColor, 'blue');
 });
@@ -96,7 +97,7 @@ test('timeout draws once, advances once and stale actions still persist the elap
   const f = await fixture(); f.tick(30_000);
   await assert.rejects(f.tea.cardAction(f.players[0].token, action(f)), e => e.code === 'stale_game_version');
   const stored = await f.stored(); assert.equal(stored.hands[f.players[0].id].length, 3); assert.equal(stored.turnIndex, 1); assert.equal(stored.version, 2);
-  assert.equal(stored.turnEndsAt, f.now() + 30_000); assert.equal(stored.lastAction.type, 'timeout');
+  assert.equal(stored.nextActionAt, f.now() + 2000); assert.equal(stored.turnEndsAt, f.now() + 32_000); assert.equal(stored.lastAction.type, 'timeout');
   const view = await f.tea.cardState(f.players[0].token); assert.equal(view.game.hand.length, 3); assert.equal(view.game.version, 2);
 });
 
@@ -104,7 +105,8 @@ test('catching up several missed turns uses their original deadlines', async () 
   const f = await fixture(); f.tick(95_000);
   const view = await f.tea.cardState(f.players[0].token);
   assert.equal(view.game.version, 4); assert.equal(view.game.turn, f.players[1].id);
-  assert.equal(view.game.turnEndsAt, f.now() + 25_000);
+  assert.equal(view.game.turnEndsAt, f.now() + 31_000);
+  assert.deepEqual(view.game.actionHistory.map(row => row.at), [f.now() - 65_000, f.now() - 33_000, f.now() - 1000]);
   const stored = await f.stored(); assert.equal(stored.hands[f.players[0].id].length, 4); assert.equal(stored.hands[f.players[1].id].length, 3);
 });
 
@@ -112,6 +114,7 @@ test('repeating an action is harmless and another wallet can reuse its request I
   const f = await fixture(); const sharedId = 'same-client-request-id';
   const firstInput = action(f, { requestId: sharedId }); const first = await f.tea.cardAction(f.players[0].token, firstInput);
   const retry = await f.tea.cardAction(f.players[0].token, firstInput); assert.deepEqual(retry, first);
+  f.tick(2000);
   const second = await f.tea.cardAction(f.players[1].token, action(f, { requestId: sharedId, expectedVersion: first.version }));
   assert.equal(second.hand.length, 3); assert.equal(second.hand[0].id, f.game.hands[f.players[1].id][0].id);
   assert.equal(second.hand.some(c => c.id === first.hand[0].id), false); assert.equal(second.turn, f.players[0].id);
@@ -129,6 +132,7 @@ test('concurrent retries of the same request execute once and later retry return
   const f = await fixture(); const input = action(f);
   const results = await Promise.all([f.tea.cardAction(f.players[0].token, input), f.tea.cardAction(f.players[0].token, input)]);
   assert.deepEqual(results[0], results[1]); assert.equal((await f.stored()).version, 2);
+  f.tick(2000);
   await f.tea.cardAction(f.players[1].token, action(f, { expectedVersion: 2 }));
   const retry = await f.tea.cardAction(f.players[0].token, input); assert.equal(retry.version, 3); assert.equal(retry.turn, f.players[0].id);
   assert.equal(retry.hand.length, 3); assert.equal((await f.stored()).version, 3);
@@ -165,12 +169,16 @@ test('start validates whole bot counts, catches up active games and deduplicates
   assert.equal((await f.stored()).id, next.id);
 });
 
-test('a predictable bot turn follows legal matching and returns control to the human', async () => {
+test('a bot waits for the visible card hold before legally playing and returning control', async () => {
   const f = await fixture(1); const botId = 'bot:1'; const botCard = card('red', 7);
   f.game.players.push(botId); f.game.names[botId] = 'BOT 1'; f.game.hands[botId] = [botCard, card('green', 8)]; await f.save();
   const view = await f.tea.cardAction(f.players[0].token, action(f));
-  assert.equal(view.turn, f.players[0].id); assert.equal(view.top.id, botCard.id); assert.equal(view.version, 3); assert.equal(view.lastAction.playerId, botId);
-  assert.equal(view.players.find(row => row.id === botId).cards, 1);
+  assert.equal(view.turn, botId); assert.equal(view.version, 2); assert.equal(view.lastAction.type, 'draw');
+  f.tick(1999); assert.equal((await f.tea.cardState(f.players[0].token)).game.version, 2);
+  f.tick(1); const next = (await f.tea.cardState(f.players[0].token)).game;
+  assert.equal(next.turn, f.players[0].id); assert.equal(next.top.id, botCard.id); assert.equal(next.version, 3); assert.equal(next.lastAction.playerId, botId);
+  assert.equal(next.players.find(row => row.id === botId).cards, 1);
+  assert.deepEqual(next.actionHistory.map(row => row.at), [f.now() - 2000, f.now()]);
 });
 
 test('empty game metadata permits only the table host to start; storage failures never mutate a hand', async () => {
@@ -179,4 +187,46 @@ test('empty game metadata permits only the table host to start; storage failures
   assert.equal((await f.stored()).hands[f.players[0].id].length, 2); f.db.failWrites = false; await f.ref.delete();
   const host = await f.tea.cardState(f.players[0].token); const guest = await f.tea.cardState(f.players[1].token);
   assert.equal(host.game, null); assert.equal(host.canStart, true); assert.equal(guest.canStart, false); assert.equal(guest.hostId, f.players[0].id);
+});
+
+test('a next player cannot cover the card during its hold, but retries remain harmless', async () => {
+  const f = await fixture(), played = f.game.hands[f.players[0].id][0], input = action(f, { action: 'play', cardId: played.id });
+  const first = await f.tea.cardAction(f.players[0].token, input);
+  assert.equal(first.nextActionAt, f.now() + 2000); assert.equal(first.turnEndsAt - first.nextActionAt, 30_000);
+  const next = action(f, { expectedVersion: first.version });
+  await assert.rejects(f.tea.cardAction(f.players[1].token, next), error => error.code === 'turn_not_ready');
+  assert.equal((await f.stored()).version, first.version); assert.equal((await f.stored()).discard.at(-1).id, played.id);
+  assert.deepEqual(await f.tea.cardAction(f.players[0].token, input), first);
+  f.tick(1999); await assert.rejects(f.tea.cardAction(f.players[1].token, next), error => error.code === 'turn_not_ready');
+  f.tick(1); const second = await f.tea.cardAction(f.players[1].token, next);
+  assert.equal(second.version, first.version + 1); assert.equal(second.actionHistory.length, 2);
+  assert.deepEqual(second.actionHistory[1].cards, []); assert.equal(second.actionHistory[1].card, null);
+});
+
+test('several bot plays are paced, retained in order after missed polls, and do not expose hidden cards', async () => {
+  const f = await fixture(1), firstCard = card('red', 2), firstBotCard = card('red', 5), secondBotCard = card('red', 8);
+  f.game.hands[f.players[0].id] = [firstCard, card('blue', 9)];
+  f.game.players.push('bot:1', 'bot:2'); Object.assign(f.game.names, { 'bot:1': 'BOT 1', 'bot:2': 'BOT 2' });
+  f.game.hands['bot:1'] = [firstBotCard, card('yellow', 7)]; f.game.hands['bot:2'] = [secondBotCard, card('green', 6)]; await f.save();
+  const initial = await f.tea.cardAction(f.players[0].token, action(f, { action: 'play', cardId: firstCard.id }));
+  assert.equal(initial.top.id, firstCard.id); assert.equal(initial.actionHistory.length, 1);
+  f.tick(4500); const view = (await f.tea.cardState(f.players[0].token)).game;
+  assert.equal(view.version, 4); assert.equal(view.turn, f.players[0].id);
+  assert.deepEqual(view.actionHistory.map(row => row.card.id), [firstCard.id, firstBotCard.id, secondBotCard.id]);
+  assert.deepEqual(view.actionHistory.map(row => row.at), [f.now() - 4500, f.now() - 2500, f.now() - 500]);
+  assert.equal(view.nextActionAt, f.now() + 1500); assert.equal(view.turnEndsAt, f.now() + 31_500);
+  assert.equal(JSON.stringify(view.actionHistory).includes(f.game.hands['bot:1'][1].id), false);
+  assert.equal(JSON.stringify(view.actionHistory).includes(f.game.hands['bot:2'][1].id), false);
+  assert.equal((await f.tea.cardState(f.players[0].token)).game.actionHistory.length, 3);
+});
+
+test('public card history stays bounded through long timeout catchup and reveals no draws', async () => {
+  const f = await fixture(); f.tick(2_000_000);
+  const view = (await f.tea.cardState(f.players[0].token)).game;
+  assert.equal(view.actionHistory.length, 48); assert.equal((await f.stored()).actionHistory.length, 48);
+  assert.equal(view.actionHistory.every(row => row.type === 'timeout' && row.card === null && row.cards.length === 0), true);
+  for (let index = 1; index < view.actionHistory.length; index++) {
+    assert.equal(view.actionHistory[index].version, view.actionHistory[index - 1].version + 1);
+    assert.equal(view.actionHistory[index].at - view.actionHistory[index - 1].at, 32_000);
+  }
 });

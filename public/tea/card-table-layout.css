@@ -15,3 +15,46 @@
 .card-header-actions{display:flex;gap:7px;align-items:center}.card-header-actions #card-game-switch{background:#e7edce;border:1px solid #a7b180;color:#556844;min-height:34px;padding:7px 10px;font-size:11px;border-radius:2px}.card-header-actions #card-game-switch[hidden]{display:none}.in-card-round .game-page-heading{margin-bottom:10px;gap:8px}.in-card-round .game-page-heading small{display:none}.in-card-round .game-page-heading h2{font-size:20px;margin:0}.in-card-round .card-mode-picker{display:none}.in-card-round.show-card-picker .card-mode-picker{display:grid}.in-card-round .back-cafe{min-height:34px;padding:7px 10px;font-size:11px}@media(max-width:520px){.in-card-round .game-page-heading h2{font-size:17px}.card-header-actions{gap:5px}.card-header-actions #card-game-switch,.in-card-round .back-cafe{font-size:10px;padding:7px 8px}.in-card-round .game-page-heading{flex-wrap:wrap}.in-card-round .game-page-heading>div:first-child{flex:1;min-width:130px}}
 
 .play-mode .side-panel:has(.cards-view.active.in-card-round) .panel-tabs{display:none}
+
+/* A card face has one boundary; the rank and suit do the explaining. */
+.tl-card,.classic-card{border:1px solid #d5d9d6;background:#fff;color:#15231d;border-radius:4px;box-shadow:0 2px 3px #14281a2b;font-family:"Segoe UI",Arial,sans-serif}
+.tl-card.red,.classic-card.red{color:#c32332}
+.tl-card-corner,.classic-card-corner{left:5px;top:4px;font-size:17px;font-weight:800;line-height:1.02;letter-spacing:-.3px;z-index:1}
+.tl-card-corner.bottom,.classic-card-corner.bottom{left:auto;top:auto;right:5px;bottom:4px}
+.tl-card-corner .card-rank,.classic-card-corner .card-rank{display:block;font-size:inherit;font-weight:800}
+.tl-card-corner .card-suit,.classic-card-corner .card-suit{display:block;font-size:.83em;line-height:1;margin-top:1px}
+.tl-card-symbol,.classic-card-symbol{font-weight:500;pointer-events:none}
+.tl-hand .tl-card-corner{font-size:18px}.tl-hand .tl-card-symbol{font-size:36px}
+.tl-top .tl-card{border-color:#d5d9d6;box-shadow:0 2px 3px #14281a2b}.tl-top .tl-card .tl-card-corner{font-size:15px}.tl-top .tl-card .tl-card-symbol{font-size:28px}
+.tl-hand .tl-card:hover:not(:disabled){border-color:#638970}
+.tl-hand .tl-card.selected{transform:translateY(-9px);border-color:#79a389;outline:0;box-shadow:0 3px 7px #14281a42}
+.tl-hand .tl-card.selected::after{right:3px;top:-8px;width:17px;height:17px;background:#d5f0df;color:#21523a;border:0;font-size:12px}
+.tl-hand .tl-card.opening:not(.selected){outline:0;border-color:#d6b363}
+.tl-hand .tl-card.opening:not(.selected)::after{content:'•';position:absolute;right:3px;top:0;color:#947328;font-size:19px;line-height:1}
+.tl-card:disabled{opacity:.85}.tl-card:focus-visible,.hand .playing-card:focus-visible{outline:3px solid #f2cb72;outline-offset:3px}
+.classic-hand .classic-card-corner{font-size:20px}.classic-hand .classic-card-symbol{font-size:37px}
+.classic-player-cards .classic-card{border-color:#d5d9d6;box-shadow:0 1px 2px #14281a26}
+.classic-player-cards .classic-card-corner{font-size:11px;top:2px;left:3px}.classic-player-cards .classic-card-corner.bottom{display:none}.classic-player-cards .classic-card-symbol{font-size:19px;inset:12px 0 0 7px}
+.classic-card.card-back{border:1px solid #b9c5d0;background:#39536b;color:#cbd8e1;box-shadow:0 2px 3px #14281a2b}
+.classic-card.card-back>span{border:0;width:auto;height:auto;font-size:21px}
+.poker-board .classic-card-corner{font-size:15px}.poker-board .classic-card-symbol{font-size:27px}
+
+.playing-card{border:1px solid #ffffff75;outline:0;border-radius:5px;box-shadow:0 2px 3px #14281a2b;font-family:"Segoe UI",Arial,sans-serif;font-weight:800;text-shadow:none}
+.playing-card:not(.back)::before{content:none}
+.playing-card.red{background:#c63f41;color:#fff}.playing-card.yellow{background:#f2cf59;color:#322c16}.playing-card.green{background:#29764d;color:#fff}.playing-card.blue{background:#285fad;color:#fff}.playing-card.wild{background:#344258;color:#fff}
+.playing-card.back{background:#39536b;color:#e4edf3;font-size:16px;text-shadow:none}
+.hand .playing-card.playable{border-color:#f5d477;outline:0;box-shadow:0 2px 3px #14281a2b}
+.hand .playing-card.playable::after{content:'•';position:absolute;right:5px;top:0;font-size:24px;line-height:1;color:#f5d477}
+.hand .playing-card:disabled{opacity:.76;box-shadow:0 2px 3px #14281a2b}
+.hand .playing-card.selected-wild{transform:translateY(-8px);border-color:#f5d477;outline:0}
+.color-arena .playing-card{border-width:1px}
+
+@media(max-width:900px){
+ .tl-hand .tl-card-corner{font-size:15px;left:4px;top:4px}.tl-hand .tl-card-corner.bottom{display:none}.tl-hand .tl-card-symbol{font-size:29px;inset:16px 0 0 8px}
+ .tl-arena .tl-top .tl-card{border-width:1px}.tl-arena .tl-top .tl-card-corner{font-size:12px;left:3px;top:3px}.tl-arena .tl-top .tl-card-corner.bottom{display:none}.tl-arena .tl-top .tl-card-symbol{font-size:20px;inset:14px 0 0 7px}
+ .classic-hand .classic-card-corner{font-size:19px}.classic-hand .classic-card-symbol{font-size:36px}
+ .classic-player-cards .classic-card-corner{font-size:11px;top:2px;left:2px}.classic-player-cards .classic-card-symbol{font-size:18px;inset:12px 0 0 7px}
+ .poker-board .classic-card{border-width:1px;box-shadow:0 1px 2px #14281a26}.poker-board .classic-card-corner{font-size:11px;left:2px;top:2px}.poker-board .classic-card-corner.bottom{display:none}.poker-board .classic-card-symbol{font-size:17px;inset:12px 0 0 7px}
+ .color-arena .playing-card{border-width:1px;font-weight:800}.color-arena+.hand-area .hand .playing-card{font-size:29px}
+}
+@media(max-width:370px){.tl-hand .tl-card-corner{font-size:13px}.tl-hand .tl-card-symbol{font-size:26px}.classic-hand .classic-card-corner{font-size:18px}.poker-board .classic-card-corner{font-size:10px}.poker-board .classic-card-symbol{font-size:15px}.classic-player-cards .classic-card-corner{font-size:10px}}

@@ -27,7 +27,7 @@ window.TeaClassicCardsUI = function ({api, t, id, myId, myTable, key}) {
     element.setAttribute('aria-label', cardLabel(card)); element.title = cardLabel(card); element.dataset.cardId = card.id;
     const corner = document.createElement('b'), symbol = document.createElement('span'), bottom = document.createElement('b');
     corner.className = 'classic-card-corner'; bottom.className = 'classic-card-corner bottom'; symbol.className = 'classic-card-symbol';
-    corner.textContent = bottom.textContent = (ranks[card.rank] || card.rank) + suits[card.suit]; symbol.textContent = suits[card.suit];
+    for(const part of [corner,bottom]){const number=document.createElement('span'),suit=document.createElement('span');number.className='card-rank';suit.className='card-suit';number.textContent=ranks[card.rank]||card.rank;suit.textContent=suits[card.suit];part.append(number,suit)}symbol.textContent=suits[card.suit];
     element.append(corner, symbol, bottom); return element;
   }
   function back() {

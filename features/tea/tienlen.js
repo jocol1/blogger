@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const { readCardGames, activeCardGame } = require('./card-coordination');
 
 const TURN_MS = 30_000;
+const HOLD_MS = 2000;
+const HISTORY_LIMIT = 48;
 const REQUEST = /^[a-zA-Z0-9-]{12,80}$/;
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const iso = value => new Date(value).toISOString();
@@ -85,17 +87,20 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
     return {
       id: game.id, tableId: game.tableId, status: game.status, version: game.version,
       players: game.players.map(id => ({ id, name: game.names[id], bot: id.startsWith('bot:'), cards: game.hands[id]?.length || 0 })),
-      hand: sorted(game.hands[walletId] || []), turn: game.players[game.turnIndex], turnEndsAt: game.turnEndsAt, serverNow: now(),
+      hand: sorted(game.hands[walletId] || []), turn: game.players[game.turnIndex], turnEndsAt: game.turnEndsAt, nextActionAt: game.nextActionAt || 0, serverNow: now(),
       top: game.top || null, passed: [...game.passed], openingCardId: game.openingCardId || null,
       winnerId: game.winnerId || null, reason: game.reason || null, lastAction: game.lastAction || null,
+      actionHistory: (game.actionHistory || []).slice(-HISTORY_LIMIT).map(({ version, playerId, type, cards, at }) => ({ version, playerId, type, cards: ['play', 'timeout_play'].includes(type) ? sorted(cards || []) : [], at })),
       ...metadata(table, game, walletId, otherGame),
     };
   }
   function record(game, playerId, type, cards, at) {
     game.version = (game.version || 1) + 1;
-    game.lastAction = { playerId, type, cards: sorted(cards), at };
+    game.lastAction = { version: game.version, playerId, type, cards: sorted(cards), at };
+    game.actionHistory = [...(game.actionHistory || []), game.lastAction].slice(-HISTORY_LIMIT);
+    game.nextActionAt = at + HOLD_MS;
   }
-  function setTurn(game, playerId, at) { game.turnIndex = game.players.indexOf(playerId); game.turnEndsAt = at + TURN_MS; }
+  function setTurn(game, playerId, at) { game.turnIndex = game.players.indexOf(playerId); game.nextActionAt = at + HOLD_MS; game.turnEndsAt = game.nextActionAt + TURN_MS; }
   function advance(game, playerId, at) {
     const owner = game.top?.playerId;
     if (owner && game.players.every(id => id === owner || game.passed.includes(id))) {
@@ -133,7 +138,8 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
     for (let guard = 0; guard < 512 && game.status === 'active'; guard++) {
       const playerId = game.players[game.turnIndex];
       if (playerId.startsWith('bot:')) {
-        const at = game.turnEndsAt - TURN_MS;
+        const at = game.nextActionAt ?? game.turnEndsAt - TURN_MS;
+        if (now() < at) break;
         const cards = chooseMove(game.hands[playerId], game.top, game.openingCardId);
         if (cards) play(game, playerId, cards, at); else pass(game, playerId, at);
         continue;
@@ -194,8 +200,8 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
         const leader = rematch ? old.winnerId : players.find(id => hands[id].some(card => card.id === minimum.id));
         const at = now(), game = {
           id: crypto.randomUUID(), tableId: table.id, status: 'active', version: 1, players, names, hands,
-          top: null, passed: [], openingCardId: rematch ? null : minimum.id, turnIndex: players.indexOf(leader), turnEndsAt: at + TURN_MS,
-          requestId, startedBy: walletId, createdAt: iso(at), winnerId: null, reason: null, lastAction: null,
+          top: null, passed: [], openingCardId: rematch ? null : minimum.id, turnIndex: players.indexOf(leader), nextActionAt: at + (leader.startsWith('bot:') ? HOLD_MS : 0), turnEndsAt: at + (leader.startsWith('bot:') ? HOLD_MS : 0) + TURN_MS,
+          requestId, startedBy: walletId, createdAt: iso(at), winnerId: null, reason: null, lastAction: null, actionHistory: [],
         };
         progress(game);
         tx.set(ref, game); tx.create(attemptRef, { gameId: game.id, tableId: table.id, walletId, createdAt: iso(at) });
@@ -233,6 +239,7 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
         const reject = (status, message, code) => { if (changed) tx.update(ref, game); return { tableId: table.id, error: { status, message, code } }; };
         if (input.expectedVersion !== undefined && input.expectedVersion !== game.version) return reject(409, 'The turn has changed. Refresh the table.', 'stale_game_version');
         if (game.status !== 'active') return reject(409, 'This round has ended.', 'game_finished');
+        if (now() < (game.nextActionAt || 0)) return reject(409, 'Give everyone a moment to see the played cards.', 'turn_not_ready');
         const turn = game.players[game.turnIndex] === walletId;
         if (input.action === 'pass') {
           if (!turn || game.passed.includes(walletId)) return reject(409, 'Wait for your turn.', 'not_turn');
