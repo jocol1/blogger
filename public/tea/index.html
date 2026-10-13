@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/assets/tea/style.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/games.css?v=courtyard3">
+  <link rel="stylesheet" href="/assets/tea/brawl.css?v=brawl4">
 </head>
 <body>
   <header class="topbar">
@@ -32,6 +33,12 @@
       <div class="dpad" aria-label="Movement controls">
         <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
       </div>
+      <section id="fight-hud" class="fight-hud" aria-label="Pixel brawl" hidden>
+        <div id="fight-hud-bars" class="fight-hud-bars"></div>
+        <div class="fight-hud-summary"><b id="fight-hud-status" role="status"></b><span id="fight-hud-time" role="timer" aria-live="off"></span></div>
+        <button id="fight-bonk" class="fight-bonk" hidden>BONK!</button>
+        <button id="fight-hud-close" class="fight-hud-close" data-i18n="close" hidden>Close</button>
+      </section>
     </section>
 
     <aside class="side-panel" id="side-panel">
@@ -94,13 +101,14 @@
   <dialog id="qr-dialog" class="modal qr-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><small data-i18n="yourOrder">YOUR ORDER</small><h2 id="qr-title">Iced tea</h2><div class="qr-wrap"><img id="qr-image" alt="Bank transfer QR"></div><div class="payment-status"><i></i><span id="qr-status" data-i18n="unpaid">Not paid yet</span></div><dl><div><dt data-i18n="bankAccount">Bank account</dt><dd id="qr-bank"></dd></div><div><dt data-i18n="amount">Amount</dt><dd id="qr-amount"></dd></div><div><dt data-i18n="transferNote">Transfer note</dt><dd><code id="qr-code"></code><button type="button" id="copy-code">Copy</button></dd></div></dl><p data-i18n="keepOpen">You can close this window. The café will keep checking your payment.</p><button type="button" id="cancel-order" class="text-danger" data-i18n="cancelOrder">Cancel this unpaid order</button></form></dialog>
   <dialog id="seat-dialog" class="modal choice-modal"><button class="close-modal" id="seat-close" aria-label="Close">×</button><small data-i18n="occupiedTable">OCCUPIED TABLE</small><h2 id="seat-dialog-title">Someone is already here</h2><p id="seat-dialog-copy"></p><div class="choice-grid"><button id="ask-seat" class="primary" data-i18n="askFirst">Ask first</button><button id="leave-seat" data-i18n="walkAway">Walk away</button><button id="rude-seat" class="rude-button" data-i18n="sitAnyway">Sit anyway</button></div><p id="seat-wait" class="wait-note" hidden></p></dialog>
   <dialog id="request-dialog" class="modal choice-modal"><small data-i18n="someoneAsks">SOMEONE IS ASKING</small><h2 id="request-title"></h2><p data-i18n="requestCopy">They want to pull up a chair at your table. The chair is not reserved while you decide.</p><div class="button-row"><button id="decline-seat" data-i18n="sayNo">No thanks</button><button id="accept-seat" class="primary" data-i18n="sayYes">Sure, sit down</button></div></dialog>
-  <dialog id="fight-dialog" class="modal fight-modal"><small data-i18n="pixelBrawl">PIXEL BRAWL</small><h2 id="fight-title">BONK!</h2><p id="fight-message"></p><div id="fight-bars" class="fight-bars"></div><button id="fight-accept" class="primary wide" data-i18n="acceptFight" hidden>Accept challenge</button><button id="fight-decline" class="wide" data-i18n="declineFight" hidden>Nope</button><button id="fight-hit" class="bonk-button" hidden>BONK!</button><button id="fight-close" class="wide" hidden data-i18n="close">Close</button></dialog>
+  <dialog id="fight-dialog" class="modal fight-modal"><small data-i18n="pixelBrawl">PIXEL BRAWL</small><h2 id="fight-title">BONK!</h2><p id="fight-message"></p><button id="fight-accept" class="primary wide" data-i18n="acceptFight" hidden>Accept challenge</button><button id="fight-decline" class="wide" data-i18n="declineFight" hidden>Nope</button></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/tea/world.js?v=courtyard3"></script>
   <script src="/assets/tea/scene.js?v=courtyard3"></script>
   <script src="/assets/tea/games-ui.js?v=courtyard3"></script>
-  <script src="/assets/tea/game-words.js?v=courtyard3"></script>
-  <script src="/assets/tea/app.js?v=courtyard3"></script>
+  <script src="/assets/tea/game-words.js?v=brawl4"></script>
+  <script src="/assets/tea/brawl-view.js?v=brawl4"></script>
+  <script src="/assets/tea/app.js?v=brawl4"></script>
 </body>
 </html>
