@@ -92,7 +92,7 @@
       $('#fight-accept').hidden=fight.targetId!==myId;$('#fight-decline').hidden=false;if(!dialog.open)dialog.showModal();
     }else{
       if(phase!==renderedFightPhase&&fight.status==='active'){
-        $$('dialog[open]').forEach(el=>el.close());$('.panel-tabs [data-tab=table]').click();requestAnimationFrame(()=>$('#fight-bonk').focus({preventScroll:true}));
+        clearTimeout(toast.timer);$('#toast').classList.remove('show');$$('dialog[open]').forEach(el=>el.close());$('.panel-tabs [data-tab=table]').click();requestAnimationFrame(()=>$('#fight-bonk').focus({preventScroll:true}));
       }else if(dialog.open)dialog.close();
       $('#fight-hud-bars').replaceChildren();for(const player of fight.players){
         const row=document.createElement('div'),name=document.createElement('b'),bar=document.createElement('span'),fill=document.createElement('i'),health=document.createElement('small');row.className='fight-hud-player';name.textContent=player.name;name.title=player.name;bar.className='fight-health';bar.setAttribute('role','progressbar');bar.setAttribute('aria-label',player.name);bar.setAttribute('aria-valuemin','0');bar.setAttribute('aria-valuemax','12');bar.setAttribute('aria-valuenow',String(player.health));fill.style.width=Math.min(100,Math.max(0,player.health)/12*100)+'%';health.textContent=player.health+'/12';bar.append(fill);row.append(name,bar,health);$('#fight-hud-bars').append(row);
