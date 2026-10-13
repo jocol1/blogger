@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/assets/tea/style.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/games.css?v=courtyard3">
-  <link rel="stylesheet" href="/assets/tea/brawl.css?v=brawl5">
+  <link rel="stylesheet" href="/assets/tea/brawl.css?v=arena1">
   <link rel="stylesheet" href="/assets/tea/cards-controls.css?v=cards6">
   <link rel="stylesheet" href="/assets/tea/tienlen.css?v=classic1">
   <link rel="stylesheet" href="/assets/tea/classic-cards.css?v=classic1">
@@ -38,11 +38,23 @@
       <div class="dpad" aria-label="Movement controls">
         <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
       </div>
+      <section id="brawl-stage" class="brawl-stage" hidden>
+        <canvas id="brawl-canvas" width="800" height="520" tabindex="0" aria-label="Pixel combat arena"></canvas>
+        <p id="brawl-help" data-i18n="brawlControlsHint"></p>
+        <div id="brawl-controls" class="brawl-controls">
+          <div id="brawl-stick" role="group" aria-label="Move"><span class="brawl-stick-knob"></span></div>
+          <div class="brawl-action-buttons">
+            <button type="button" id="brawl-punch"><b data-i18n="brawlPunch">Punch</b><small>J / SPACE</small></button>
+            <button type="button" id="brawl-kick"><b data-i18n="brawlKick">Kick</b><small>K</small></button>
+            <button type="button" id="brawl-dash"><b data-i18n="brawlDash">Dash</b><small>SHIFT</small></button>
+          </div>
+        </div>
+      </section>
       <section id="fight-hud" class="fight-hud" aria-label="Pixel brawl" hidden>
         <div id="fight-hud-bars" class="fight-hud-bars"></div>
         <div class="fight-hud-summary"><b id="fight-hud-status" role="status"></b><span id="fight-hud-time" role="timer" aria-live="off"></span></div>
-        <button id="fight-bonk" class="fight-bonk" hidden>BONK!</button>
-        <button id="fight-hud-close" class="fight-hud-close" data-i18n="close" hidden>Close</button>
+        <button type="button" id="fight-forfeit" class="fight-forfeit" data-i18n="brawlExit" hidden>Leave match</button>
+        <button id="fight-hud-close" class="fight-hud-close" data-i18n="brawlBack" hidden>Back to café</button>
       </section>
     </section>
 
@@ -198,7 +210,9 @@
   <script src="/assets/tea/scene.js?v=courtyard3"></script>
   <script src="/assets/tea/games-ui.js?v=courtyard3"></script>
   <script src="/assets/tea/game-words.js?v=classic1"></script>
+  <script src="/assets/tea/brawl-words.js?v=arena1"></script>
   <script src="/assets/tea/brawl-view.js?v=brawl4"></script>
+  <script src="/assets/tea/brawl-ui.js?v=arena1"></script>
   <script src="/assets/tea/card-view.js?v=cards6"></script>
   <script src="/assets/tea/card-table-layout.js?v=classic1"></script>
   <script src="/assets/tea/card-layout-words.js?v=readable2"></script>
@@ -207,6 +221,6 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=readable2"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=readable2"></script>
-  <script src="/assets/tea/app.js?v=classic1"></script>
+  <script src="/assets/tea/app.js?v=arena1"></script>
 </body>
 </html>

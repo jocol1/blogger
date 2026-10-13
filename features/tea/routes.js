@@ -57,7 +57,8 @@ function createTeaRouter({ service, isAdmin }) {
   router.get('/api/tea/fights/current', asyncRoute(async (req, res) => res.json(await service.fightState(token(req)))));
   router.post('/api/tea/fights', json, asyncRoute(async (req, res) => res.status(201).json({ fight: await service.challengeFight(token(req), req.body.opponentId) })));
   router.post('/api/tea/fights/:id/respond', json, asyncRoute(async (req, res) => res.json({ fight: await service.respondFight(token(req), req.params.id, req.body.accepted === true) })));
-  router.post('/api/tea/fights/:id/hit', json, asyncRoute(async (req, res) => res.json({ fight: await service.hitFight(token(req), req.params.id, req.body) })));
+  router.post('/api/tea/fights/:id/hit', json, asyncRoute(async (req, res) => res.json({ fight: await service.hitFight(token(req), req.params.id, req.body, req.get('X-Tea-Socket-ID')) })));
+  router.post('/api/tea/fights/:id/quit', json, asyncRoute(async (req, res) => res.json({ fight: await service.forfeitFight(token(req), req.params.id) })));
 
   router.get('/tra-da/admin', adminOnly, asyncRoute(async (req, res) => {
     const [rows, prices] = await Promise.all([service.adminOrders(), service.menu()]); const key = csrf(req);
@@ -68,7 +69,7 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/tra-da/admin/orders/:id/redeliver', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.redeliver(req.params.id); res.redirect('/tra-da/admin'); }));
 
   router.use((error, req, res, next) => {
-    if (error instanceof TeaError || error.tableGameError || error.tienLenError || error.classicCardError) return res.status(error.status).json({ error: error.message, code: error.code });
+    if (error instanceof TeaError || error.tableGameError || error.tienLenError || error.classicCardError || error.brawlError) return res.status(error.status).json({ error: error.message, code: error.code });
     if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.', code: 'bad_json' });
     console.error('Tea café operation failed:', error.code || error.name);
     res.status(503).json({ error: 'The café connection is taking a break. Please try again.', code: 'storage_error' });
@@ -86,6 +87,16 @@ function attachTeaSockets(io, service) {
     socket.emit('tea:ready', socket.data.tea);
     socket.broadcast.emit('tea:state-request');
     socket.on('tea:move', input => service.move(socket.data.walletId, input));
+    socket.on('tea:fight-input', (input, acknowledge) => {
+      try {
+        const fight = service.fightInput(socket.data.walletId, socket.id, input);
+        if (typeof acknowledge === 'function') acknowledge({ ok: true, fight });
+      } catch (error) {
+        const payload = { ok: false, error: error.message, code: error.code || 'fight_unavailable' };
+        if (typeof acknowledge === 'function') acknowledge(payload);
+        else if (error.report !== false) socket.emit('tea:fight-error', payload);
+      }
+    });
     socket.on('disconnect', () => service.disconnect(socket.data.walletId, socket.id));
   });
 }

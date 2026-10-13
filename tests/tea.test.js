@@ -126,15 +126,20 @@ test('pixel brawl needs consent, rate limits hits and ends when a player leaves'
   const f = fixture(), one = await player(f, 'One'), two = await player(f, 'Two'); await f.tea.connect(one.token, fakeSocket('one')); await f.tea.connect(two.token, fakeSocket('two'));
   const table = emptyRoom().tables[1]; await walkNear(f, one.id, table.seats[0]); await f.tea.seat(one.token, table.seats[0].id); await walkNear(f, two.id, table.seats[1]); await f.tea.seat(two.token, table.seats[1].id);
   const pending = await f.tea.challengeFight(one.token, two.id); assert.equal(pending.status, 'pending'); const active = await f.tea.respondFight(two.token, pending.id, true); assert.equal(active.status, 'active');
-  const first = await f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-01' }); assert.equal(first.players.find(p => p.id === two.id).health, 11);
-  assert.deepEqual(await f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-01' }), first);
-  await assert.rejects(f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-02' }), error => error.code === 'hit_rate');
-  await f.tea.leave(two.token); const finished = (await f.tea.fightState(one.token)).fight; assert.equal(finished, null);
+  await assert.rejects(f.tea.hitFight(one.token, pending.id, { requestId: 'fight-countdown-01' }, 'one'), error => error.code === 'fight_countdown');
+  f.tick(3000);
+  const first = await f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-01' }, 'one'); assert.equal(first.players.find(p => p.id === two.id).health, 20); assert.equal(first.actionHistory.at(-1).hit, false);
+  assert.deepEqual(await f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-01' }, 'one'), first);
+  await assert.rejects(f.tea.hitFight(one.token, pending.id, { requestId: 'fight-hit-request-02' }, 'one'), error => error.code === 'hit_rate');
+  await f.tea.leave(two.token); const finished = (await f.tea.fightState(one.token)).fight; assert.equal(finished.status, 'finished'); assert.equal(finished.reason, 'player_left'); assert.equal(finished.winnerId, one.id);
 });
 
 test('a completed brawl deduplicates its winning hit and ignores forged damage',async()=>{
   const f=fixture(),one=await player(f,'One'),two=await player(f,'Two');const room=emptyRoom();Object.assign(room.tables[0].seats[0],{walletId:one.id,seatedAt:f.now()});Object.assign(room.tables[0].seats[1],{walletId:two.id,seatedAt:f.now()});room.tables[0].ownerId=one.id;await f.db.collection('tea_rooms').doc('main').set(room);await f.tea.connect(one.token,fakeSocket('one'));await f.tea.connect(two.token,fakeSocket('two'));
-  const challenge=await f.tea.challengeFight(one.token,two.id);await f.tea.respondFight(two.token,challenge.id,true);let finished,input;for(let i=0;i<12;i++){f.tick(300);input={requestId:`winning-hit-request-${i}`,damage:999,winnerId:two.id};finished=await f.tea.hitFight(one.token,challenge.id,input)}assert.equal(finished.status,'finished');assert.equal(finished.winnerId,one.id);assert.equal(finished.players.find(p=>p.id===two.id).health,0);assert.deepEqual(await f.tea.hitFight(one.token,challenge.id,input),finished);assert.equal((await f.donations.wallet(one.token)).balance,0);
+  const challenge=await f.tea.challengeFight(one.token,two.id);await f.tea.respondFight(two.token,challenge.id,true);f.tick(3000);let seq=0;
+  for(let step=0;step<34;step++){f.tea.fightInput(one.id,'one',{fightId:challenge.id,seq:seq++,dx:1,dy:0});f.tick(50);f.tea.tickFights();}
+  f.tea.fightInput(one.id,'one',{fightId:challenge.id,seq:seq++,dx:0,dy:0});
+  let finished,input;for(let i=0;i<10;i++){input={requestId:`winning-hit-request-${i}`,damage:999,winnerId:two.id};finished=await f.tea.hitFight(one.token,challenge.id,input,'one');if(i<9)f.tick(450)}assert.equal(finished.status,'finished');assert.equal(finished.winnerId,one.id);assert.equal(finished.players.find(p=>p.id===two.id).health,0);assert.deepEqual(await f.tea.hitFight(one.token,challenge.id,input,'one'),finished);assert.equal((await f.donations.wallet(one.token)).balance,0);
 });
 
 test('expired and declined brawl challenges free both players for a new challenge',async()=>{
