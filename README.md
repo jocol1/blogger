@@ -28,7 +28,13 @@ Chọn **Đánh bài** mặc định mở **Tiến lên miền Nam**; có nút c
 
 Luật Tiến lên ở quán: 3 < 4 < … < A < 2; bích < chuồn < rô < cơ. Hỗ trợ rác, đôi, bộ ba, tứ quý, sảnh từ ba lá không có 2, ba và bốn đôi thông. Ba đôi thông chặt một heo; tứ quý chặt một/đôi heo hoặc ba đôi thông; bốn đôi thông chặt một/đôi heo, ba đôi thông, tứ quý và bốn đôi thông nhỏ hơn, kể cả ngoài lượt. Bộ cùng loại và cùng độ dài phải lớn hơn bộ trước. Bỏ lượt là bỏ cả vòng; khi mọi người còn lại bỏ, người đánh cuối mở vòng mới. Ván đầu mở bằng lá nhỏ nhất đã chia (3 bích nếu có); ván sau người thắng trước mở. Mỗi lượt 30 giây, hết giờ tự bỏ lượt hoặc đánh lá nhỏ nhất nếu đang mở vòng. Đây là ván nhanh: ai hết bài trước thắng, không áp dụng tới trắng, phạt thối hay cược. Luật tổ hợp/chặt tham khảo [hướng dẫn ZingPlay](https://play.zing.vn/detail-games/chi-tiet.tien-len-mien-nam.2.html); các khác biệt của quán được ghi ngay trong mục Luật chơi.
 
-Lựa chọn lá Tiến lên giữ nguyên khi poll; thao tác gửi ID ván, phiên bản và ID yêu cầu. Lỗi mạng dùng lại đúng ID, không đánh hai lần. Bài đổi màu và Tiến lên không chạy đồng thời tại cùng bàn. Người rời bàn hoặc server khởi động lại hủy ván đang chơi, không ảnh hưởng món hay ví.
+Lựa chọn lá Tiến lên giữ nguyên khi poll; thao tác gửi ID ván, phiên bản và ID yêu cầu. Lỗi mạng dùng lại đúng ID, không đánh hai lần. Mỗi bàn chỉ chạy một trò bài tại một thời điểm, được kiểm tra trong cùng transaction. Người rời bàn hủy ván Tiến lên, Bài đổi màu hoặc Bài cào; trong Poker họ bỏ bài và những người còn lại tiếp tục. Người cuối rời bàn khiến ván bot được xử lý ngay cùng transaction trả ghế, tránh chặn khách mới. Server khởi động lại hủy các ván đang chơi, không ảnh hưởng món hay ví.
+
+Mục **Đánh bài** có thêm **Bài cào 3 lá** và **Poker Texas Hold’em** cho 2–8 người, gồm tối đa ba bot. Bài cào dùng bộ 52 lá: A tính 1, 2–9 tính theo số, 10/J/Q/K tính 0; tổng lấy hàng đơn vị. Ba lá J/Q/K là ba tây và thắng mọi bài tính nút; bằng nút hoặc cùng ba tây thì cùng thắng, không so chất hay áp dụng sáp/liêng. Mỗi người thấy ba lá của mình, bấm sẵn sàng; cả bàn lật khi đủ người hoặc sau 30 giây. Không dùng chip, tiền hoặc xu.
+
+Poker dùng hai lá riêng, năm lá chung và các vòng preflop/flop/turn/river. Mỗi ván mới cấp lại 1.000 chip chơi, blind 10/20, nút chia bài luân chuyển. Có nhường/check, theo/call, úp/fold, tố đến tổng chip trong vòng và all-in. Server chọn bộ năm lá tốt nhất, xử lý sảnh A–5, hòa, pot phụ, chip lẻ và hoàn phần chưa ai theo. All-in thiếu một mức tố đầy đủ không tự mở lại quyền tố. Bài của người đã úp hoặc thắng vì mọi đối thủ úp không bị công khai. Hết 30 giây tự nhường nếu không cần theo, còn lại tự úp; mốc thời gian giữ nguyên qua các lần poll. Chip chỉ tồn tại trong ván, không trừ/cộng ví, không mua hoặc đổi tiền. Quy tắc bộ bài tham khảo [PokerStars](https://www.pokerstars.com/poker/games/texas-holdem/) và mức tố tham khảo [Poker TDA](https://www.pokertda.com/view-poker-tda-rules/).
+
+Các trò bài xếp người chơi quanh bốn cạnh theo góc nhìn từng khách: mình ở dưới, đối thủ ở trái/trên/phải; bàn ba người đặt hai đối thủ ở trái và phải, bàn đông hơn chia nhóm theo cạnh. Tiến lên có **Gom đôi và bộ / Xếp theo số**, Bài đổi màu có **Xếp theo màu / Thứ tự chia**. Sắp lại bài vẫn giữ lựa chọn và ID lá. Khi đã chia, giao diện tập trung vào bàn, có nút **Chọn trò khác** và **Về quán**; thanh thao tác đứng riêng để không che lá. Poker giữ ô nhập chip qua các lần cập nhật; thao tác chưa được xác nhận có nút gửi lại cùng mã. Sau ván Bài cào/Poker có thể chọn lại số bot để chơi tiếp.
 
 Mục **Trò chơi** có ba trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
 
@@ -123,6 +129,7 @@ Các collection riêng của tính năng này:
 - `tea_items`, `tea_consume_attempts`, `tea_settings`, `tea_card_games`, `tea_card_attempts`
 - `tea_card_start_attempts` (chống chia bài trùng qua các lần chơi lại)
 - `tea_tienlen_games`, `tea_tienlen_actions`, `tea_tienlen_starts` (Tiến lên miền Nam và ID thao tác chống trùng)
+- `tea_classic_card_games`, `tea_classic_card_starts`, `tea_classic_card_actions` (Bài cào/Poker và ID thao tác chống trùng, không lưu tay bài trong document thao tác)
 - `tea_social_games`, `tea_social_actions` (ba trò bàn mới)
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
@@ -146,6 +153,7 @@ Các API chính:
 - `/api/tea/orders`, `/api/tea/order`, `/api/tea/items/consume`
 - `/api/tea/cards`, `/api/tea/cards/current`, `/api/tea/cards/action`
 - `POST /api/tea/tienlen`, `GET /api/tea/tienlen/current`, `POST /api/tea/tienlen/action`
+- `POST /api/tea/card-games/:key`, `GET /api/tea/card-games/:key/current`, `POST /api/tea/card-games/:key/action` (`baicao`, `poker`)
 - `POST /api/tea/seats/:seatId/ask`, `GET /api/tea/seat-requests`, `POST /api/tea/seat-requests/:id/respond`
 - `/api/tea/fights`, `/api/tea/fights/current`, `/api/tea/fights/:id/respond`, `/api/tea/fights/:id/hit`
 - `POST /api/tea/games`, `GET /api/tea/games/:key`, `POST /api/tea/games/:key/action` (`dice`, `rps`, `memory`)

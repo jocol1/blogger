@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { readCardGames, activeCardGame } = require('./card-coordination');
 
 const TURN_MS = 30_000;
 const REQUEST = /^[a-zA-Z0-9-]{12,80}$/;
@@ -75,11 +76,11 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
   const starts = () => db.collection('tea_tienlen_starts');
   let io = null;
 
-  function metadata(table, game, walletId, colorActive = false) {
+  function metadata(table, game, walletId, otherGame = null) {
     const seatedPlayers = table?.seats.filter(seat => seat.walletId).map(seat => seat.walletId) || [];
-    return { member: Boolean(game?.players.includes(walletId)), hostId: table?.ownerId || null, seatedPlayers, cardGameActive: Boolean(colorActive), canStart: Boolean(table?.ownerId === walletId && seatedPlayers.length <= 4 && game?.status !== 'active' && !colorActive) };
+    return { member: Boolean(game?.players.includes(walletId)), hostId: table?.ownerId || null, seatedPlayers, cardGameActive: Boolean(otherGame), activeCardGame: game?.status === 'active' ? 'tienlen' : otherGame || null, canStart: Boolean(table?.ownerId === walletId && seatedPlayers.length <= 4 && game?.status !== 'active' && !otherGame) };
   }
-  function view(game, walletId, table, colorActive = false) {
+  function view(game, walletId, table, otherGame = null) {
     if (!game) return null;
     return {
       id: game.id, tableId: game.tableId, status: game.status, version: game.version,
@@ -87,7 +88,7 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
       hand: sorted(game.hands[walletId] || []), turn: game.players[game.turnIndex], turnEndsAt: game.turnEndsAt, serverNow: now(),
       top: game.top || null, passed: [...game.passed], openingCardId: game.openingCardId || null,
       winnerId: game.winnerId || null, reason: game.reason || null, lastAction: game.lastAction || null,
-      ...metadata(table, game, walletId, colorActive),
+      ...metadata(table, game, walletId, otherGame),
     };
   }
   function record(game, playerId, type, cards, at) {
@@ -168,14 +169,15 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
       const result = await db.runTransaction(async tx => {
         const { table, ref } = await current(tx, walletId);
         if (table.ownerId !== walletId) fail(403, 'Only the table host can start.', 'not_host');
-        const snapshot = await tx.get(ref), color = await tx.get(db.collection('tea_card_games').doc(table.id));
+        const activity = await readCardGames(tx, db, table.id), snapshot = activity.tienlen.snapshot;
+        const otherGame = activeCardGame(activity, 'tienlen');
         const attemptRef = starts().doc(hash(`${walletId}:${requestId}`)), prior = await tx.get(attemptRef);
         const old = snapshot.exists ? snapshot.data() : null;
         if (prior.exists && (!old || prior.data().gameId !== old.id || prior.data().tableId !== table.id)) fail(409, 'That earlier round has ended. Start with a new request.', 'stale_start');
         const before = old && JSON.stringify(old);
         if (old) { checkPlayers(old, table); progress(old); }
-        if (prior.exists) { if (before !== JSON.stringify(old)) tx.update(ref, old); return view(old, walletId, table); }
-        if (old?.status === 'active' || (color.exists && color.data().status === 'active')) {
+        if (prior.exists) { if (before !== JSON.stringify(old)) tx.update(ref, old); return view(old, walletId, table, otherGame); }
+        if (old?.status === 'active' || otherGame) {
           if (old && before !== JSON.stringify(old)) tx.update(ref, old);
           return { tableId: table.id, error: { status: 409, message: 'A card game is already running at this table.', code: 'game_active' } };
         }
@@ -205,12 +207,12 @@ function createTienLen({ db, now = () => Date.now(), tableIds = [] }) {
       const result = await db.runTransaction(async tx => {
         const { table, ref } = await current(tx, walletId, true);
         if (!table) return { game: null, ...metadata(null, null, walletId) };
-        const snapshot = await tx.get(ref), color = await tx.get(db.collection('tea_card_games').doc(table.id));
-        const game = snapshot.exists ? snapshot.data() : null, before = game && JSON.stringify(game), colorActive = color.exists && color.data().status === 'active';
+        const activity = await readCardGames(tx, db, table.id), snapshot = activity.tienlen.snapshot;
+        const game = snapshot.exists ? snapshot.data() : null, before = game && JSON.stringify(game), otherGame = activeCardGame(activity, 'tienlen');
         if (game) { checkPlayers(game, table); progress(game); }
         const changed = Boolean(game && before !== JSON.stringify(game));
         if (changed) tx.update(ref, game);
-        return { game: view(game, walletId, table, colorActive), ...metadata(table, game, walletId, colorActive), changed, tableId: table.id };
+        return { game: view(game, walletId, table, otherGame), ...metadata(table, game, walletId, otherGame), changed, tableId: table.id };
       });
       if (result.changed) emit(result.tableId);
       const { changed, tableId, ...publicResult } = result; return publicResult;

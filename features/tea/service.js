@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 const { createTableGames } = require('./table-games');
 const { createTienLen } = require('./tienlen');
+const { createClassicCards } = require('./classic-cards');
+const { readCardGames, activeCardGame } = require('./card-coordination');
 
 const ROOM_ID = 'main';
 const MAX_GUESTS = 32;
@@ -52,6 +54,7 @@ function cardMatches(card, top, activeColor) {
 function createTeaService({ db, config, now = () => Date.now() }) {
   const tableGames=db?createTableGames({db,now}):null;
   const tienLen = db ? createTienLen({ db, now, tableIds: TABLES.map(table => table.id) }) : null;
+  const classicCards = db ? createClassicCards({ db, now, tableIds: TABLES.map(table => table.id) }) : null;
   const col = name => db?.collection(name);
   const rooms = () => col('tea_rooms');
   const profiles = () => col('tea_profiles');
@@ -168,17 +171,17 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     if (result) io?.to(`wallet:${walletId}`).emit('tea:item', result);
     return result;
   }
-  function cardMetadata(table, game, walletId, tienLenActive = false) {
+  function cardMetadata(table, game, walletId, otherGame = null) {
     const seatedPlayers = table?.seats.filter(seat => seat.walletId).map(seat => seat.walletId) || [];
-    return { hostId: table?.ownerId || null, seatedPlayers, member: Boolean(game?.players.includes(walletId)), tienLenActive: Boolean(tienLenActive), canStart: Boolean(table?.ownerId === walletId && seatedPlayers.length <= 4 && game?.status !== 'active' && !tienLenActive) };
+    return { hostId: table?.ownerId || null, seatedPlayers, member: Boolean(game?.players.includes(walletId)), tienLenActive: otherGame === 'tienlen', activeCardGame: game?.status === 'active' ? 'color' : otherGame || null, canStart: Boolean(table?.ownerId === walletId && seatedPlayers.length <= 4 && game?.status !== 'active' && !otherGame) };
   }
-  function cardPublic(game, walletId, table, tienLenActive = false) {
+  function cardPublic(game, walletId, table, otherGame = null) {
     if (!game) return null;
     const hand = game.hands?.[walletId] || [];
     return {
       id: game.id, tableId: game.tableId, status: game.status, players: game.players.map(id => ({ id, bot: id.startsWith('bot:'), name: game.names[id], cards: game.hands[id]?.length || 0 })),
       turn: game.players[game.turnIndex], top: game.discard.at(-1), activeColor: game.activeColor, turnEndsAt: game.turnEndsAt, winnerId: game.winnerId || null,
-      reason: game.reason || null, hand, serverNow: now(), version: game.version || 1, lastAction: game.lastAction || null, ...cardMetadata(table, game, walletId, tienLenActive),
+      reason: game.reason || null, hand, serverNow: now(), version: game.version || 1, lastAction: game.lastAction || null, ...cardMetadata(table, game, walletId, otherGame),
     };
   }
   function recordCardAction(game, playerId, type, card = null, at = now()) {
@@ -218,7 +221,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   const service = {
     config, TABLES, paymentReady,
     menu,
-    attachIO(value) { io = value; tienLen?.attachIO(value); },
+    attachIO(value) { io = value; tienLen?.attachIO(value); classicCards?.attachIO(value); },
     walletIdFor,
     async profile(token) { const walletId = await walletIdFor(token); return { walletId, profile: await profileFor(walletId) }; },
     async saveProfile(token, input) {
@@ -316,17 +319,19 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     async leaveByWallet(walletId, reason) {
       const result = await db.runTransaction(async tx => {
         const { ref, row: room, exists } = await ensureRoom(tx); const current = tableForWallet(room, walletId); if (!current) return null;
-        const gameRef = games().doc(current.table.id); const gameSnapshot = await tx.get(gameRef);
-        const tienLenRef = col('tea_tienlen_games').doc(current.table.id); const tienLenSnapshot = await tx.get(tienLenRef);
+        const activity = await readCardGames(tx, db, current.table.id);
+        const gameRef = activity.color.ref, gameSnapshot = activity.color.snapshot;
+        const tienLenRef = activity.tienlen.ref, tienLenSnapshot = activity.tienlen.snapshot;
         current.seat.walletId = null; current.seat.seatedAt = null;
         if (current.table.ownerId === walletId) { const occupied = current.table.seats.filter(s => s.walletId).sort((a, b) => a.seatedAt - b.seatedAt); current.table.ownerId = occupied[0]?.walletId || null; }
+        classicCards.departInTransaction(tx, current.table, activity);
         room.updatedAt = iso(now()); exists ? tx.update(ref, room) : tx.create(ref, room);
         if (gameSnapshot.exists && gameSnapshot.data().status === 'active' && gameSnapshot.data().players.includes(walletId)) tx.update(gameRef, { ...gameSnapshot.data(), version: (gameSnapshot.data().version || 1) + 1, status: 'finished', reason: reason === 'disconnect' ? 'player_disconnected' : 'player_left', winnerId: null, finishedAt: iso(now()) });
         if (tienLenSnapshot.exists && tienLenSnapshot.data().status === 'active' && tienLenSnapshot.data().players.includes(walletId)) tx.update(tienLenRef, { status: 'finished', version: (tienLenSnapshot.data().version || 1) + 1, reason: 'player_left', winnerId: null, finishedAt: iso(now()) });
         return { tableId: current.table.id };
       });
       const fight = fightFor(walletId); if (fight) finishFight(fight, reason === 'disconnect' ? 'player_disconnected' : 'player_left', fight.players.find(id => id !== walletId));
-      const player = presence.get(walletId); if (player) Object.assign(player, { tableId: null, seatId: null }); if (result) { io?.to(`table:${result.tableId}`).emit('tea:tienlen', { tableId: result.tableId }); sockets.get(walletId)?.leave(`table:${result.tableId}`); } io?.emit('tea:state', await service.publicState()); return result;
+      const player = presence.get(walletId); if (player) Object.assign(player, { tableId: null, seatId: null }); if (result) { io?.to(`table:${result.tableId}`).emit('tea:tienlen', { tableId: result.tableId }); io?.to(`table:${result.tableId}`).emit('tea:classic-card', { tableId: result.tableId }); sockets.get(walletId)?.leave(`table:${result.tableId}`); } io?.emit('tea:state', await service.publicState()); return result;
     },
     async chat(token, input) {
       const walletId = await walletIdFor(token); const text = String(input?.text || '').replace(/[\p{Cc}\p{Cf}]/gu, ' ').trim();
@@ -395,8 +400,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       if (!Number.isInteger(botCount) || botCount < 0 || botCount > 2) throw new TeaError(400, 'Choose 0, 1 or 2 bots.', 'bad_bot_count');
       const result = await db.runTransaction(async tx => {
         const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId); if (!current) throw new TeaError(409, 'Sit at a table first.', 'not_seated'); if (current.table.ownerId !== walletId) throw new TeaError(403, 'Only the table host can start.', 'not_host');
-        const ref = games().doc(current.table.id); const old = await tx.get(ref);
-        const tienLenSnapshot = await tx.get(col('tea_tienlen_games').doc(current.table.id));
+        const activity = await readCardGames(tx, db, current.table.id), ref = activity.color.ref, old = activity.color.snapshot;
         const attemptRef = cardStartAttempts().doc(hash(`${walletId}:${requestId}`)); const prior = await tx.get(attemptRef);
         if (prior.exists && (!old.exists || prior.data().gameId !== old.data().id || prior.data().tableId !== current.table.id)) throw new TeaError(409, 'That earlier game has already ended. Start with a new request.', 'stale_start');
         if (old.exists && (old.data().status === 'active' || old.data().requestId === requestId || prior.exists)) {
@@ -404,7 +408,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
           if (!prior.exists) tx.create(attemptRef, { gameId: game.id, tableId: game.tableId, walletId, createdAt: iso(now()) });
           return cardPublic(game, walletId, current.table);
         }
-        if (tienLenSnapshot.exists && tienLenSnapshot.data().status === 'active') throw new TeaError(409, 'Tiến lên is already running at this table.', 'game_active');
+        if (activeCardGame(activity, 'color')) throw new TeaError(409, 'A card game is already running at this table.', 'game_active');
         const humans = current.table.seats.filter(s => s.walletId).map(s => s.walletId); if (humans.length + botCount < 2 || humans.length + botCount > 4) throw new TeaError(400, 'A game needs 2–4 players.', 'bad_player_count');
         const profileRows = {}; for (const id of humans) { const snap = await tx.get(profiles().doc(id)); profileRows[id] = snap.exists ? snap.data().nickname : 'Guest'; }
         const players = [...humans, ...Array.from({ length: botCount }, (_, i) => `bot:${i + 1}`)]; const names = { ...profileRows }; players.filter(id => id.startsWith('bot:')).forEach((id, i) => { names[id] = `BOT ${i + 1}`; }); const deck = makeDeck(); const hands = Object.fromEntries(players.map(id => [id, []])); for (let n = 0; n < 7; n++) for (const id of players) hands[id].push(deck.pop()); let top = deck.pop(); while (top.kind !== 'number') { deck.unshift(top); top = deck.pop(); }
@@ -416,12 +420,12 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       const walletId = await walletIdFor(token); return db.runTransaction(async tx => {
         const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); const current = roomSnapshot.exists && tableForWallet(roomSnapshot.data(), walletId);
         if (!current) return { game: null, ...cardMetadata(null, null, walletId) };
-        const ref = games().doc(current.table.id), snapshot = await tx.get(ref), tienLenSnapshot = await tx.get(col('tea_tienlen_games').doc(current.table.id));
-        const tienLenActive = tienLenSnapshot.exists && tienLenSnapshot.data().status === 'active';
-        if (!snapshot.exists) return { game: null, ...cardMetadata(current.table, null, walletId, tienLenActive) };
+        const activity = await readCardGames(tx, db, current.table.id), ref = activity.color.ref, snapshot = activity.color.snapshot;
+        const otherGame = activeCardGame(activity, 'color');
+        if (!snapshot.exists) return { game: null, ...cardMetadata(current.table, null, walletId, otherGame) };
         const game = snapshot.data(), before = JSON.stringify(game); applyTimeout(game);
         if (before !== JSON.stringify(game)) tx.update(ref, game);
-        return { game: cardPublic(game, walletId, current.table, tienLenActive), ...cardMetadata(current.table, game, walletId, tienLenActive) };
+        return { game: cardPublic(game, walletId, current.table, otherGame), ...cardMetadata(current.table, game, walletId, otherGame) };
       });
     },
     async cardAction(token, input) {
@@ -459,6 +463,9 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     async startTienLen(token, input) { return tienLen.start(await walletIdFor(token), input); },
     async tienLenState(token) { return tienLen.state(await walletIdFor(token)); },
     async tienLenAction(token, input) { return tienLen.action(await walletIdFor(token), input); },
+    async startClassicCard(token, input) { return classicCards.start(await walletIdFor(token), input); },
+    async classicCardState(token, key) { return classicCards.state(await walletIdFor(token), key); },
+    async classicCardAction(token, input) { return classicCards.action(await walletIdFor(token), input); },
     async tableGameState(token,key){return tableGames.state(await walletIdFor(token),key)},
     async tableGameAction(token,input){const result=await tableGames.action(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
     async adminOrders() { requireDb(); const snapshot = await orders().where('createdMs', '>', 0).orderBy('createdMs').limit(200).get(); return snapshot.docs.map(doc => doc.data()).sort((a, b) => b.createdMs - a.createdMs); },
@@ -481,6 +488,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       });
       await tableGames.cancelAfterRestart();
       await tienLen.cancelAfterRestart();
+      await classicCards.cancelAfterRestart();
     },
   };
   return service;
