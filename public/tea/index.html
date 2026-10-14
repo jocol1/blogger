@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2b1d17">
   <link rel="icon" href="data:,">
   <title>Locly Pixel Tea Café</title>
-  <link rel="stylesheet" href="/assets/tea/style.css?v=courtyard3">
+  <link rel="stylesheet" href="/assets/tea/style.css?v=folkgames1">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/games.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/brawl.css?v=arena1">
@@ -36,7 +36,7 @@
        <div class="world-caption"><b data-i18n="courtyard">The little tea courtyard</b><span data-i18n="freeEntry">FREE ENTRY · GOOD COMPANY</span></div>
       <div id="speech-layer" aria-live="polite"></div>
       <div class="controls-hint"><span class="desktop-only">WASD / ↑↓←→</span><span data-i18n="tapWalk">Tap anywhere to walk</span></div>
-      <button id="interact-button" class="interact-button" hidden><span>●</span> <b data-i18n="sit">Sit</b></button>
+      <button id="interact-button" class="interact-button" hidden><span>●</span> <b>Sit</b></button>
       <div class="dpad" aria-label="Movement controls">
         <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
       </div>
@@ -85,7 +85,7 @@
       <section class="panel-view table-view" data-view="table">
         <div id="table-empty" class="big-empty"><span>▱</span><h2 data-i18n="pullChair">Pull up a chair</h2><p data-i18n="tableEmpty">Walk to any free chair. If people are there, ask first or sit down anyway.</p></div>
         <div id="table-room" hidden>
-          <div class="table-header"><div><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div><div class="table-tools"><button id="leave-button" class="danger"><span data-i18n="standUp">Stand up</span></button></div></div>
+          <div class="table-header"><div><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div></div>
           <section class="brawl-box"><div><b data-i18n="pixelBrawl">Pixel brawl</b><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section>
           <div class="chat-list" id="chat-list" aria-live="polite"></div>
           <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
@@ -195,7 +195,7 @@
         <div id="card-game" hidden><div class="card-scroll-area"><div class="card-table"><div class="card-arena color-arena"><div id="card-players" class="card-players"></div><div class="card-stage"><div class="deck-block"><small data-i18n="drawPile">DRAW PILE</small><button id="draw-pile" type="button" class="playing-card back" aria-label="Draw one and pass">LOC</button></div><div class="deck-block"><small data-i18n="inPlay">IN PLAY</small><div id="top-card" class="color-play-pile"></div></div><div class="turn-sign"><b id="turn-label"></b><span id="card-clock"></span><span id="active-color"></span></div></div></div><div class="hand-area"><div class="hand-sort-row"><small data-i18n="yourHand">Your hand</small><button id="sort-color-hand" type="button" data-i18n="sortDealt">Deal order</button></div><small data-i18n="yourHand">YOUR HAND · TAP A CARD TO PLAY</small><div id="hand" class="hand"></div></div></div></div><div class="card-action-bar"><p id="card-feedback" role="status"></p><div id="color-picker" class="color-picker" hidden><span data-i18n="chooseColor">Choose the next color</span><button data-color="red" aria-label="Red"></button><button data-color="yellow" aria-label="Yellow"></button><button data-color="green" aria-label="Green"></button><button data-color="blue" aria-label="Blue"></button><button id="cancel-wild" data-i18n="cancelChoice">Cancel</button></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="card-retry" class="primary" data-i18n="retryCard" hidden>Retry action</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button></div></div>
         </div>
       </section>
-       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="dice"><span>⚄</span><b data-i18n="diceName">Dice Dash</b><small data-i18n="diceShort">Race to 20</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button></div><div id="mini-game-stage"></div></section>
+       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="dice"><span>⚄</span><b data-i18n="diceName">Dice Dash</b><small data-i18n="diceShort">Race to 20</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button><button data-mini-game="oanquan"><span>◉</span><b data-i18n="oanquanName">Ô ăn quan</b><small data-i18n="oanquanShort">A Vietnamese sowing game</small></button></div><div id="mini-game-stage"></div></section>
     </aside>
   </main>
 
@@ -214,17 +214,17 @@
   </dialog>
 
   <dialog id="wallet-dialog" class="modal wallet-modal"><form method="dialog" id="wallet-form"><button class="close-modal" value="cancel">×</button><small data-i18n="walletBackup">WALLET BACKUP</small><h2 data-i18n="keepCode">Keep this code safe</h2><p data-i18n="walletCopy">It restores your character, coins and purchases if browser data is cleared.</p><textarea id="wallet-code" readonly></textarea><div class="button-row"><button type="button" id="copy-wallet" class="primary" data-i18n="copyCode">Copy code</button><button type="button" id="show-restore" data-i18n="restoreAnother">Restore another</button></div><div id="restore-box" hidden><input id="restore-code" placeholder="Paste a 64-character code"><button type="button" id="restore-wallet" data-i18n="restore">Restore</button></div></form></dialog>
-  <dialog id="qr-dialog" class="modal qr-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><small data-i18n="yourOrder">YOUR ORDER</small><h2 id="qr-title">Iced tea</h2><div class="qr-wrap"><img id="qr-image" alt="Bank transfer QR"></div><div class="payment-status"><i></i><span id="qr-status" data-i18n="unpaid">Not paid yet</span></div><dl><div><dt data-i18n="bankAccount">Bank account</dt><dd id="qr-bank"></dd></div><div><dt data-i18n="amount">Amount</dt><dd id="qr-amount"></dd></div><div><dt data-i18n="transferNote">Transfer note</dt><dd><code id="qr-code"></code><button type="button" id="copy-code">Copy</button></dd></div></dl><p data-i18n="keepOpen">You can close this window. The café will keep checking your payment.</p><button type="button" id="cancel-order" class="text-danger" data-i18n="cancelOrder">Cancel this unpaid order</button></form></dialog>
+  <dialog id="qr-dialog" class="modal qr-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><small data-i18n="yourOrder">YOUR ORDER</small><h2 id="qr-title">Iced tea</h2><div class="qr-wrap"><img id="qr-image" alt="Bank transfer QR"></div><div class="payment-status"><i></i><span id="qr-status" data-i18n="unpaid">Not paid yet</span></div><dl><div><dt data-i18n="bankAccount">Bank account</dt><dd id="qr-bank"></dd></div><div><dt data-i18n="amount">Amount</dt><dd id="qr-amount"></dd></div><div><dt data-i18n="transferNote">Transfer note</dt><dd><code id="qr-code"></code><button type="button" id="copy-code">Copy</button></dd></div></dl><p class="qr-phone-help" data-i18n="qrPhoneHelp">On your phone, download the QR and choose it from your bank app’s gallery. On a computer, scan the QR with your phone.</p><div class="qr-actions"><button type="button" id="download-qr" class="primary" data-i18n="downloadQr">Download QR</button></div><button type="button" id="cancel-order" class="text-danger" data-i18n="cancelOrder">Cancel this unpaid order</button><p data-i18n="keepOpen">You can close this window. The café will keep checking your payment.</p></form></dialog>
   <dialog id="seat-dialog" class="modal choice-modal"><button class="close-modal" id="seat-close" aria-label="Close">×</button><small data-i18n="occupiedTable">OCCUPIED TABLE</small><h2 id="seat-dialog-title">Someone is already here</h2><p id="seat-dialog-copy"></p><div class="choice-grid"><button id="ask-seat" class="primary" data-i18n="askFirst">Ask first</button><button id="leave-seat" data-i18n="walkAway">Walk away</button><button id="rude-seat" class="rude-button" data-i18n="sitAnyway">Sit anyway</button></div><p id="seat-wait" class="wait-note" hidden></p></dialog>
   <dialog id="request-dialog" class="modal choice-modal"><small data-i18n="someoneAsks">SOMEONE IS ASKING</small><h2 id="request-title"></h2><p data-i18n="requestCopy">They want to pull up a chair at your table. The chair is not reserved while you decide.</p><div class="button-row"><button id="decline-seat" data-i18n="sayNo">No thanks</button><button id="accept-seat" class="primary" data-i18n="sayYes">Sure, sit down</button></div></dialog>
   <dialog id="fight-dialog" class="modal fight-modal"><small data-i18n="pixelBrawl">PIXEL BRAWL</small><h2 id="fight-title">BONK!</h2><p id="fight-message"></p><button id="fight-accept" class="primary wide" data-i18n="acceptFight" hidden>Accept challenge</button><button id="fight-decline" class="wide" data-i18n="declineFight" hidden>Nope</button></dialog>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/assets/tea/world.js?v=courtyard3"></script>
-  <script src="/assets/tea/scene.js?v=courtyard3"></script>
+  <script src="/assets/tea/world.js?v=street1"></script>
+  <script src="/assets/tea/scene.js?v=street1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
-  <script src="/assets/tea/games-ui.js?v=courtyard3"></script>
-  <script src="/assets/tea/game-words.js?v=classic1"></script>
+  <script src="/assets/tea/games-ui.js?v=folkgames1"></script>
+  <script src="/assets/tea/game-words.js?v=folkgames1"></script>
   <script src="/assets/tea/brawl-words.js?v=arena1"></script>
   <script src="/assets/tea/poker-words.js?v=poker2"></script>
   <script src="/assets/tea/brawl-view.js?v=brawl4"></script>
@@ -237,6 +237,6 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/app.js?v=mobile1"></script>
+  <script src="/assets/tea/app.js?v=folkgames1"></script>
 </body>
 </html>

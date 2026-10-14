@@ -32,3 +32,22 @@ test('new game HTTP APIs validate wallet ownership, keys and action payloads',as
   const express=require('express'),http=require('node:http'),{createTeaRouter}=require('../features/tea/routes');const f=fixture(),[host]=await guests(f,1),app=express();app.use(createTeaRouter({service:f.tea,isAdmin:()=>false}));const server=http.createServer(app);await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const url=`http://127.0.0.1:${server.address().port}`,headers={'Content-Type':'application/json','X-Wallet-Token':host.token};
   try{assert.equal((await fetch(url+'/api/tea/games/dice')).status,401);assert.equal((await fetch(url+'/api/tea/games/unknown',{headers})).status,400);const started=await fetch(url+'/api/tea/games',{method:'POST',headers,body:JSON.stringify({key:'memory',requestId:req()})});assert.equal(started.status,201);const {game}=await started.json();assert.ok(game.tiles.every(tile=>tile.symbol===null));assert.equal((await fetch(url+'/api/tea/games/memory/action',{method:'POST',headers,body:JSON.stringify({gameId:game.id,requestId:req(),index:999})})).status,400);const flip=await fetch(url+'/api/tea/games/memory/action',{method:'POST',headers,body:JSON.stringify({gameId:game.id,requestId:req(),index:0,winnerId:host.id,score:999})});assert.equal(flip.status,200);assert.equal((await flip.json()).game.players[0].score,0)}finally{await new Promise(resolve=>server.close(resolve))}
 });
+
+
+test('oanquan requires two players and validates turns, ownership and duplicate moves',async()=>{
+ const f=fixture(),[host,other]=await guests(f);let game=await f.tea.startTableGame(host.token,{key:'oanquan',requestId:req()});assert.deepEqual(game.pits,[5,5,5,5,5,1,5,5,5,5,5,1]);
+ await assert.rejects(f.tea.tableGameAction(other.token,{key:'oanquan',gameId:game.id,requestId:req(),pit:6,direction:1}),e=>e.code==='not_turn');
+ await assert.rejects(f.tea.tableGameAction(host.token,{key:'oanquan',gameId:game.id,requestId:req(),pit:6,direction:1}),e=>e.code==='bad_pit');
+ const input={key:'oanquan',gameId:game.id,requestId:req(),pit:0,direction:1};const results=await Promise.all([f.tea.tableGameAction(host.token,input),f.tea.tableGameAction(host.token,input)]);assert.deepEqual(results[0],results[1]);game=results[0];assert.equal(game.turn,other.id);assert.equal(game.players.reduce((n,p)=>n+p.score,0)+game.pits.reduce((n,p)=>n+p,0)+game.quan.filter(Boolean).length*9,70);
+ const f3=fixture(),[h3]=await guests(f3,3);await assert.rejects(f3.tea.startTableGame(h3.token,{key:'oanquan',requestId:req()}),e=>e.code==='oan_two_players');
+});
+test('oanquan captures beyond a gap, values a quan once and collects sides at the end',async()=>{
+ const f=fixture(),[host]=await guests(f);let game=await f.tea.startTableGame(host.token,{key:'oanquan',requestId:req()});const ref=f.db.collection('tea_social_games').doc('t3-oanquan');
+ await f.db.runTransaction(async tx=>tx.update(ref,{pits:[0,0,1,0,0,4,0,0,0,0,0,0],quan:[true,false]}));
+ game=await f.tea.tableGameAction(host.token,{key:'oanquan',gameId:game.id,requestId:req(),pit:2,direction:1});assert.equal(game.last.captured,13);assert.equal(game.status,'finished');assert.equal(game.players[0].score,14);assert.ok(game.pits.every(n=>n===0));assert.deepEqual(game.quan,[false,false]);
+});
+test('oanquan refills an empty side and a solo bot continues after the delay',async()=>{
+ const f=fixture(),[host]=await guests(f,1);let game=await f.tea.startTableGame(host.token,{key:'oanquan',botCount:1,requestId:req()});const ref=f.db.collection('tea_social_games').doc('t3-oanquan');
+ await f.db.runTransaction(async tx=>tx.update(ref,{pits:[0,0,1,0,0,1,0,0,0,0,0,1]}));
+ game=await f.tea.tableGameAction(host.token,{key:'oanquan',gameId:game.id,requestId:req(),pit:2,direction:1});assert.equal(game.players[1].score,-5);assert.deepEqual(game.pits.slice(6,11),[1,1,1,1,1]);f.tick(1000);game=(await f.tea.tableGameState(host.token,'oanquan')).game;assert.equal(game.turn,host.id);
+});

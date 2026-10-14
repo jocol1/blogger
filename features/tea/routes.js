@@ -40,6 +40,38 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/api/tea/chat', json, asyncRoute(async (req, res) => res.status(201).json(await service.chat(token(req), req.body))));
   router.post('/api/tea/orders', json, asyncRoute(async (req, res) => res.status(201).json(await service.order(token(req), req.body))));
   router.get('/api/tea/order', asyncRoute(async (req, res) => res.json(await service.currentOrder(token(req)))));
+  router.get('/api/tea/order/qr', asyncRoute(async (req, res) => {
+    const order = (await service.currentOrder(token(req))).order;
+    if (!order || order.status !== 'pending') return res.status(409).json({ error: 'No pending order.', code: 'no_pending_order' });
+    let imageUrl;
+    try { imageUrl = new URL(order.qrUrl); } catch { return res.status(503).json({ error: 'QR download is unavailable.', code: 'qr_unavailable' }); }
+    const expectedPath = `/image/${encodeURIComponent(service.config.bank)}-${encodeURIComponent(service.config.account)}-compact2.png`;
+    if (imageUrl.protocol !== 'https:' || imageUrl.hostname !== 'img.vietqr.io' || imageUrl.pathname !== expectedPath || imageUrl.searchParams.get('addInfo') !== order.code || imageUrl.searchParams.get('amount') !== String(order.price) || imageUrl.searchParams.get('accountName') !== service.config.accountName) return res.status(503).json({ error: 'QR download is unavailable.', code: 'qr_unavailable' });
+    let image;
+    try {
+      const upstream = await fetch(imageUrl, { redirect: 'error', signal: AbortSignal.timeout(8000) });
+      const length = Number(upstream.headers.get('content-length') || 0);
+      if (!upstream.ok || !String(upstream.headers.get('content-type') || '').toLowerCase().startsWith('image/png') || length > 2_000_000) throw new Error('QR image unavailable');
+      const reader = upstream.body?.getReader();
+      if (!reader) throw new Error('QR image unavailable');
+      const chunks = [];
+      let total = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        total += value.byteLength;
+        if (total > 2_000_000) {
+          await reader.cancel();
+          throw new Error('QR image too large');
+        }
+        chunks.push(Buffer.from(value));
+      }
+      image = Buffer.concat(chunks, total);
+    } catch { return res.status(503).json({ error: 'QR download is temporarily unavailable.', code: 'qr_unavailable' }); }
+    if (image.length < 8 || image.length > 2_000_000 || !image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) return res.status(503).json({ error: 'QR download is temporarily unavailable.', code: 'qr_unavailable' });
+    res.set({ 'Content-Type': 'image/png', 'Content-Disposition': `attachment; filename="locly-${order.code}.png"`, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store' });
+    res.send(image);
+  }));
   router.delete('/api/tea/order', asyncRoute(async (req, res) => res.json(await service.cancelOrder(token(req)))));
   router.post('/api/tea/items/consume', json, asyncRoute(async (req, res) => res.json(await service.consume(token(req), req.body))));
   router.post('/api/tea/cards', json, asyncRoute(async (req, res) => res.status(201).json(await service.startCard(token(req), req.body))));

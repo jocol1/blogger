@@ -5,8 +5,8 @@
     ['t5',110,445,4], ['t6',415,445,8], ['t7',690,445,2], ['t8',860,445,4],
   ];
   const TABLES = layout.map(([id,x,y,capacity]) => {
-    const offsets = capacity===2 ? [[-62,0],[62,0]] : capacity===4 ? [[0,-66],[72,0],[0,66],[-72,0]] : [[-46,-66],[46,-66],[92,-24],[92,24],[46,66],[-46,66],[-92,24],[-92,-24]];
-    return {id,x,y,capacity,size:capacity===2?'small':capacity===4?'medium':'large',width:capacity===8?142:capacity===4?96:72,height:capacity===8?76:capacity===4?74:62,seats:offsets.map(([dx,dy],i)=>({id:`${id}-${i+1}`,x:x+dx,y:y+dy}))};
+    const offsets = capacity===2 ? [[-54,0],[54,0]] : capacity===4 ? [[0,-56],[62,0],[0,56],[-62,0]] : [[-42,-56],[42,-56],[68,-18],[68,18],[42,56],[-42,56],[-68,18],[-68,-18]];
+    return {id,x,y,capacity,size:capacity===2?'small':capacity===4?'medium':'large',width:capacity===8?88:capacity===4?66:50,height:capacity===8?54:capacity===4?46:38,seats:offsets.map(([dx,dy],i)=>({id:`${id}-${i+1}`,x:x+dx,y:y+dy}))};
   });
   function blocked(x,y,tables=TABLES) {
     return x<26||x>934||y<76||y>606||(x>350&&x<610&&y<135)||tables.some(t=>Math.abs(x-t.x)<t.width/2+19&&Math.abs(y-t.y)<t.height/2+17);

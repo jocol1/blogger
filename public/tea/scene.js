@@ -28,20 +28,22 @@ window.TeaScene = (() => {
     for(const [bx,by] of [[-12,-10],[3,-10],[-4,-20]]){p(c,'#97532e',bx-7,by,16,10);p(c,'#d9984a',bx-7,by-2,14,8);p(c,'#f1bd6e',bx-5,by-4,10,6);p(c,'#aa6435',bx,by,3,2)}c.restore();
   }
   function buildGround(){
-    p(c,'#78a95d',0,0,960,640);
-    for(let i=0;i<800;i++){const x=rng(i,1)*960,y=rng(i,2)*640;p(c,i%3?'#83b367':'#60924d',x,y,4,2)}
-    // Raised brick courtyard with edging and little worn tiles.
-    p(c,'#536644',14,70,932,548);p(c,'#775c40',18,68,924,544);p(c,'#e2c89a',24,74,912,530);
-    for(let y=80;y<604;y+=24)for(let x=28;x<934;x+=32){const offset=(Math.floor(y/24)%2)*16;p(c,'#c9a874',x-offset,y,30,22);p(c,rng(x,y)>.4?'#d8b985':'#d3b17c',x-offset+2,y,28,18);p(c,'#e5c99b',x-offset+3,y,24,2);if(rng(y,x)>.74)p(c,'#bfa16b',x-offset+8,y+12,10,2)}
-    // Main horizontal aisle, slightly lighter than the table patios.
-    p(c,'#e2cca0',26,312,908,46);for(let x=30;x<936;x+=48){p(c,'#ceb184',x,332,36,2);p(c,'#f0d9ad',x+10,316,20,2)}
-    // Garden borders stay outside the walking area.
-    for(let x=20;x<960;x+=34){p(c,'#31573a',x,0,30,38);p(c,'#518243',x+2,0,26,30);p(c,'#70a34f',x+4,2,12,8)}
-    for(let x=12;x<960;x+=64){p(c,'#69523b',x,614,8,26);p(c,'#ac8150',x+2,614,4,24)}p(c,'#b6905f',0,620,960,6);p(c,'#775c3c',0,628,960,4);
-    for(let i=0;i<30;i++)flower(c,28+i*31,632,['#f3d16c','#e6a7a3','#b8d9ea'][i%3]);
-    // Trees frame the café and lanterns warm the entrance.
-    tree(c,70,54,.8);tree(c,890,50,.84);tree(c,230,40,.62);tree(c,740,34,.65);
-    pot(c,30,102);pot(c,930,102);pot(c,278,110);pot(c,674,108);
+    // A modest sidewalk café right beside a Vietnamese neighborhood street.
+    p(c,'#898173',0,0,960,640);
+    for(let i=0;i<1000;i++){const x=rng(i,1)*960,y=rng(i,2)*640;p(c,i%3?'#938b7d':'#7d776d',x,y,4,2)}
+    p(c,'#776451',12,66,936,492);p(c,'#c6b59a',18,68,924,482);p(c,'#b9a88e',24,74,912,470);
+    for(let y=78;y<538;y+=28)for(let x=28;x<934;x+=44){const offset=(Math.floor(y/28)%2)*22;p(c,'#9d8b72',x-offset,y,42,26);p(c,rng(x,y)>.35?'#c7b59a':'#c0ae93',x-offset+2,y+2,38,22);p(c,'#d4c2a5',x-offset+4,y+2,32,2);if(rng(y,x)>.72)p(c,'#ad9a80',x-offset+10,y+17,12,2)}
+    // The shop's awning shades the first row; the open pavement stays walkable.
+    p(c,'#ad7654',26,303,908,10);p(c,'#e7d7bb',26,313,908,5);
+    for(let x=34;x<936;x+=48){p(c,'#f0e1c7',x,315,28,2)}
+    // Curb, gutter and road: tables sit on the pavement, feet almost at the street.
+    p(c,'#61594f',0,544,960,16);p(c,'#ded2bb',0,544,960,6);p(c,'#a89a82',0,550,960,6);
+    for(let x=8;x<960;x+=36){p(c,'#796f62',x,552,30,3);p(c,'#c3b8a3',x+2,553,24,1)}
+    p(c,'#55534e',0,560,960,80);for(let i=0;i<700;i++){const x=rng(i,17)*960,y=560+rng(i,23)*80;p(c,i%4?'#5d5b55':'#66635d',x,y,4,2)}
+    p(c,'#e8d8ae',102,596,116,4);p(c,'#e8d8ae',390,596,116,4);p(c,'#e8d8ae',678,596,116,4);
+    // A low painted shopfront and a few pots replace the garden border.
+    for(let x=20;x<960;x+=40){p(c,'#8d6650',x,0,36,54);p(c,'#b4805c',x+2,0,32,46);p(c,'#c69a70',x+4,5,24,34);p(c,'#705545',x+14,8,3,30);p(c,'#e1c39a',x+6,42,24,3)}
+    for(const x of [38,922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
     for(const x of [190,786]){p(c,'#5a4532',x,56,6,58);p(c,'#7a583b',x-8,106,22,6);p(c,'#4d4030',x-12,48,28,6);p(c,'#be8e45',x-8,54,20,26);p(c,'#fae49b',x-4,56,12,20);p(c,'#fff5bf',x,60,4,10)}
     // Tea stall: shelves, tile roof, wooden boards, checkered awning.
     p(c,'#836347',342,22,280,124);p(c,'#583f30',350,30,264,102);p(c,'#bd905f',358,36,248,88);
@@ -53,31 +55,33 @@ window.TeaScene = (() => {
     for(let x=342;x<622;x+=28){p(c,(x-342)%56?'#ead5a3':'#729164',x,92,28,18);p(c,(x-342)%56?'#cfb785':'#506d46',x,110,28,4)}
     p(c,'#523c2d',350,114,264,24);p(c,'#996d44',356,114,252,20);p(c,'#bc8e57',358,116,248,4);for(let x=360;x<608;x+=32)p(c,'#785334',x,122,2,12);
     glass(c,380,110,.6);snack(c,566,105,.62);p(c,'#557261',406,94,18,20);p(c,'#a6c6aa',408,96,14,14);p(c,'#3e544b',408,90,14,6);p(c,'#7c8d6b',424,98,6,4);
-    // Welcome sign and soft grass at the entrance.
-    p(c,'#7e5b3b',222,569,8,36);p(c,'#684a33',188,558,78,30);p(c,'#e8cf99',192,562,70,22);c.fillStyle='#76553c';c.font='bold 10px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('COME ON IN',227,577);c.textAlign='left';
-    for(const x of [307,584,792]){p(c,'#bdd494',x,590,10,4);p(c,'#91ae70',x+4,584,2,10)}
+    // A striped plastic awning over the sidewalk tea stall.
+    p(c,'#f1d6a8',340,140,284,8);for(let x=342;x<620;x+=28){p(c,(x-342)%56?'#d45d42':'#e8c980',x,148,26,14);p(c,'#a24b37',x,160,26,3)}
+    p(c,'#665444',188,509,108,26);p(c,'#ead8b6',192,513,100,18);c.fillStyle='#654b39';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('TRÀ ĐÁ • VỈA HÈ',242,525);c.textAlign='left';
+    for(const x of [314,644,802]){p(c,'#74905e',x,526,8,10);p(c,'#9baf70',x-4,522,14,4)}
   }
   buildGround();
   function chair(c,seat,table,highlight=false){
-    const x=seat.x,y=seat.y,vertical=Math.abs(y-table.y)>40;
-    p(c,'#967b51',x-15,y+10,32,10);
-    p(c,'#664f35',x-13,y-12,28,24);p(c,'#ba7b4c',x-11,y-10,24,22);p(c,'#dfa56a',x-9,y-10,20,4);
-    if(vertical){const by=y<table.y?y-24:y+9;p(c,'#654a33',x-16,by,34,14);p(c,'#b97448',x-14,by+2,30,8);p(c,'#dfa26a',x-12,by+2,26,2);for(const sx of [-9,7])p(c,'#714a32',x+sx,by+2,2,8)}
-    else {const bx=x<table.x?x-19:x+12;p(c,'#684d35',bx,y-18,8,40);p(c,'#c48852',bx+2,y-16,4,34)}
-    p(c,'#63462f',x-12,y+11,4,10);p(c,'#63462f',x+10,y+11,4,10);p(c,'#ce9259',x-11,y+11,2,8);
-    if(highlight){c.strokeStyle='#ffefaf';c.lineWidth=2;c.strokeRect(x-21,y-27,44,50)}
-    if(!seat.walletId){p(c,'#496846',x-4,y-2,10,8);p(c,'#c1d591',x-2,y,6,2)}
+    const x=seat.x,y=seat.y,colors=['#447e9c','#c54e3e','#5c8b54','#d59b3f'],color=colors[(Number(seat.id.split('-').at(-1))-1)%colors.length];
+    // Tiny Vietnamese sidewalk plastic stool: low legs, chunky seat, no dining-chair back.
+    p(c,'#716657',x-10,y+8,22,4);p(c,'#5c554b',x-8,y+2,3,9);p(c,'#5c554b',x+6,y+2,3,9);
+    p(c,'#263e43',x-13,y-3,28,8);p(c,color,x-12,y-5,26,8);p(c,'#e1c6a0',x-9,y-4,20,2);p(c,'#fff0cd',x-12,y-5,3,2);
+    if(highlight){c.strokeStyle='#fff0a9';c.lineWidth=2;c.strokeRect(x-16,y-9,34,24)}
   }
   function table(c,table,nearestId){
-    const {x,y,width:w,height:h}=table;for(const seat of table.seats)chair(c,seat,table,seat.id===nearestId);
-    p(c,'#b39060',x-w/2-6,y+h/2+6,w+20,12);p(c,'#664b31',x-w/2+9,y+h/2-4,8,18);p(c,'#664b31',x+w/2-15,y+h/2-4,8,18);
-    p(c,'#654932',x-w/2-4,y-h/2-4,w+8,h+8);p(c,'#ad7746',x-w/2-2,y-h/2-2,w+4,h+4);p(c,'#d6a166',x-w/2,y-h/2-2,w,h-2);
-    for(let i=12;i<h-4;i+=16){p(c,'#b98551',x-w/2+2,y-h/2+i,w-4,2);p(c,'#e1b37a',x-w/2+4,y-h/2+i+2,w-8,2)}
-    for(let i=0;i<5;i++){const sx=x-w/2+10+rng(i,w)*(w-20),sy=y-h/2+8+rng(i,h)*(h-20);p(c,'#c38d54',sx,sy,10,2)}
-    // Every table is laid with a tiny flower jar and coaster.
-    p(c,'#b98850',x-8,y-18,18,12);p(c,'#658b71',x-4,y-30,8,16);p(c,'#b4d2b1',x-2,y-28,4,12);flower(c,x,y-32,'#f0d483');
-    p(c,'#eacb91',x+w/2-23,y-h/2+7,18,11);c.fillStyle='#825d37';c.font='bold 8px "Segoe UI",sans-serif';c.fillText('#'+table.id.slice(1),x+w/2-21,y-h/2+16);
-    p(c,'#714f35',x-21,y+6,42,18);p(c,'#f7dfaa',x-19,y+6,38,14);c.fillStyle='#765230';c.font='bold 10px "Segoe UI",sans-serif';c.textAlign='center';c.fillText(`${table.seats.filter(s=>s.walletId).length}/${table.capacity}`,x,y+17);c.textAlign='left';
+    const {x,y,width:w,height:h}=table,occupied=table.seats.filter(s=>s.walletId).length;
+    for(const seat of table.seats)chair(c,seat,table,seat.id===nearestId);
+    // Short metal legs and a small, colorful plastic top like a sidewalk tea table.
+    for(const [dx,dy] of [[-w/2+8,-h/2+7],[w/2-8,-h/2+7],[-w/2+8,h/2-5],[w/2-8,h/2-5]]){
+      p(c,'#555149',x+dx-2,y+dy,4,h/2+9);p(c,'#84796a',x+dx-1,y+dy+2,2,h/2+6);
+    }
+    p(c,'#454038',x-w/2-3,y-h/2+1,w+8,h+8);p(c,'#c64f3d',x-w/2-2,y-h/2-2,w+4,h+5);
+    p(c,table.capacity===8?'#52859b':table.capacity===4?'#4f875b':'#cd543f',x-w/2,y-h/2-4,w,h+2);
+    p(c,'#e58a58',x-w/2+3,y-h/2-3,w-6,3);p(c,'#f0d9ad',x-w/2+5,y-h/2-1,w-10,2);
+    for(let i=0;i<4;i++){const sx=x-w/2+8+rng(i,w)*(w-16),sy=y-h/2+6+rng(i,h)*(h-12);p(c,'#ffffff35',sx,sy,5,2)}
+    // One tiny tea glass and a share plate make the tables read as tea-stall tables.
+    glass(c,x-8,y+1,.38);p(c,'#756147',x+9,y+5,12,3);p(c,'#e8d8b4',x+8,y+2,14,4);p(c,'#ca8a4d',x+10,y,4,3);p(c,'#d79b55',x+15,y,4,3);
+    c.fillStyle='#3f382f';c.font='bold 8px "Segoe UI",sans-serif';c.textAlign='center';c.fillText(`${occupied}/${table.capacity}`,x,y+h/2+16);c.textAlign='left';
   }
   function avatar(c,x,y,avatar,scale=1,seated=false,walking=false,time=0){
     c.save();c.translate(Math.round(x/2)*2,Math.round(y/2)*2);c.scale(scale,scale);
