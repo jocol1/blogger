@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const express = require('express');
 const { TeaError } = require('./service');
+const MENU = require('../../public/tea/menu');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -95,9 +96,9 @@ function createTeaRouter({ service, isAdmin }) {
   router.get('/tra-da/admin', adminOnly, asyncRoute(async (req, res) => {
     const [rows, prices] = await Promise.all([service.adminOrders(), service.menu()]); const key = csrf(req);
     const cards = rows.map(row => `<article class="card"><strong>${esc(row.kind === 'tea' ? 'Iced tea' : 'Snack plate')}</strong> · <span class="${row.status === 'paid' ? 'paid' : ''}">${esc(row.status)}</span><p>${esc(row.code)} · ${Number(row.price).toLocaleString('vi-VN')}đ · received ${Number(row.paidAmount).toLocaleString('vi-VN')}đ</p><p class="muted">${esc(row.createdAt)} · wallet ${esc(row.walletId)}</p>${row.status === 'paid' ? `<form method="post" action="/tra-da/admin/orders/${encodeURIComponent(row.id)}/redeliver"><input type="hidden" name="csrf" value="${key}"><button>Send waiter again</button></form>` : ''}</article>`).join('') || '<div class="card">No café orders yet.</div>';
-    res.send(page(`<p><a href="/tra-da">← Café</a> · <a href="/xin-tien/admin">Wallet admin</a></p><h1>Pixel Tea Café</h1><section class="card"><h2>Prices for new orders</h2><form method="post" action="/tra-da/admin/prices"><input type="hidden" name="csrf" value="${key}"><label>Iced tea <input name="tea" type="number" step="1000" value="${prices.tea}"></label> <label>Snack plate <input name="snack" type="number" step="1000" value="${prices.snack}"></label> <button>Save</button></form></section><div class="grid">${cards}</div>`));
+    res.send(page(`<p><a href="/tra-da">← Café</a> · <a href="/xin-tien/admin">Wallet admin</a></p><h1>Pixel Tea Café</h1><section class="card"><h2>Prices for new orders</h2><form method="post" action="/tra-da/admin/prices"><input type="hidden" name="csrf" value="${key}">${Object.entries(MENU).map(([kind,item])=>`<label>${esc(item.en)} <input name="${kind}" type="number" min="1000" max="1000000" step="1" value="${esc(prices[kind])}"></label>`).join(' ')} <button>Save</button></form></section><div class="grid">${cards}</div>`));
   }));
-  router.post('/tra-da/admin/prices', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.updatePrices({ tea: Number(req.body.tea), snack: Number(req.body.snack) }); res.redirect('/tra-da/admin'); }));
+  router.post('/tra-da/admin/prices', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.updatePrices(req.body); res.redirect('/tra-da/admin'); }));
   router.post('/tra-da/admin/orders/:id/redeliver', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.redeliver(req.params.id); res.redirect('/tra-da/admin'); }));
 
   router.use((error, req, res, next) => {

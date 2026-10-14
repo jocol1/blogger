@@ -129,6 +129,10 @@ Tham khảo [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html) và [S
 
 ## Dữ liệu và API
 
+Menu quán pixel gồm trà đá 5.000đ, đĩa bánh 10.000đ, trà chanh 10.000đ, cà phê sữa đá 15.000đ và hạt hướng dương 10.000đ. Mỗi món có ba lần dùng. Danh mục dùng chung ở `public/tea/menu.js`; giá đã lưu của món cũ được giữ nguyên khi thêm món. Quản trị có thể sửa giá từng món tại `/tra-da/admin`; đơn đã tạo giữ giá lúc đặt.
+
+Ăn/uống chỉ phát hiệu ứng sau khi server trừ phần thành công. Sự kiện có `eventId` để trình duyệt bỏ qua bản gửi trùng qua HTTP và Socket.IO. Nhân vật nâng cốc/đưa tay ăn, có cảnh phóng to cạnh nút để xem trên điện thoại; chế độ giảm chuyển động tắt phần chuyển động và hạt trang trí. Thanh toán và món vẫn là trải nghiệm pixel, không giao đồ ăn thật.
+
 Các collection riêng của tính năng này:
 
 - `game_wallets`, `game_wallet_tokens`

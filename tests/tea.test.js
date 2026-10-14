@@ -146,3 +146,21 @@ test('expired and declined brawl challenges free both players for a new challeng
   const f=fixture(),one=await player(f,'One'),two=await player(f,'Two');const room=emptyRoom();Object.assign(room.tables[0].seats[0],{walletId:one.id,seatedAt:f.now()});Object.assign(room.tables[0].seats[1],{walletId:two.id,seatedAt:f.now()});room.tables[0].ownerId=one.id;await f.db.collection('tea_rooms').doc('main').set(room);await f.tea.connect(one.token,fakeSocket('one'));await f.tea.connect(two.token,fakeSocket('two'));
   await f.tea.challengeFight(one.token,two.id);f.tick(21000);const next=await f.tea.challengeFight(one.token,two.id);assert.equal(next.status,'pending');assert.equal((await f.tea.respondFight(one.token,next.id,false)).reason,'declined');const again=await f.tea.challengeFight(two.token,one.id);assert.equal(again.status,'pending');
 });
+
+
+test('new menu defaults merge with saved prices and admin changes preserve pending order prices',async()=>{
+ const f=fixture(),wallet=await player(f);await seedSeat(f,wallet.id);
+ await f.db.collection('tea_settings').doc('menu').set({tea:6000,snack:12000});
+ assert.deepEqual(Object.fromEntries(Object.entries(await f.tea.menu()).filter(([key])=>key!=='updatedAt')),{tea:6000,snack:12000,lemonade:10000,coffee:15000,seeds:10000});
+ const order=await f.tea.order(wallet.token,{kind:'coffee',requestId:'coffee-order-00001'});assert.equal(order.price,15000);assert.equal(new URL(order.qrUrl).searchParams.get('amount'),'15000');
+ await f.tea.updatePrices({coffee:17000});assert.equal((await f.tea.menu()).tea,6000);assert.equal((await f.tea.currentOrder(wallet.token)).order.price,15000);
+ await assert.rejects(f.tea.updatePrices({coffee:-100}),e=>e.code==='bad_price');await assert.rejects(f.tea.order(wallet.token,{kind:'toString',requestId:'invalid-order-00001'}),e=>e.code==='bad_order');
+});
+for(const kind of ['lemonade','coffee','seeds'])test(kind+' payment, serving and concurrent consume retries keep three portions',async()=>{
+ const f=fixture(),wallet=await player(f);await seedSeat(f,wallet.id);const order=await f.tea.order(wallet.token,{kind,requestId:'new-menu-order-00001'});
+ await assert.rejects(f.tea.consume(wallet.token,{requestId:'early-consume-0001'}),e=>e.code==='no_item');
+ await f.donations.receive({id:97001,transferType:'in',transferAmount:order.price,accountNumber:config.account,content:order.code});
+ await f.tea.currentOrder(wallet.token);f.tick(2300);const served=await f.tea.currentOrder(wallet.token);assert.equal(served.item.kind,kind);assert.equal(served.item.remaining,3);
+ const input={requestId:'new-consume-00001'};const [a,b]=await Promise.all([f.tea.consume(wallet.token,input),f.tea.consume(wallet.token,input)]);assert.deepEqual(a,b);assert.equal(a.remaining,2);assert.ok(a.eventId);
+ await f.tea.consume(wallet.token,{requestId:'new-consume-00002'});const end=await f.tea.consume(wallet.token,{requestId:'new-consume-00003'});assert.equal(end.remaining,0);assert.notEqual(a.eventId,end.eventId);assert.equal((await f.tea.currentOrder(wallet.token)).item,null);
+});

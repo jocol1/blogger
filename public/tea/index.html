@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2b1d17">
   <link rel="icon" href="data:,">
   <title>Locly Pixel Tea Café</title>
-  <link rel="stylesheet" href="/assets/tea/style.css?v=folkgames1">
+  <link rel="stylesheet" href="/assets/tea/style.css?v=menu1">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/games.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/brawl.css?v=arena1">
@@ -71,13 +71,11 @@
       <section class="panel-view active" data-view="cafe">
         <div class="panel-heading"><div><small data-i18n="todayMenu">TODAY'S MENU</small><h1 data-i18n="whatOrder">What can we get you?</h1></div><span class="pixel-steam">⌁</span></div>
         <p class="panel-copy" data-i18n="sitFirst">Find an empty chair and sit down before ordering. Everything here is pixel art, made for fun.</p>
-        <div class="menu-grid">
-           <button class="menu-item" data-order="tea"><span class="menu-art tea-art"><canvas id="tea-menu-art" width="80" height="80" aria-hidden="true"></canvas></span><span><b data-i18n="icedTea">Iced tea</b><small data-i18n="threeSips">3 cool sips</small></span><strong id="tea-price">5,000đ</strong></button>
-           <button class="menu-item" data-order="snack"><span class="menu-art snack-art"><canvas id="snack-menu-art" width="80" height="80" aria-hidden="true"></canvas></span><span><b data-i18n="snackPlate">Snack plate</b><small data-i18n="threeBites">3 crunchy bites</small></span><strong id="snack-price">10,000đ</strong></button>
-        </div>
         <div id="order-empty" class="empty-state"><span>↳</span><p data-i18n="orderHint">Your order and payment status will appear here.</p></div>
         <div id="order-card" class="order-card" hidden></div>
         <div id="item-card" class="item-card" hidden></div>
+        <div id="consume-feedback" class="consume-feedback" hidden><canvas id="consume-preview" width="128" height="128" aria-hidden="true"></canvas><p id="consume-message" role="status"></p></div>
+         <div class="menu-grid" id="cafe-menu"></div>
          <section class="table-directory"><div class="directory-heading"><b data-i18n="findTable">Find your spot</b><small data-i18n="tableSizes">2 · 4 · 8 seats</small></div><div id="table-directory"></div><p data-i18n="tableWalk">Pick a table to walk over. Sit when you reach a free chair.</p></section>
         <p class="payment-note"><span>ⓘ</span><span data-i18n="bankOnly">Vietnamese bank transfer only. International cards are not supported yet.</span></p>
       </section>
@@ -221,7 +219,8 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/tea/world.js?v=street1"></script>
-  <script src="/assets/tea/scene.js?v=street1"></script>
+  <script src="/assets/tea/menu.js?v=menu1"></script>
+  <script src="/assets/tea/scene.js?v=menu1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
   <script src="/assets/tea/games-ui.js?v=folkgames1"></script>
   <script src="/assets/tea/game-words.js?v=folkgames1"></script>
@@ -237,6 +236,6 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/app.js?v=folkgames1"></script>
+  <script src="/assets/tea/app.js?v=menu1"></script>
 </body>
 </html>

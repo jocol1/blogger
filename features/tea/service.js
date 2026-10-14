@@ -9,7 +9,8 @@ const ROOM_ID = 'main';
 const MAX_GUESTS = 32;
 const CHAT_LIMIT = 500;
 const MAX_BALANCE = 9_999_999;
-const MENU_DEFAULTS = { tea: 5000, snack: 10000 };
+const MENU = require('../../public/tea/menu');
+const MENU_DEFAULTS = Object.fromEntries(Object.entries(MENU).map(([kind,item])=>[kind,item.price]));
 const COLORS = ['red', 'yellow', 'green', 'blue'];
 const CARD_HOLD_MS = 2000;
 const CARD_HISTORY_LIMIT = 48;
@@ -128,7 +129,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   async function menu() {
     requireDb();
     const snapshot = await settings().get();
-    return snapshot.exists ? snapshot.data() : { ...MENU_DEFAULTS, updatedAt: iso(now()) };
+    return { ...MENU_DEFAULTS, updatedAt: iso(now()), ...(snapshot.exists ? snapshot.data() : {}) };
   }
   async function profileFor(walletId) {
     const snapshot = await profiles().doc(walletId).get();
@@ -391,8 +392,9 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     },
     async order(token, input) {
       if (!paymentReady()) throw new TeaError(503, 'Bank transfer ordering is unavailable.', 'payment_unavailable');
-      const walletId = await walletIdFor(token); const kind = ['tea', 'snack'].includes(input?.kind) ? input.kind : null; const requestId = cleanRequestId(input?.requestId); if (!kind || !requestId) throw new TeaError(400, 'Invalid order.', 'bad_order');
+      const walletId = await walletIdFor(token); const kind = Object.hasOwn(MENU, input?.kind) ? input.kind : null; const requestId = cleanRequestId(input?.requestId); if (!kind || !requestId) throw new TeaError(400, 'Invalid order.', 'bad_order');
       const prices = await menu();
+      if (!Number.isSafeInteger(prices[kind]) || prices[kind]<1000 || prices[kind]>1_000_000) throw new TeaError(503, 'This menu item is unavailable.', 'bad_price');
       for (let tries = 0; tries < 6; tries++) {
         const code = `DH${crypto.randomInt(10_000_000).toString().padStart(7, '0')}`; const orderId = hash(`${walletId}:${requestId}`).slice(0, 36);
         const result = await db.runTransaction(async tx => {
@@ -421,7 +423,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
         const attemptRef = consumeAttempts().doc(attemptId); const previous = await tx.get(attemptRef); if (previous.exists) return previous.data().result;
         const profileRef = profiles().doc(walletId); const profileSnapshot = await tx.get(profileRef); if (!profileSnapshot.exists) throw new TeaError(409, 'You have nothing to eat or drink.', 'no_item'); const roomSnapshot = await tx.get(rooms().doc(ROOM_ID)); if (!roomSnapshot.exists || !tableForWallet(roomSnapshot.data(), walletId)) throw new TeaError(409, 'Sit down to eat or drink.', 'not_seated'); const profile = profileSnapshot.data(), activeIds = profile.activeItemIds?.length ? profile.activeItemIds : profile.activeItemId ? [profile.activeItemId] : []; if (!activeIds.length) throw new TeaError(409, 'You have nothing to eat or drink.', 'no_item');
         const itemRef = items().doc(activeIds[0]); const itemSnapshot = await tx.get(itemRef); if (!itemSnapshot.exists || itemSnapshot.data().status !== 'served') throw new TeaError(409, 'Your order has not reached the table yet.', 'not_served');
-        const item = itemSnapshot.data(); const remaining = item.remaining - 1; const value = { id: item.id, kind: item.kind, remaining, status: remaining ? 'served' : 'finished' }; tx.update(itemRef, { ...value, updatedAt: iso(now()), finishedAt: remaining ? null : iso(now()) }); if (!remaining) { const next = activeIds.slice(1); tx.update(profileRef, { activeItemId: next[0] || null, activeItemIds: next, updatedAt: iso(now()) }); } tx.create(attemptRef, { walletId, result: value, createdAt: iso(now()) }); return value;
+        const item = itemSnapshot.data(); const remaining = item.remaining - 1; const value = { id: item.id, eventId: attemptId, kind: item.kind, remaining, status: remaining ? 'served' : 'finished' }; tx.update(itemRef, { ...value, updatedAt: iso(now()), finishedAt: remaining ? null : iso(now()) }); if (!remaining) { const next = activeIds.slice(1); tx.update(profileRef, { activeItemId: next[0] || null, activeItemIds: next, updatedAt: iso(now()) }); } tx.create(attemptRef, { walletId, result: value, createdAt: iso(now()) }); return value;
       }); io?.emit('tea:consume', { walletId, ...result }); return result;
     },
     async receiveInTransaction({ tx, code, payload, createdAt }) {
@@ -513,7 +515,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     async tableGameState(token,key){return tableGames.state(await walletIdFor(token),key)},
     async tableGameAction(token,input){const result=await tableGames.action(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
     async adminOrders() { requireDb(); const snapshot = await orders().where('createdMs', '>', 0).orderBy('createdMs').limit(200).get(); return snapshot.docs.map(doc => doc.data()).sort((a, b) => b.createdMs - a.createdMs); },
-    async updatePrices(input) { const tea = Number(input.tea), snack = Number(input.snack); if (![tea, snack].every(v => Number.isSafeInteger(v) && v >= 1000 && v <= 1_000_000)) throw new TeaError(400, 'Prices must be whole VND amounts.', 'bad_price'); const value = { tea, snack, updatedAt: iso(now()) }; await settings().set(value); return value; },
+    async updatePrices(input) { const value=await menu(); for(const kind of Object.keys(MENU)){if(input[kind]===undefined)continue;const price=Number(input[kind]);if(!Number.isSafeInteger(price)||price<1000||price>1_000_000)throw new TeaError(400,'Prices must be whole VND amounts.','bad_price');value[kind]=price}value.updatedAt=iso(now());await settings().set(value);return value; },
     async redeliver(orderId) { const snapshot = await items().doc(`tea-${orderId}`).get(); if (!snapshot.exists) throw new TeaError(404, 'Item not found.', 'item_not_found'); await items().doc(`tea-${orderId}`).set({ ...snapshot.data(), status: 'waiting', deliverAt: null, updatedAt: iso(now()) }); await prepareDelivery(snapshot.data().walletId); },
     async maintenance() {
       if (!db) return; const expired = await messages().where('purgeAt', '<', now()).limit(200).get(); for (const doc of expired.docs) await messages().doc(doc.data().id).delete();

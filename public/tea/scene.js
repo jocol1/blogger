@@ -98,6 +98,34 @@ window.TeaScene = (() => {
     if((avatar.hair||0)%3===1){p(c,'#a9af65',-10,-35,22,4);p(c,'#c9c88b',-8,-39,16,6);p(c,'#717d4e',-8,-35,16,2)}
     c.restore();
   }
-  function menu(canvas,kind){if(!canvas)return;const c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.clearRect(0,0,80,80);kind==='tea'?glass(c,40,48,1.8):snack(c,40,48,1.35)}
-  return {ground:layer,table,avatar,glass,snack,menu};
+  function dish(c,x,y,kind,scale=1){
+    if(kind==='tea')return glass(c,x,y,scale);
+    if(kind==='snack')return snack(c,x,y,scale);
+    c.save();c.translate(x,y);c.scale(scale,scale);
+    if(kind==='seeds'){
+      p(c,'#704b36',-22,8,44,6);p(c,'#548b83',-24,-2,48,12);p(c,'#c7d2aa',-20,-6,40,14);
+      for(let i=0;i<14;i++){const x=-16+(i%5)*7,y=-6+Math.floor(i/5)*5;p(c,'#3e382f',x,y,4,6);p(c,'#d4b888',x,y,2,4)}
+    }else{
+      p(c,'#4e625b',-10,-18,20,32);p(c,'#d0e8d7',-8,-16,16,28);
+      p(c,kind==='coffee'?'#68422d':'#b5bb4b',-6,-6,12,16);
+      if(kind==='coffee'){p(c,'#ead4a0',-6,4,12,6);p(c,'#a97b4c',-6,0,12,4)}
+      for(const [dx,dy] of [[-5,-12],[2,-9],[-3,-3]]){p(c,'#f3f2d2',dx,dy,4,4)}
+      p(c,'#edb25b',4,-28,2,32);p(c,'#fff4d7',-10,-20,20,2);
+      if(kind==='lemonade'){p(c,'#52784a',-15,-20,12,12);p(c,'#ebcf5c',-13,-18,8,8);p(c,'#fff1a4',-11,-16,4,4)}
+    }c.restore();
+  }
+  function enjoy(c,x,y,person,kind,elapsed,reduced=false,scale=1){
+    const drink=window.TeaMenu?.[kind]?.drink??(kind==='tea'),phase=Math.min(1,elapsed/2200);
+    c.save();c.translate(x,y);c.scale(scale,scale);
+    const lift=reduced?1:Math.min(1,phase/.2)*Math.min(1,(1-phase)/.2);
+    const handX=22-14*lift,handY=2-18*lift;
+    p(c,'#e7ad79',9,handY,handX-5,5);
+    if(drink){c.save();c.translate(handX,handY);if(!reduced)c.rotate(-.22*lift);dish(c,0,0,kind,.62);c.restore()}
+    else{p(c,kind==='seeds'?'#514332':'#bf8042',handX-3,handY-5,8,6);p(c,'#f2c97e',handX-2,handY-5,4,2)}
+    if(lift>.7){p(c,'#f1c38b',-5,-23,13,5);p(c,'#513a2e',-4,-21,4,2);p(c,'#513a2e',4,-21,4,2);p(c,'#d88972',-7,-18,4,3);p(c,'#d88972',6,-18,4,3)}
+    if(!reduced)for(let i=0;i<5;i++){const q=(phase*1.6+i*.17)%1,dx=(i%2?-1:1)*(16+q*15),dy=-34-q*17;p(c,drink?'#bde7db':'#e6b76b',dx,dy,4,4);if(drink&&i%2===0){p(c,'#fff0b3',dx-2,dy+2,8,2)}}
+    c.restore();
+  }
+  function menu(canvas,kind){if(!canvas)return;const c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.clearRect(0,0,80,80);dish(c,40,48,kind,window.TeaMenu?.[kind]?.drink?1.8:1.35)}
+  return {ground:layer,table,avatar,glass,snack,dish,enjoy,menu};
 })();
