@@ -1,11 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createGame, act, progress, view, evaluateFive, evaluateSeven, chooseBotAction, compareScore, makeDeck, TURN_MS } = require('../features/tea/poker');
+const { createGame, act, progress, depart, view, evaluateFive, evaluateSeven, chooseBotAction, compareScore, makeDeck, TURN_MS, ACTION_HOLD_MS } = require('../features/tea/poker');
 
 const c = (rank, suit = 0) => ({ id: `pk-${rank}-${suit}`, rank, suit });
 const game = (players = ['A', 'B', 'C'], dealerIndex = 0) => createGame({ id: 'test-hand', tableId: 'table-1', players, names: { A: 'Alice', B: 'Bob', C: 'Charlie' }, now: 1_000, dealerIndex });
 const turn = g => g.players[g.turnIndex];
-const play = (g, action, raiseTo, now = 1_001) => act(g, turn(g), { action, ...(raiseTo === undefined ? {} : { raiseTo }) }, now);
+const play = (g, action, raiseTo, now = Math.max(1_001, g.nextActionAt || 0)) => act(g, turn(g), { action, ...(raiseTo === undefined ? {} : { raiseTo }) }, now);
 const chipTotal = g => g.players.reduce((sum, id) => sum + g.playerState[id].stack + (g.status === 'active' ? g.playerState[id].totalBet : 0), 0);
 function street(g, stage = 'flop') {
   g.stage = stage; g.board = [c(2), c(7, 1), c(9, 2)]; g.currentBet = 0; g.minRaise = 20;
@@ -198,22 +198,25 @@ test('safe views reveal only owned holes during play and public showdown contend
 
 test('deadline timeout folds when facing a call and checks if no bet is owed', () => {
   const g = game(); progress(g, 31_000);
-  assert.equal(g.playerState.A.folded, true); assert.equal(g.lastAction.type, 'timeout_fold'); assert.equal(g.lastAction.at, 31_000); assert.equal(g.turnEndsAt, 61_000);
-  const h = game(['A', 'B']); play(h, 'call', undefined, 2_000); progress(h, 32_000);
-  assert.equal(h.stage, 'flop'); assert.equal(h.lastAction.type, 'timeout_check'); assert.equal(h.lastAction.at, 32_000); assert.equal(h.turnEndsAt, 62_000);
+  assert.equal(g.playerState.A.folded, true); assert.equal(g.lastAction.type, 'timeout_fold'); assert.equal(g.lastAction.at, 31_000); assert.equal(g.turnEndsAt, 61_000 + ACTION_HOLD_MS);
+  const h = game(['A', 'B']); play(h, 'call', undefined, 2_000); progress(h, 32_000 + ACTION_HOLD_MS);
+  assert.equal(h.stage, 'flop'); assert.equal(h.lastAction.type, 'timeout_check'); assert.equal(h.lastAction.at, 32_000 + ACTION_HOLD_MS); assert.equal(h.turnEndsAt, 62_000 + 2 * ACTION_HOLD_MS);
 });
 
 test('catch-up after interruption uses original deadlines rather than extending hand from restart time', () => {
   const g = game(['A', 'B', 'C', 'D']); progress(g, 121_000);
-  assert.equal(g.status, 'finished'); assert.equal(g.finishedAt, new Date(91_000).toISOString()); assert.equal(g.version, 4); assert.equal(chipTotal(g), 4_000);
-  const h = street(game(['A', 'B'])); progress(h, 181_000);
-  assert.equal(h.stage, 'showdown'); assert.equal(h.finishedAt, new Date(181_000).toISOString()); assert.equal(h.version, 7); assert.equal(chipTotal(h), 2_000);
+  assert.equal(g.status, 'finished'); assert.equal(g.finishedAt, new Date(91_000 + 2 * ACTION_HOLD_MS).toISOString()); assert.equal(g.version, 4); assert.equal(chipTotal(g), 4_000);
+  const h = street(game(['A', 'B'])); progress(h, 181_000 + 5 * ACTION_HOLD_MS);
+  assert.equal(h.stage, 'showdown'); assert.equal(h.finishedAt, new Date(181_000 + 5 * ACTION_HOLD_MS).toISOString()); assert.equal(h.version, 7); assert.equal(chipTotal(h), 2_000);
 });
 
-test('bots act after a timed-out player at the exact original timestamp with no millisecond drift', () => {
+test('bots wait for the visible action hold after a timeout and keep the original schedule', () => {
   const g = street(game(['A', 'bot:tea', 'C'])); g.hands['bot:tea'] = [c(4, 2), c(6, 3)];
   progress(g, 31_000);
-  assert.equal(turn(g), 'C'); assert.equal(g.turnEndsAt, 61_000); assert.equal(g.lastAction.at, 31_000); assert.equal(g.version, 3);
+  assert.equal(turn(g), 'bot:tea'); assert.equal(g.version, 2);
+  progress(g, 31_000 + ACTION_HOLD_MS - 1); assert.equal(g.version, 2);
+  progress(g, 31_000 + ACTION_HOLD_MS);
+  assert.equal(turn(g), 'C'); assert.equal(g.turnEndsAt, 61_000 + 2 * ACTION_HOLD_MS); assert.equal(g.lastAction.at, 31_000 + ACTION_HOLD_MS); assert.equal(g.version, 3);
 });
 
 test('bot decision consumes own hand and public board only, uses legal affordable actions', () => {
@@ -221,7 +224,79 @@ test('bot decision consumes own hand and public board only, uses legal affordabl
   const state = view(g, 'bot:b', 1_001), original = chooseBotAction(state, 0.5);
   g.hands.A = [c(14), c(14, 1)]; g.hands.C = [c(14, 2), c(14, 3)]; g.deck.reverse();
   assert.deepEqual(chooseBotAction(view(g, 'bot:b', 1_001), 0.5), original);
-  progress(g, 1_001); assert.equal(turn(g), 'C'); assert.equal(g.version, 3); assert.equal(chipTotal(g), 3_000);
+  progress(g, 1_001); assert.equal(turn(g), 'bot:b'); assert.equal(g.version, 2);
+  progress(g, 1_001 + ACTION_HOLD_MS); assert.equal(turn(g), 'C'); assert.equal(g.version, 3); assert.equal(chipTotal(g), 3_000);
+});
+
+test('a confirmed action remains visible for the full hold and the next human gets a full thirty seconds', () => {
+  const g = game(['A', 'B']); play(g, 'call', undefined, 2_000);
+  const before = structuredClone(g), held = view(g, 'B', 2_000);
+  assert.equal(held.canCheck, true); assert.equal(held.canAct, false);
+  assert.equal(held.nextActionAt, 2_000 + ACTION_HOLD_MS); assert.equal(held.turnEndsAt, held.nextActionAt + TURN_MS);
+  assert.throws(() => act(g, 'B', { action: 'check' }, held.nextActionAt - 1), errorCode('turn_not_ready'));
+  assert.deepEqual(g, before); assert.equal(view(g, 'B', held.nextActionAt).canAct, true);
+  act(g, 'B', { action: 'check' }, held.nextActionAt);
+  assert.equal(g.stage, 'flop'); assert.equal(g.lastAction.at, held.nextActionAt);
+  assert.deepEqual(g.actionHistory.map(event => event.playerId), ['A', 'B']);
+});
+
+test('opening bots and consecutive bots perform one visible action at each scheduled hold', () => {
+  const g = game(['A', 'bot:1', 'bot:2', 'bot:3']);
+  // Fixed, unpaired low holes remove optional random preflop raises from this timing check.
+  g.hands={A:[c(10),c(11)],'bot:1':[c(3,1),c(7,1)],'bot:2':[c(4,2),c(8,2)],'bot:3':[c(5,3),c(9,3)]};
+  const used=new Set(Object.values(g.hands).flat().map(card=>card.id));g.deck=makeDeck().filter(card=>!used.has(card.id));
+  progress(g, 1_000); assert.equal(g.version, 1); assert.equal(g.lastAction, null);
+  progress(g, 1_000 + ACTION_HOLD_MS - 1); assert.equal(g.version, 1);
+  progress(g, 1_000 + ACTION_HOLD_MS); assert.equal(g.version, 2); assert.equal(turn(g), 'A');
+  play(g, 'call'); const own = g.lastAction, at = g.nextActionAt;
+  progress(g, at - 1); assert.deepEqual(g.lastAction, own); assert.equal(g.actionHistory.length, 2);
+  progress(g, at); assert.equal(g.actionHistory.length, 3); assert.equal(turn(g), 'bot:2');
+  progress(g, at + ACTION_HOLD_MS - 1); assert.equal(g.actionHistory.length, 3);
+  progress(g, at + ACTION_HOLD_MS); assert.equal(g.actionHistory.length, 4);
+  assert.deepEqual(g.actionHistory.map(event => event.version), [2, 3, 4, 5]);
+  assert.equal(g.actionHistory[3].at - g.actionHistory[2].at, ACTION_HOLD_MS);
+  assert.equal(g.actionHistory[3].board.length, 3); assert.equal(chipTotal(g), 4_000);
+});
+
+test('delayed polling retains ordered public action snapshots without replaying or revealing private cards', () => {
+  const g = street(game(['A', 'bot:1', 'bot:2', 'B']));
+  play(g, 'check'); const at = g.nextActionAt;
+  progress(g, at + ACTION_HOLD_MS);
+  assert.deepEqual(g.actionHistory.map(event => event.playerId), ['A', 'bot:1', 'bot:2']);
+  assert.equal(g.actionHistory.every((event, index, entries) => index === 0 || event.at > entries[index - 1].at), true);
+  const unchanged = structuredClone(g); progress(g, at + ACTION_HOLD_MS); assert.deepEqual(g, unchanged);
+  g.actionHistory[0].hands = g.hands; g.actionHistory[0].players[0].hand = g.hands.A;
+  const state = view(g, 'A', at + ACTION_HOLD_MS);
+  assert.equal(state.actionHistory.some(event => 'hands' in event || 'deck' in event || event.players.some(player => 'hand' in player)), false);
+  state.actionHistory[0].board[0].rank = 99; state.actionHistory[0].players[0].stack = 99;
+  assert.notEqual(g.actionHistory[0].board[0].rank, 99); assert.notEqual(g.playerState.A.stack, 99);
+});
+
+test('action history is bounded even when repeated full raises produce a long hand', () => {
+  const g = game(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+  g.players.forEach(id => { g.playerState[id].stack += 5_000; });
+  for (let i = 0; i < 60; i++) play(g, 'raise', g.currentBet + g.minRaise);
+  const state = view(g, 'A', g.nextActionAt);
+  assert.equal(state.actionHistory.length, 48); assert.equal(state.actionHistory[0].version, 14); assert.equal(state.actionHistory.at(-1).version, 61);
+  assert.equal(chipTotal(g), 48_000);
+});
+
+test('legacy active documents without pacing fields continue at their stored deadline', () => {
+  const g = game(['A', 'bot:1', 'B']); delete g.nextActionAt; delete g.actionHistory;
+  assert.equal(view(g, 'A', 1_001).nextActionAt, 1_000); play(g, 'call');
+  const at = g.nextActionAt; progress(g, at);
+  assert.equal(g.version, 3); assert.equal(g.actionHistory.length, 2); assert.equal(g.actionHistory[0].playerId, 'A');
+  assert.equal(turn(g), 'B'); assert.equal(chipTotal(g), 3_000);
+});
+
+test('the last human leaving cancels a bot-only hand immediately and returns each virtual contribution once', () => {
+  const g = game(['A', 'bot:1', 'bot:2']); play(g, 'raise', 100);
+  depart(g, ['A'], 3_000, true);
+  const ended = structuredClone(g), state = view(g, 'bot:1', 3_000);
+  assert.equal(g.status, 'finished'); assert.equal(g.reason, 'player_left'); assert.equal(g.nextActionAt, null);
+  assert.equal(g.players.every(id => g.playerState[id].stack === 1_000), true); assert.equal(chipTotal(g), 3_000);
+  assert.deepEqual(state.winnerIds, []); assert.equal(state.results, undefined); assert.equal(state.players.some(player => 'hand' in player), false);
+  depart(g, ['A'], 4_000, true); progress(g, 100_000); assert.deepEqual(g, ended);
 });
 
 test('hundreds of bounded mixed human/bot hands finish without negative or lost virtual chips', () => {
@@ -229,7 +304,10 @@ test('hundreds of bounded mixed human/bot hands finish without negative or lost 
     const count = 2 + iteration % 7, ids = Array.from({ length: count }, (_, i) => i === 0 || i % 2 ? `human-${i}` : `bot:${i}`), g = game(ids);
     let clock = 1_001;
     for (let actions = 0; actions < 500 && g.status === 'active'; actions++) {
+      clock = Math.max(clock, g.nextActionAt);
       progress(g, clock); if (g.status !== 'active') break;
+      if (turn(g).startsWith('bot:')) continue;
+      clock = Math.max(clock, g.nextActionAt);
       const state = view(g, turn(g), clock);
       if (actions % 17 === 0 && state.canAllIn) play(g, 'allin', undefined, clock);
       else if (state.canCheck) play(g, 'check', undefined, clock);

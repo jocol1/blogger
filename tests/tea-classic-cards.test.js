@@ -4,6 +4,7 @@ const crypto = require('node:crypto');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
 const { TABLES } = require('../public/tea/world');
 const { createClassicCards, makeDeck, score, REVEAL_MS } = require('../features/tea/classic-cards');
+const { ACTION_HOLD_MS } = require('../features/tea/poker');
 
 const request = () => crypto.randomUUID();
 const card = (rank, suit = 0) => ({ id: `bc-${rank}-${suit}`, rank, suit });
@@ -241,7 +242,7 @@ test('Poker timeout advances and persists before rejecting a late action, withou
   const game = await f.stored('poker'), next = (await f.classic.state(f.players[0], 'poker')).game;
   assert.equal(game.playerState[first.turn].folded, true); assert.equal(game.version, first.version + 1);
   assert.equal(game.lastAction.type, 'timeout_fold'); assert.equal(game.lastAction.at, f.now());
-  assert.notEqual(next.turn, first.turn); assert.equal(next.turnEndsAt, f.now() + 30_000);
+  assert.notEqual(next.turn, first.turn); assert.equal(next.nextActionAt, f.now() + ACTION_HOLD_MS); assert.equal(next.turnEndsAt, next.nextActionAt + 30_000);
 });
 
 test('concurrent duplicate starts create a single deal and retries cannot switch to a different card mode', async () => {

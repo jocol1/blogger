@@ -60,11 +60,8 @@ function createClassicCards({ db, now = () => Date.now(), tableIds = [] }) {
     const absent = game.players.filter(id => !id.startsWith('bot:') && !table.seats.some(seat => seat.walletId === id));
     if (!absent.length) return;
     if (game.key === 'poker') {
-      for (const id of absent) if (!game.playerState[id].folded) {
-        game.playerState[id].folded = true; game.version++;
-        game.lastAction = { playerId: id, type: 'leave', at };
-      }
-      poker.progress(game, at);
+      const noHumans = game.players.filter(id => !id.startsWith('bot:')).every(id => !table.seats.some(seat => seat.walletId === id));
+      poker.depart(game, absent, at, noHumans);
     } else {
       game.status = 'finished'; game.version++; game.finishedAt = iso(at); game.reason = 'player_left'; game.winnerIds = [];
     }

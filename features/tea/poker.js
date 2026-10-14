@@ -1,6 +1,8 @@
 const crypto = require('node:crypto');
 
 const TURN_MS = 30_000;
+const ACTION_HOLD_MS = 1_100;
+const HISTORY_LIMIT = 48;
 const SMALL_BLIND = 10;
 const BIG_BLIND = 20;
 const STARTING_STACK = 1_000;
@@ -73,9 +75,40 @@ function contribute(game, id, amount) {
 }
 function record(game, playerId, type, amount, at) {
   game.version++;
-  game.lastAction = { playerId, type, amount, at };
+  game.lastAction = { version: game.version, playerId, type, amount, at };
 }
-function setTurn(game, index, at) { game.turnIndex = index; game.turnEndsAt = at + TURN_MS; }
+function readyAt(game) {
+  return Number.isFinite(game.nextActionAt) ? game.nextActionAt : game.turnEndsAt - TURN_MS;
+}
+function setTurn(game, index, at, hold = ACTION_HOLD_MS) {
+  game.turnIndex = index; game.nextActionAt = at + hold; game.turnEndsAt = game.nextActionAt + TURN_MS;
+}
+// Keep enough public snapshots to display every action missed by a poll. Never copy
+// the private hands, deck or a whole game document into this feed.
+function publicAction(game, action) {
+  return {
+    version: action.version, playerId: action.playerId, type: action.type, amount: action.amount || 0, at: action.at,
+    stage: game.stage, board: clone(game.board), pot: game.status === 'finished' ? game.finalPot ?? pot(game) : pot(game),
+    turn: game.status === 'active' ? game.players[game.turnIndex] : null,
+    nextActionAt: game.status === 'active' ? readyAt(game) : null,
+    players: game.players.map(id => {
+      const player = game.playerState[id];
+      return { id, stack: player.stack, bet: player.bet, totalBet: player.totalBet, folded: player.folded, allIn: player.allIn };
+    }),
+  };
+}
+function rememberAction(game) {
+  if (!game.lastAction) return;
+  const history = Array.isArray(game.actionHistory) ? game.actionHistory : [];
+  game.actionHistory = [...history, publicAction(game, game.lastAction)].slice(-HISTORY_LIMIT);
+}
+function safeHistory(game) {
+  return (Array.isArray(game.actionHistory) ? game.actionHistory : []).slice(-HISTORY_LIMIT).map(entry => ({
+    version: entry.version, playerId: entry.playerId, type: entry.type, amount: entry.amount, at: entry.at,
+    stage: entry.stage, board: clone(entry.board || []), pot: entry.pot, turn: entry.turn, nextActionAt: entry.nextActionAt,
+    players: (entry.players || []).map(player => ({ id: player.id, stack: player.stack, bet: player.bet, totalBet: player.totalBet, folded: player.folded, allIn: player.allIn })),
+  }));
+}
 function nextNeeding(game, from) {
   for (let step = 1; step <= game.players.length; step++) {
     const index = (from + step) % game.players.length;
@@ -135,7 +168,7 @@ function finish(game, at, uncontested = false) {
   game.payouts.forEach(({ playerId, amount }) => { game.playerState[playerId].stack += amount; });
   game.players.forEach(id => { game.playerState[id].allIn = game.playerState[id].stack === 0 && !game.playerState[id].folded; });
   game.status = 'finished'; game.stage = game.showdown ? 'showdown' : game.stage;
-  game.finishedAt = new Date(at).toISOString(); game.turnEndsAt = null;
+  game.finishedAt = new Date(at).toISOString(); game.turnEndsAt = null; game.nextActionAt = null;
 }
 function reconcile(game, at, from = game.turnIndex) {
   if (game.status !== 'active') return;
@@ -156,14 +189,15 @@ function createGame({ id, tableId, players, names = {}, now, dealerIndex = 0 }) 
   if (!Array.isArray(players) || players.length < 2 || players.length > 8 || new Set(players).size !== players.length || players.some(player => typeof player !== 'string')) fail(400, 'Poker needs 2–8 players.', 'bad_player_count');
   if (!Number.isFinite(now)) fail(400, 'A server timestamp is required.', 'bad_clock');
   dealerIndex = Number.isInteger(dealerIndex) ? ((dealerIndex % players.length) + players.length) % players.length : 0;
-  const game = { id, tableId, key: 'poker', status: 'active', version: 1, players: [...players], names: Object.fromEntries(players.map(player => [player, names[player] || player])), hands: {}, playerState: {}, deck: makeDeck(), board: [], burned: [], stage: 'preflop', currentBet: BIG_BLIND, minRaise: BIG_BLIND, dealerIndex, turnIndex: 0, turnEndsAt: now + TURN_MS, createdAt: new Date(now).toISOString(), lastAction: null, payouts: [], winnerIds: [], refunds: [], showdown: false, botSeed: crypto.randomBytes(4).readUInt32LE(0) || 1 };
+  const game = { id, tableId, key: 'poker', status: 'active', version: 1, players: [...players], names: Object.fromEntries(players.map(player => [player, names[player] || player])), hands: {}, playerState: {}, deck: makeDeck(), board: [], burned: [], stage: 'preflop', currentBet: BIG_BLIND, minRaise: BIG_BLIND, dealerIndex, turnIndex: 0, turnEndsAt: now + TURN_MS, createdAt: new Date(now).toISOString(), lastAction: null, actionHistory: [], payouts: [], winnerIds: [], refunds: [], showdown: false, botSeed: crypto.randomBytes(4).readUInt32LE(0) || 1 };
   players.forEach(player => { game.hands[player] = []; game.playerState[player] = { stack: STARTING_STACK, bet: 0, totalBet: 0, folded: false, allIn: false, actedAtBet: null }; });
   // Deal one card at a time, beginning left of the dealer.
   for (let round = 0; round < 2; round++) for (let step = 1; step <= players.length; step++) game.hands[players[(dealerIndex + step) % players.length]].push(game.deck.pop());
   game.smallBlindIndex = players.length === 2 ? dealerIndex : (dealerIndex + 1) % players.length;
   game.bigBlindIndex = (game.smallBlindIndex + 1) % players.length;
   contribute(game, players[game.smallBlindIndex], SMALL_BLIND); contribute(game, players[game.bigBlindIndex], BIG_BLIND);
-  setTurn(game, (game.bigBlindIndex + 1) % players.length, now);
+  const openingIndex = (game.bigBlindIndex + 1) % players.length;
+  setTurn(game, openingIndex, now, players[openingIndex].startsWith('bot:') ? ACTION_HOLD_MS : 0);
   return game;
 }
 function applyAction(game, playerId, input, now, timeout = false) {
@@ -171,6 +205,7 @@ function applyAction(game, playerId, input, now, timeout = false) {
   if (!game.players.includes(playerId)) fail(403, 'You are not playing this hand.', 'not_player');
   if (game.players[game.turnIndex] !== playerId || !needsAction(game, playerId)) fail(409, 'Wait for your turn.', 'not_turn');
   if (!Number.isFinite(now) || (!timeout && now >= game.turnEndsAt)) fail(409, 'This turn has expired. Refresh the table.', 'turn_expired');
+  if (!timeout && now < readyAt(game)) fail(409, 'Let the previous action finish before playing.', 'turn_not_ready');
   const p = game.playerState[playerId], action = input?.action, owed = Math.max(0, game.currentBet - p.bet), maximum = p.bet + p.stack;
   let amount = 0, type = action;
   if (action === 'fold') p.folded = true;
@@ -196,6 +231,7 @@ function applyAction(game, playerId, input, now, timeout = false) {
   p.actedAtBet = game.currentBet;
   record(game, playerId, timeout ? `timeout_${type}` : type, amount, now);
   reconcile(game, now, game.turnIndex);
+  rememberAction(game);
   return game;
 }
 function act(game, playerId, input, now) { return applyAction(game, playerId, input, now); }
@@ -225,13 +261,34 @@ function progress(game, now) {
   for (let guard = 0; guard < 2_048 && game.status === 'active'; guard++) {
     const playerId = game.players[game.turnIndex];
     if (playerId.startsWith('bot:')) {
-      const at = game.turnEndsAt - TURN_MS;
+      const at = readyAt(game);
+      if (now < at) break;
       act(game, playerId, chooseBotAction(view(game, playerId, at), botRandom(game)), at);
     } else if (now >= game.turnEndsAt) {
       const at = game.turnEndsAt, p = game.playerState[playerId], action = p.bet < game.currentBet ? 'fold' : 'check';
       applyAction(game, playerId, { action }, at, true);
     } else break;
   }
+  return game;
+}
+function cancel(game, now, reason = 'player_left') {
+  if (game.status !== 'active') return game;
+  game.players.forEach(id => {
+    const player = game.playerState[id];
+    player.stack += player.totalBet; player.bet = 0; player.totalBet = 0; player.allIn = false;
+  });
+  game.version++; game.status = 'finished'; game.reason = reason; game.finishedAt = new Date(now).toISOString();
+  game.turnEndsAt = null; game.nextActionAt = null; game.showdown = false; game.finalPot = 0;
+  game.winnerIds = []; game.payouts = []; delete game.results;
+  return game;
+}
+function depart(game, playerIds, now, abandon = false) {
+  if (game.status !== 'active') return game;
+  for (const id of playerIds) if (game.playerState[id] && !game.playerState[id].folded) {
+    game.playerState[id].folded = true; record(game, id, 'leave', 0, now); rememberAction(game);
+  }
+  if (abandon) cancel(game, now);
+  else progress(game, now);
   return game;
 }
 function view(game, walletId, now) {
@@ -242,14 +299,15 @@ function view(game, walletId, now) {
     id: game.id, tableId: game.tableId, key: 'poker', status: game.status, version: game.version,
     players: game.players.map(id => { const p = game.playerState[id]; return { id, name: game.names[id], bot: id.startsWith('bot:'), stack: p.stack, bet: p.bet, totalBet: p.totalBet, folded: p.folded, allIn: p.allIn, ...(game.status === 'finished' && game.showdown && !p.folded ? { hand: clone(game.hands[id]) } : {}) }; }),
     hand: clone(game.hands[walletId] || []), board: clone(game.board), pot: game.status === 'finished' ? game.finalPot ?? pot(game) : pot(game),
-    stage: game.stage, turn: turnId, turnEndsAt: game.turnEndsAt, serverNow: now,
+    stage: game.stage, turn: turnId, turnEndsAt: game.turnEndsAt, nextActionAt: game.status === 'active' ? readyAt(game) : null, serverNow: now,
+    canAct: Boolean(actor && now >= readyAt(game) && now < game.turnEndsAt),
     dealerId: game.players[game.dealerIndex], smallBlindId: game.players[game.smallBlindIndex], bigBlindId: game.players[game.bigBlindIndex],
     currentBet: game.currentBet, toCall: owed, minRaiseTo: minRaiseTo(game), maxRaiseTo: maximum,
     canCheck: actor && owed === 0, canRaise: Boolean(raiseAllowed && maximum >= minRaiseTo(game)), canAllIn: Boolean(actor && (maximum <= game.currentBet || raiseAllowed || (livePlayers(game).length < 2 && owed > 0))),
-    winnerIds: [...game.winnerIds], payouts: clone(game.payouts), lastAction: game.lastAction ? clone(game.lastAction) : null, reason: game.reason || null,
+    winnerIds: [...game.winnerIds], payouts: clone(game.payouts), lastAction: game.lastAction ? clone(game.lastAction) : null, actionHistory: safeHistory(game), reason: game.reason || null,
     ...(game.status === 'finished' && game.showdown ? { results: clone(game.results) } : {}),
   };
   return result;
 }
 
-module.exports = { createGame, act, progress, view, evaluateFive, evaluateSeven, chooseBotAction, makeDeck, compareScore, TURN_MS, SMALL_BLIND, BIG_BLIND, STARTING_STACK };
+module.exports = { createGame, act, progress, depart, cancel, view, evaluateFive, evaluateSeven, chooseBotAction, makeDeck, compareScore, TURN_MS, ACTION_HOLD_MS, SMALL_BLIND, BIG_BLIND, STARTING_STACK };

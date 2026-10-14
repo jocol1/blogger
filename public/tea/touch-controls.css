@@ -1,0 +1,4 @@
+.dpad,.dpad *,#brawl-controls,#brawl-controls *,#cafe-canvas,#brawl-canvas{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+}
+.dpad button,#brawl-stick,.brawl-action-buttons button{touch-action:none}
