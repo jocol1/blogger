@@ -11,32 +11,36 @@ function createTableGames({db,now}) {
     const base={id:game.id,version:game.version||0,key:game.key,tableId:game.tableId,status:game.status,players:game.players.map(id=>({id,name:game.names[id],bot:id.startsWith('bot:'),score:game.scores[id]||0})),turn:game.players[game.turnIndex],deadline:game.deadline,winnerIds:game.winnerIds||[],serverNow:now(),round:game.round||1,last:game.last||null,member:game.players.includes(walletId)};
     if(game.key==='dice')return {...base,target:20};
     if(game.key==='rps')return {...base,submitted:game.players.filter(id=>game.choices[id]),myChoice:game.choices[walletId]||null,maxRounds:5};
-    if(game.key==='oanquan')return {...base,pits:game.pits,quan:game.quan,side:game.players.indexOf(walletId),last:game.last||null};
+    if(game.key==='oanquan')return {...base,pits:game.pits,quan:game.quan,playback:game.playback||null,side:game.players.indexOf(walletId),last:game.last||null};
     return {...base,tiles:game.tiles.map((symbol,index)=>({index,symbol:game.matched.includes(index)||(game.reveal||[]).includes(index)||game.status==='finished'?symbol:null,matched:game.matched.includes(index)})),revealUntil:game.revealUntil||null};
   }
   function advance(game,at=now()){game.turnIndex=(game.turnIndex+1)%game.players.length;game.deadline=at+15_000;game.first=null}
   function finish(game){game.status='finished';const maximum=Math.max(...Object.values(game.scores));game.winnerIds=game.players.filter(id=>game.scores[id]===maximum);game.finishedAt=now()}
   const OAN_SIDES=[[0,1,2,3,4],[10,9,8,7,6]],OAN_QUAN=[5,11];
-  function finishOanQuan(game){for(let side=0;side<2;side++)for(const pit of OAN_SIDES[side]){game.scores[game.players[side]]+=game.pits[pit];game.pits[pit]=0}finish(game)}
+  function finishOanQuan(game,record){for(let side=0;side<2;side++)for(const pit of OAN_SIDES[side]){const playerId=game.players[side];game.scores[playerId]+=game.pits[pit];game.pits[pit]=0;record?.('collect',pit,{playerId,score:game.scores[playerId]})}finish(game)}
   function oanQuanMove(game,id,pit,direction,at=now(),timeout=false){
     const side=game.players.indexOf(id),own=OAN_SIDES[side];if(!own?.includes(pit)||!game.pits[pit]||![-1,1].includes(direction))fail(400,'Choose a non-empty pit on your side.','bad_pit');
+    const before={pits:[...game.pits],quan:[...game.quan],scores:{...game.scores}},steps=[];
+    let duration=0;const record=(type,index,extra={})=>{const ms=type==='sow'?320:type==='capture'?800:500;steps.push({type,pit:index,count:game.pits[index],at:duration,duration:ms,...extra});duration+=ms};
     const next=index=>(index+direction+12)%12;let cursor=pit,captured=0;const seen=new Set();
-    // Continue from the square AFTER the last seed, never from the landing square.
     while(true){
       const state=cursor+':'+game.pits.join(',');if(seen.has(state))break;seen.add(state);
-      let stones=game.pits[cursor];game.pits[cursor]=0;
-      while(stones-->0){cursor=next(cursor);game.pits[cursor]++}
+      let stones=game.pits[cursor];game.pits[cursor]=0;record('pickup',cursor,{held:stones});
+      while(stones>0){cursor=next(cursor);game.pits[cursor]++;stones--;record('sow',cursor,{held:stones})}
       const adjacent=next(cursor);
       if(game.pits[adjacent]>0){if(OAN_QUAN.includes(adjacent))break;cursor=adjacent;continue}
       let gap=adjacent;
-      while(game.pits[gap]===0){const target=next(gap);if(!game.pits[target])break;captured+=game.pits[target];const qi=OAN_QUAN.indexOf(target);if(qi>=0&&game.quan[qi]){captured+=9;game.quan[qi]=false}game.pits[target]=0;gap=next(target)}
+      while(game.pits[gap]===0){const target=next(gap);if(!game.pits[target])break;let points=game.pits[target];const qi=OAN_QUAN.indexOf(target);if(qi>=0&&game.quan[qi]){points+=9;game.quan[qi]=false}captured+=points;game.scores[id]+=points;game.pits[target]=0;record('capture',target,{points,playerId:id,score:game.scores[id],quan:[...game.quan],held:0});gap=next(target)}
       break;
     }
-    game.scores[id]+=captured;game.last={playerId:id,pit,direction,lastPit:cursor,captured,timeout};
-    if(OAN_QUAN.every(index=>game.pits[index]===0)){finishOanQuan(game);return}
-    advance(game,at);game.deadline=at+30_000;
-    const nextId=game.players[game.turnIndex],row=OAN_SIDES[game.turnIndex];
-    if(row.every(index=>game.pits[index]===0)){for(const index of row)game.pits[index]=1;game.scores[nextId]-=5;game.last.refilledPlayerId=nextId}
+    game.last={playerId:id,pit,direction,lastPit:cursor,captured,timeout};
+    if(OAN_QUAN.every(index=>game.pits[index]===0))finishOanQuan(game,record);
+    else{
+      advance(game,at);const nextId=game.players[game.turnIndex],row=OAN_SIDES[game.turnIndex];
+      if(row.every(index=>game.pits[index]===0)){game.scores[nextId]-=5;for(const index of row){game.pits[index]=1;record('refill',index,{playerId:nextId,score:game.scores[nextId]})}game.last.refilledPlayerId=nextId}
+    }
+    game.playback={id:crypto.randomUUID(),playerId:id,direction,startedAt:at,endsAt:at+duration+900,before,steps};
+    game.deadline=game.playback.endsAt+30_000;game.botReadyAt=game.playback.endsAt+900;
   }
   function botOanQuan(game,at=now()){const id=game.players[game.turnIndex],pits=OAN_SIDES[game.turnIndex].filter(index=>game.pits[index]>0);oanQuanMove(game,id,pits[crypto.randomInt(pits.length)],crypto.randomInt(2)?1:-1,at)}
   function dice(game,id,at=now()){const roll=crypto.randomInt(1,7);game.scores[id]+=roll;game.last={playerId:id,roll};if(game.scores[id]>=20){game.status='finished';game.winnerIds=[id];game.finishedAt=now()}else advance(game,at)}
@@ -55,6 +59,7 @@ function createTableGames({db,now}) {
   }
   function progress(game){
     for(let guard=0;guard<80&&game.status==='active';guard++){
+      if(game.key==='oanquan'&&game.playback?.endsAt>now())break;
       if(game.revealUntil){if(now()<game.revealUntil)break;game.reveal=[];game.revealUntil=null}
       const id=game.players[game.turnIndex];
       if(game.key==='rps'){
@@ -67,7 +72,7 @@ function createTableGames({db,now}) {
         if(game.key==='dice')dice(game,id);
         else if(game.key==='oanquan')botOanQuan(game);
         else{const free=game.tiles.map((_,i)=>i).filter(i=>!game.matched.includes(i)&&i!==game.first),memory=game.botMemory||{};let selected=null;if(game.first!==null)selected=free.find(i=>memory[i]&&memory[i]===memory[game.first]);else selected=free.find(i=>memory[i]&&free.some(j=>j!==i&&memory[j]===memory[i]));if(free.length)flip(game,id,selected??free[crypto.randomInt(free.length)]);}
-        game.botReadyAt=now()+900;break;
+        if(game.key!=='oanquan')game.botReadyAt=now()+900;break;
       }
       if(now()>=game.deadline){const at=game.deadline;if(game.key==='oanquan'){const side=game.players.indexOf(id),pit=OAN_SIDES[side].find(index=>game.pits[index]>0);if(pit!==undefined)oanQuanMove(game,id,pit,1,at,true);else finishOanQuan(game)}else{game.last={playerId:id,timeout:true};game.first=null;game.reveal=[];advance(game,at)}continue}break;
     }
@@ -82,6 +87,7 @@ function createTableGames({db,now}) {
     async start(walletId,input){const key=input.key,requestId=input.requestId;const botCount=Number(input.botCount||0);if(!REQUEST.test(requestId||'')||!Number.isInteger(botCount)||botCount<0||botCount>3)fail(400,'Invalid game request.','bad_request');
       return db.runTransaction(async tx=>{
         const {table,ref}=await current(tx,walletId,key);const snap=await tx.get(ref);if(snap.exists&&snap.data().requestId===requestId&&snap.data().startedBy===walletId)return view(snap.data(),walletId);
+        if(snap.exists&&key==='oanquan'&&snap.data().playback?.endsAt>now()&&!snap.data().last?.canceled)fail(409,'Wait for the stones to finish moving.','move_playback');
         if(snap.exists&&snap.data().status==='active'){const game=snap.data();checkPlayers(game,table);progress(game);if(game.status==='active')fail(409,'This game is already running.','game_active')}
         if(table.ownerId!==walletId)fail(403,'The first guest at the table starts the game.','not_host');const humans=table.seats.filter(s=>s.walletId).map(s=>s.walletId);if(humans.length+botCount>8)fail(400,'A table game supports up to eight players.','bad_player_count');
         const players=[...humans,...Array.from({length:botCount},(_,i)=>`bot:${i+1}`)],names={};for(const id of humans){const p=await tx.get(db.collection('tea_profiles').doc(id));names[id]=p.exists?p.data().nickname:'Guest'}players.filter(id=>id.startsWith('bot:')).forEach((id,i)=>names[id]=`BOT ${i+1}`);
@@ -95,9 +101,10 @@ function createTableGames({db,now}) {
     async action(walletId,input){if(!REQUEST.test(input.requestId||''))fail(400,'Invalid request.','bad_request');return db.runTransaction(async tx=>{
       const {table,ref}=await current(tx,walletId,input.key);const snap=await tx.get(ref);if(!snap.exists)fail(404,'Start a game first.','game_missing');const game=snap.data();if(game.id!==input.gameId)fail(409,'That game has ended.','old_game');if(!game.players.includes(walletId))fail(403,'You are watching this game.','spectator');
       const attempt=attempts().doc(crypto.createHash('sha256').update(`${game.id}:${walletId}:${input.requestId}`).digest('hex')),prior=await tx.get(attempt);if(prior.exists)return prior.data().result;
-      checkPlayers(game,table);progress(game);if(game.status!=='active')fail(409,'This game has ended.','game_finished');
+      if(game.key==='oanquan'){if(input.expectedVersion!==(game.version||0))fail(409,'The board has changed. Try again.','stale_move');if(game.playback?.endsAt>now())fail(409,'Wait for the stones to finish moving.','move_playback');if(game.status==='active'&&now()>=game.deadline)fail(409,'Your turn has expired. Refresh the board.','turn_expired')}
+      checkPlayers(game,table);if(game.key!=='oanquan')progress(game);if(game.status!=='active')fail(409,'This game has ended.','game_finished');
       if(game.key==='rps'){if(!['rock','paper','scissors'].includes(input.choice))fail(400,'Choose rock, paper or scissors.','bad_choice');if(game.round!==input.round||game.choices[walletId])fail(409,'Wait for the next round.','already_played');game.choices[walletId]=input.choice;progress(game)}
-      else{if(game.players[game.turnIndex]!==walletId||game.revealUntil)fail(409,'Wait for your turn.','not_turn');if(game.key==='dice')dice(game,walletId);else if(game.key==='oanquan'){oanQuanMove(game,walletId,Number(input.pit),Number(input.direction));game.deadline=now()+30_000}else{const index=Number(input.index);if(!Number.isInteger(index)||index<0||index>=12||game.matched.includes(index)||game.first===index)fail(400,'Choose a hidden tile.','bad_tile');flip(game,walletId,index)}game.botReadyAt=now()+900;progress(game)}
+      else{if(game.players[game.turnIndex]!==walletId||game.revealUntil)fail(409,'Wait for your turn.','not_turn');if(game.key==='dice')dice(game,walletId);else if(game.key==='oanquan'){oanQuanMove(game,walletId,Number(input.pit),Number(input.direction))}else{const index=Number(input.index);if(!Number.isInteger(index)||index<0||index>=12||game.matched.includes(index)||game.first===index)fail(400,'Choose a hidden tile.','bad_tile');flip(game,walletId,index)}if(game.key!=='oanquan')game.botReadyAt=now()+900;progress(game)}
       game.version=(game.version||0)+1;const result=view(game,walletId);tx.set(ref,game);tx.create(attempt,{result,createdAt:now()});return result;
     })},
     async cancelAfterRestart(){for(const key of KEYS)for(let n=1;n<=8;n++){const ref=games().doc(`t${n}-${key}`);await db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data().status==='active')tx.update(ref,{status:'finished',winnerIds:[],last:{canceled:true},finishedAt:now()})})}},

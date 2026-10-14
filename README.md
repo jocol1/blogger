@@ -127,6 +127,8 @@ Server kiểm tra khóa bằng phép so sánh an toàn, đúng tài khoản nh�
 
 Tham khảo [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html) và [SePay Test Mode](https://docs.sepay.vn/test-mode.html).
 
+Ô ăn quan hiển thị năm ô của người xem ở hàng dưới. Chọn ô rồi chọn rải trái/phải; server lưu từng bước bốc, rải, ăn và bổ sung dân cùng thời điểm phát. Người chơi và bot đều chờ hoạt ảnh kết thúc rồi mới được đi, với 30 giây đầy đủ cho lượt mới. Tải lại giữa nước đi tiếp tục từ thời điểm hiện tại, không phát lại từ đầu. API nước đi Ô ăn quan gửi `expectedVersion` để từ chối thao tác trên bàn cũ. Chạy kiểm tra hai người chơi bằng `tests/browser/tea-oanquan.js` trên bản xem thử dữ liệu giả lập.
+
 ## Dữ liệu và API
 
 Menu quán pixel gồm trà đá 5.000đ, đĩa bánh 10.000đ, trà chanh 10.000đ, cà phê sữa đá 15.000đ và hạt hướng dương 10.000đ. Mỗi món có ba lần dùng. Danh mục dùng chung ở `public/tea/menu.js`; giá đã lưu của món cũ được giữ nguyên khi thêm món. Quản trị có thể sửa giá từng món tại `/tra-da/admin`; đơn đã tạo giữ giá lúc đặt.
