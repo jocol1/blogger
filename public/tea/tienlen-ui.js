@@ -73,7 +73,7 @@ window.TeaTienLenUI=function({api,t,id,myId,myTable}){
   function action(type){if(busy||retry||!game||paused())return;const cards=selectedCards();if(type==='play'&&!view.legal(cards,game,myId()))return;if(type==='pass'&&(!ownTurn()||!game.top||game.openingCardId))return;send({action:type,cardIds:type==='play'?cards.map(card=>card.id):[],gameId:game.id,expectedVersion:game.version||1,requestId:id()})}
   async function start(){
     if(busy)return;startRequest||={botCount:Number($('#tl-bots').value),requestId:id()};busy=true;generation++;errorKey='';render();
-    try{const value=await api('/api/tea/tienlen',{method:'POST',body:JSON.stringify(startRequest)});value.receivedAt=Date.now();startRequest=null;retry=null;update(value);document.querySelector('.cards-view').scrollTop=0}
+    try{const value=await api('/api/tea/tienlen',{method:'POST',body:JSON.stringify(startRequest)});value.receivedAt=Date.now();startRequest=null;retry=null;update(value);document.querySelector('.cards-view').scrollTop=0;document.querySelector('#tl-game .card-scroll-area').scrollTop=0}
     catch(error){const transient=!error.status||error.status>=500;if(!transient)startRequest=null;errorKey=transient?'cardsRetry':error.code==='not_host'?'cardsHostWait':error.code==='bad_player_count'?'cardsNeedPlayers':['card_busy','game_busy','table_busy','game_active'].includes(error.code)?'tlGameBusy':'cardsActionFailed'}finally{busy=false;render()}
   }
   $('#tl-sort').onclick=()=>{groupedHand=!groupedHand;render()};$('#tl-bots').onchange=()=>{botsTouched=true;render()};$('#tl-start').onclick=start;$('#tl-rematch').onclick=start;$('#tl-play').onclick=()=>action('play');$('#tl-pass').onclick=()=>action('pass');$('#tl-retry').onclick=()=>{if(retry)send(retry)};

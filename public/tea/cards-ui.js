@@ -64,7 +64,7 @@ window.TeaCardsUI=function({api,t,id,myId,myTable}){
   function play(card){if(!myTurn()||busy||retry||paused()||!TeaCardView.playable(card,game))return;if(card.kind==='wild'){wild=card;errorText='';render();$('#color-picker [data-color]').focus({preventScroll:true});return}action({action:'play',cardId:card.id})}
   async function start(){
     if(busy)return;startRequest ||= {botCount:Number($('#bot-count').value),requestId:id()};busy=true;generation++;errorText='';render();
-    try{const value=await api('/api/tea/cards',{method:'POST',body:JSON.stringify(startRequest)});startRequest=null;value.receivedAt=Date.now();update(value);document.querySelector('.cards-view').scrollTop=0}
+    try{const value=await api('/api/tea/cards',{method:'POST',body:JSON.stringify(startRequest)});startRequest=null;value.receivedAt=Date.now();update(value);document.querySelector('.cards-view').scrollTop=0;document.querySelector('#card-game .card-scroll-area').scrollTop=0}
     catch(error){const transient=!error.status||error.status>=500;if(!transient)startRequest=null;errorText=t(transient?'cardsRetry':error.code==='not_host'?'cardsHostWait':error.code==='bad_player_count'?'cardsNeedPlayers':'cardsActionFailed')}
     finally{busy=false;render()}
   }

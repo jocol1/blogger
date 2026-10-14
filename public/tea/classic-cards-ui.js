@@ -274,7 +274,7 @@ root.TeaClassicCardsUI = function ({api, t, id, myId, myTable, key}) {
     try {
       const value = await api('/api/tea/card-games/' + key + (starting ? '' : '/action'), {method: 'POST', body: JSON.stringify(payload)});
       if (revision !== generation) return; value.receivedAt = Date.now(); retry = null; startRequest = null; errorKey = '';
-      if (poker) { $('raise').dataset.dirty = ''; } update(value);if(starting)document.querySelector('.cards-view').scrollTop=0;
+      if (poker) { $('raise').dataset.dirty = ''; } update(value);if(starting){document.querySelector('.cards-view').scrollTop=0;$('game').querySelector('.card-scroll-area').scrollTop=0;}
     } catch (error) {
       if (revision !== generation) return; const transient = !error.status || error.status >= 500;
       if (starting) startRequest = transient ? payload : null; else retry = transient ? payload : null;
