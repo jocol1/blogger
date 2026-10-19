@@ -131,7 +131,7 @@ Tham khảo [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html) và [S
 
 ## Cài Locly Tea trên điện thoại
 
-Trang `/tra-da` là PWA tên **Locly Tea**, mở thẳng vào quán và ưu tiên chơi ngang. Trên Android, bấm **Cài quán**; nếu trình duyệt không đưa ra hộp cài, dùng mục **Cài đặt ứng dụng / Thêm vào màn hình chính** trong menu. Trên iPhone, mở bằng Safari rồi chọn **Chia sẻ → Thêm vào Màn hình chính → Mở dưới dạng ứng dụng**. Hãy sao lưu mã ví trước khi cài vì vùng lưu trữ của bản cài có thể không dùng chung với tab trình duyệt.
+Trang `/tra-da` là PWA tên **Locly Tea**, mở thẳng vào quán và ưu tiên chơi ngang. Trên Android, bấm **Cài quán**; nếu trình duyệt không đưa ra hộp cài, dùng mục **Cài đặt ứng dụng / Thêm vào màn hình chính** trong menu. Chrome có thể nhận yêu cầu trước khi Android tạo biểu tượng; nếu không thấy Locly Tea trong **Cài đặt → Ứng dụng**, mở trang bằng Firefox Android rồi chọn **⋮ → Cài đặt → Thêm vào màn hình chính**. Trên iPhone, mở bằng Safari rồi chọn **Chia sẻ → Thêm vào Màn hình chính → Mở dưới dạng ứng dụng**. Hãy sao lưu mã ví trước khi cài vì vùng lưu trữ của bản cài có thể không dùng chung với tab trình duyệt.
 
 Manifest yêu cầu `standalone` và `landscape`. Điện thoại đang cầm dọc sẽ tạm khóa thao tác chơi, nhắc xoay ngang nhưng vẫn cho mở sao lưu/khôi phục ví và hướng dẫn cài. Service worker chỉ cache tài nguyên giao diện công khai; API, ví, chat, QR, quản trị và yêu cầu ghi dữ liệu luôn đi qua mạng. Bản cài vẫn cần Internet. Khi có phiên bản mới, người chơi chủ động bấm **Cập nhật khi chơi xong**; ứng dụng không tự tải lại giữa ván hoặc trong lúc còn đơn thanh toán.
 
