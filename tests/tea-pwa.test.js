@@ -11,11 +11,11 @@ test('Locly Tea manifest installs as a standalone landscape app',()=>{
 });
 
 test('service worker caches only the public café shell and waits for an explicit update',()=>{
-  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v11/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
+  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v12/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
 });
 
 test('tea page exposes install, rotation, offline, recovery and deferred update controls',()=>{
-  const html=read('public/tea/index.html'),pwa=read('public/tea/pwa.js'),app=read('public/tea/app.js');for(const id of ['install-button','install-dialog','rotate-overlay','offline-banner','update-banner','wallet-recovery','create-wallet','panel-close'])assert.match(html,new RegExp(`id="${id}"`));assert.match(html,/data-mini-game="quiz"/);assert.match(html,/data-mini-game="coin"/);assert.match(pwa,/beforeinstallprompt/);assert.match(pwa,/navigator\.standalone/);assert.match(pwa,/teaCanReload/);assert.match(pwa,/controllerchange/);assert.match(app,/wallet_recovery_required/);assert.doesNotMatch(app,/removeItem\(WALLET_KEY\)/);assert.doesNotMatch(html,/data-mini-game="(?:dice|oanquan)"/);assert.doesNotMatch(html,/oanquan-ui|oanquan-playback/);
+  const html=read('public/tea/index.html'),pwa=read('public/tea/pwa.js'),app=read('public/tea/app.js');for(const id of ['install-button','install-dialog','install-confirm','install-manual','rotate-overlay','offline-banner','update-banner','wallet-recovery','create-wallet','panel-close'])assert.match(html,new RegExp(`id="${id}"`));assert.match(html,/data-mini-game="quiz"/);assert.match(html,/data-mini-game="coin"/);assert.match(pwa,/beforeinstallprompt/);assert.match(pwa,/syncInstallControls/);assert.match(pwa,/navigator\.standalone/);assert.match(pwa,/teaCanReload/);assert.match(pwa,/controllerchange/);assert.match(app,/wallet_recovery_required/);assert.doesNotMatch(app,/removeItem\(WALLET_KEY\)/);assert.doesNotMatch(html,/data-mini-game="(?:dice|oanquan)"/);assert.doesNotMatch(html,/oanquan-ui|oanquan-playback/);
 });
 
 test('portrait mode pauses controls instead of rotating the interface',()=>{
