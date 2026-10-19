@@ -42,13 +42,16 @@
   }
   function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2600); }
   function applyLocale() {
-    document.documentElement.lang = locale; renderMenu(); $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); }); $$('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); }); $('#language-button').textContent = locale === 'en' ? 'VI' : 'EN';$('#connection-text').textContent=t(socket?.connected?'connected':'connecting'); localStorage.setItem(LOCALE_KEY, locale); renderPanel();gameUi?.render();if(fightData)renderFight();brawlUi?.render();
+    document.documentElement.lang = locale; renderMenu();updateCafeClock(); $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); }); $$('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); }); $('#language-button').textContent = locale === 'en' ? 'VI' : 'EN';$('#connection-text').textContent=t(socket?.connected?'connected':'connecting'); localStorage.setItem(LOCALE_KEY, locale); renderPanel();gameUi?.render();if(fightData)renderFight();brawlUi?.render();
   }
   function beep(freq = 620) { if (!sound) return; const Audio = window.AudioContext || window.webkitAudioContext; if (!Audio) return; const audio = new Audio(), osc = audio.createOscillator(), gain = audio.createGain(); osc.frequency.value = freq; gain.gain.setValueAtTime(.035,audio.currentTime); gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.13); osc.connect(gain).connect(audio.destination); osc.start(); osc.stop(audio.currentTime+.14); }
 
   function drawAvatar(context,x,y,avatar,scale=1,seated=false){TeaScene.avatar(context,x,y,avatar,scale,seated)}
   const movingGuests=new Map();
   let path=[],serverOffset=0;
+  function updateCafeClock(){const now=Date.now()+serverOffset,day=TeaAmbience.timeAt(now),clock=$('#cafe-time');if(clock.textContent!==day.clock)clock.textContent=day.clock;clock.dateTime=new Date(now).toISOString();$('#cafe-time-label').textContent=locale==='vi'?'Giờ Việt Nam':'Vietnam time';$('#cafe-day-phase').textContent={day:'☀',night:'☾',dawn:'☀',dusk:'☾'}[day.phase];$('#world-clock').dataset.phase=day.phase;document.body.classList.toggle('cafe-night',day.night>.5)}
+  setInterval(updateCafeClock,1000);
+
   function drawScene(time=0){
     drawConsumptionPreview(time);for(const [key,effect] of consumptionEffects)if(time-effect.started>2200)consumptionEffects.delete(key);
     if($('#cafe-shell').classList.contains('play-mode')||$('#cafe-shell').classList.contains('brawl-mode')){requestAnimationFrame(drawScene);return}const mobile=innerWidth<=900,rect=canvas.getBoundingClientRect(),desiredWidth=mobile?Math.max(420,Math.round(640*rect.width/Math.max(1,rect.height))):960;
@@ -56,10 +59,10 @@
     ctx.setTransform(1,0,0,1,0,0);ctx.clearRect(0,0,canvas.width,canvas.height);
     const me=(state?.guests||[]).find(g=>g.walletId===myId);
     if(mobile&&me){view.scale=1.65;view.tx=Math.max(canvas.width-960*view.scale,Math.min(0,canvas.width/2-me.x*view.scale));view.ty=Math.max(640-640*view.scale,Math.min(0,320-me.y*view.scale))}else view={scale:1,tx:0,ty:0};
-    ctx.setTransform(view.scale,0,0,view.scale,view.tx,view.ty);ctx.drawImage(TeaScene.ground,0,0);
+    ctx.setTransform(view.scale,0,0,view.scale,view.tx,view.ty);ctx.drawImage(TeaScene.ground,0,0);TeaAmbience.vehicles(ctx,Date.now()+serverOffset,reducedMotion.matches);
     const near=state&&nearestSeat();for(const table of state?.room?.tables||[])TeaScene.table(ctx,table,near?.seat?.id);
     const guests=[...(state?.guests||[])].sort((a,b)=>a.y-b.y);for(const guest of guests)drawGuest(guest,time);
-    drawWaiter(time);requestAnimationFrame(drawScene);
+    drawWaiter(time);TeaAmbience.lighting(ctx,Date.now()+serverOffset);requestAnimationFrame(drawScene);
   }
   function drawGuest(guest,time){
     TeaScene.avatar(ctx,guest.x,guest.y,guest,1,Boolean(guest.seatId),Date.now()-(movingGuests.get(guest.walletId)||0)<180,time);
@@ -75,8 +78,7 @@
   function nearestSeat(){const me=(state?.guests||[]).find(g=>g.walletId===myId);if(!me||me.seatId)return null;let best=null;for(const table of state.room.tables)for(const seat of table.seats){if(seat.walletId)continue;const distance=Math.hypot(me.x-seat.x,me.y-seat.y);if(distance<96&&(!best||distance<best.distance))best={seat,table,distance}}return best}
   function renderInteract(){const button=$('#interact-button'),seated=Boolean(myTable()),near=!seated&&state&&nearestSeat();button.hidden=!seated&&!near;button.dataset.action=seated?'leave':'sit';button.dataset.seat=near?.seat?.id||'';button.querySelector('b').textContent=t(seated?'standUp':'sit');button.querySelector('span').textContent=seated?'↗':'●';button.classList.toggle('is-leaving',seated)}
   function myTable(){return state?.room?.tables?.find(table=>table.seats.some(seat=>seat.walletId===myId))||null}
-  function renderDirectory(){const box=$('#table-directory');box.replaceChildren();for(const table of state?.room?.tables||[]){const button=document.createElement('button'),count=table.seats.filter(s=>s.walletId).length;button.className=`table-spot ${table.capacity===8?'large':table.capacity===4?'medium':'small'}`;button.disabled=count===table.capacity;button.title=t('tableName')+' '+table.id.slice(1);const icon=document.createElement('span'),label=document.createElement('b'),status=document.createElement('small');icon.className='table-icon';icon.textContent=String(table.capacity);label.textContent=t('tableName')+' '+table.id.slice(1);status.textContent=`${count}/${table.capacity}`;button.append(icon,label,status);button.onclick=()=>{const me=state.guests.find(g=>g.walletId===myId);const seats=table.seats.filter(s=>!s.walletId).sort((a,b)=>Math.hypot(a.x-me.x,a.y-me.y)-Math.hypot(b.x-me.x,b.y-me.y));if(seats[0])walkTo(seats[0])};box.append(button)}}
-  function renderPanel(){if(!state)return;const table=myTable(), seated=Boolean(table);$$('.menu-item').forEach(button=>button.disabled=!seated||Boolean(orderData?.order)||!cafeConfig?.ready);$('#table-empty').hidden=seated;$('#table-room').hidden=!seated;$('#table-name').textContent=table?`${t('tableName')} ${table.id.slice(1)} · ${table.seats.filter(seat=>seat.walletId).length}/${table.capacity||table.seats.length}`:'';$('#start-card').disabled=!seated;renderDirectory();renderFightPicker();$('#cards-seat-warning').hidden=seated;renderInteract();renderOrder();renderCard()}
+  function renderPanel(){if(!state)return;const table=myTable(), seated=Boolean(table);$$('.menu-item').forEach(button=>button.disabled=!seated||Boolean(orderData?.order)||!cafeConfig?.ready);$('#table-empty').hidden=seated;$('#table-room').hidden=!seated;$('#table-name').textContent=table?`${t('tableName')} ${table.id.slice(1)} · ${table.seats.filter(seat=>seat.walletId).length}/${table.capacity||table.seats.length}`:'';$('#start-card').disabled=!seated;renderFightPicker();$('#cards-seat-warning').hidden=seated;renderInteract();renderOrder();renderCard()}
   function renderFightPicker(){const select=$('#fight-opponent'),table=myTable();if(!select)return;const previous=select.value;select.innerHTML='';const ids=new Set((table?.seats||[]).map(seat=>seat.walletId).filter(id=>id&&id!==myId));for(const guest of state?.guests||[]){if(!ids.has(guest.walletId))continue;const option=document.createElement('option');option.value=guest.walletId;option.textContent=guest.nickname;select.append(option)}if([...select.options].some(option=>option.value===previous))select.value=previous;$('#challenge-fight').disabled=!select.value||['pending','active'].includes(fightData?.status)}
   function updateFight(fight){
     if(!fight||dismissedFights.has(fight.id))return;if(fightData?.id===fight.id&&(fightData.version||0)>(fight.version||0))return;

@@ -8,7 +8,12 @@ async (page) => {
     await context.addInitScript(({token})=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi')},{token:wallet.token});
     const live=await context.newPage();live.on('pageerror',error=>errors.push(error.message));await live.goto(base+'/tra-da');
     await live.waitForFunction(()=>document.querySelector('#connection-dot')?.classList.contains('live'));
-    await live.locator('#table-directory .table-spot').nth(4).click();await live.waitForFunction(()=>document.querySelector('#interact-button')?.dataset.seat?.startsWith('t5-'));
+    await (async()=>{
+      const viewport=live.viewportSize();await live.setViewportSize({width:1440,height:1000});await live.waitForFunction(()=>document.querySelector('#cafe-canvas').width===960);
+      const seat=await live.evaluate(async index=>{const state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':localStorage.getItem('locly-game-wallet')}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},4);
+      if(!seat)throw Error('No free test chair');const bounds=await live.locator('#cafe-canvas').boundingBox();await live.locator('#cafe-canvas').click({position:{x:seat.x*bounds.width/960,y:seat.y*bounds.height/640}});
+      await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await live.setViewportSize(viewport);
+    })();await live.waitForFunction(()=>document.querySelector('#interact-button')?.dataset.seat?.startsWith('t5-'));
     const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});
     await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('[data-tab=cards]').click();
     if(await live.locator('#card-game-switch').isVisible())await live.locator('#card-game-switch').click();await live.locator('[data-card-mode=color]').click();await live.locator('#bot-count').selectOption('2');await live.locator('#start-card').click();

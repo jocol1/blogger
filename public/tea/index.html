@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2b1d17">
   <link rel="icon" href="data:,">
   <title>Locly Pixel Tea Café</title>
-  <link rel="stylesheet" href="/assets/tea/style.css?v=oanquan2">
+  <link rel="stylesheet" href="/assets/tea/style.css?v=street-time1">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/games.css?v=courtyard3">
   <link rel="stylesheet" href="/assets/tea/brawl.css?v=arena1">
@@ -32,6 +32,7 @@
    <main class="cafe-shell" id="cafe-shell">
     <section class="world-card" aria-label="Pixel tea café">
       <div class="world-status"><span id="connection-dot"></span><span id="connection-text" data-i18n="connecting">Entering the café…</span></div>
+       <div class="world-clock" id="world-clock"><span id="cafe-day-phase" aria-hidden="true">☀</span><div><time id="cafe-time">--:--:--</time><small id="cafe-time-label">Vietnam time</small></div></div>
        <canvas id="cafe-canvas" width="960" height="640" aria-label="Walk around the café and find a free chair"></canvas>
        <div class="world-caption"><b data-i18n="courtyard">The little tea courtyard</b><span data-i18n="freeEntry">FREE ENTRY · GOOD COMPANY</span></div>
       <div id="speech-layer" aria-live="polite"></div>
@@ -76,7 +77,6 @@
         <div id="item-card" class="item-card" hidden></div>
         <div id="consume-feedback" class="consume-feedback" hidden><canvas id="consume-preview" width="128" height="128" aria-hidden="true"></canvas><p id="consume-message" role="status"></p></div>
          <div class="menu-grid" id="cafe-menu"></div>
-         <section class="table-directory"><div class="directory-heading"><b data-i18n="findTable">Find your spot</b><small data-i18n="tableSizes">2 · 4 · 8 seats</small></div><div id="table-directory"></div><p data-i18n="tableWalk">Pick a table to walk over. Sit when you reach a free chair.</p></section>
         <p class="payment-note"><span>ⓘ</span><span data-i18n="bankOnly">Vietnamese bank transfer only. International cards are not supported yet.</span></p>
       </section>
 
@@ -220,6 +220,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/tea/world.js?v=street1"></script>
   <script src="/assets/tea/menu.js?v=menu1"></script>
+  <script src="/assets/tea/ambience.js?v=street-time1"></script>
   <script src="/assets/tea/scene.js?v=menu1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
   <script src="/assets/tea/oanquan-playback.js?v=oanquan2"></script>
@@ -238,6 +239,6 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/app.js?v=menu1"></script>
+  <script src="/assets/tea/app.js?v=street-time1"></script>
 </body>
 </html>

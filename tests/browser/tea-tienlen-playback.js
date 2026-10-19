@@ -8,7 +8,12 @@ async (page)=>{
     await context.addInitScript(token=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi')},wallet.token);
     entry.page=await context.newPage();entry.page.on('pageerror',e=>errors.push(e.message));await entry.page.goto(base+'/tra-da');
     await entry.page.waitForFunction(()=>document.querySelector('#connection-dot').classList.contains('live'));
-    await entry.page.locator('#table-directory .table-spot').nth(4).click();await entry.page.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
+    await (async()=>{
+      const viewport=entry.page.viewportSize();await entry.page.setViewportSize({width:1440,height:1000});await entry.page.waitForFunction(()=>document.querySelector('#cafe-canvas').width===960);
+      const seat=await entry.page.evaluate(async index=>{const state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':localStorage.getItem('locly-game-wallet')}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},4);
+      if(!seat)throw Error('No free test chair');const bounds=await entry.page.locator('#cafe-canvas').boundingBox();await entry.page.locator('#cafe-canvas').click({position:{x:seat.x*bounds.width/960,y:seat.y*bounds.height/640}});
+      await entry.page.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await entry.page.setViewportSize(viewport);
+    })();await entry.page.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
     const seat=await entry.page.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});
     await entry.page.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await entry.page.locator('[data-tab=cards]').click();return entry;
   }

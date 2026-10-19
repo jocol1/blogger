@@ -10,7 +10,12 @@ async(page)=>{
       await context.request.put(base+'/api/tea/profile',{headers,data:{nickname:'Sower '+i,language:'vi'}});
       await context.addInitScript(token=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi')},wallet.token);
       const live=await context.newPage();live.on('pageerror',e=>errors.push(e.message));await live.goto(base+'/tra-da');await live.waitForSelector('#connection-dot.live');
-      await live.locator('#table-directory .table-spot').nth(1).click();await live.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t2-'));
+      await (async()=>{
+      const viewport=live.viewportSize();await live.setViewportSize({width:1440,height:1000});await live.waitForFunction(()=>document.querySelector('#cafe-canvas').width===960);
+      const seat=await live.evaluate(async index=>{const state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':localStorage.getItem('locly-game-wallet')}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},1);
+      if(!seat)throw Error('No free test chair');const bounds=await live.locator('#cafe-canvas').boundingBox();await live.locator('#cafe-canvas').click({position:{x:seat.x*bounds.width/960,y:seat.y*bounds.height/640}});
+      await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await live.setViewportSize(viewport);
+    })();await live.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t2-'));
       const seat=await live.locator('#interact-button').getAttribute('data-seat');const seated=await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});assert(seated.ok(),'Could not sit');
       await live.waitForFunction(()=>document.querySelector('#interact-button').dataset.action==='leave');await live.locator('[data-tab=games]').click();await live.locator('[data-mini-game=oanquan]').click();
       guests.push({context,live,wallet,headers});
