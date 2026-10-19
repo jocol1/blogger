@@ -4,6 +4,7 @@ const crypto=require('node:crypto');
 const {MemoryFirestore}=require('./helpers/memory-firestore');
 const {createTeaService,emptyRoom}=require('../features/tea/service');
 const {createDonationService}=require('../features/donations/service');
+const {QUIZ}=require('../features/tea/table-games');
 
 function fixture(){let clock=Date.parse('2026-10-12T00:00:00Z');const db=new MemoryFirestore(),now=()=>clock;const tea=createTeaService({db,config:{},now}),wallets=createDonationService({db,config:{},now});return{db,tea,wallets,tick(ms){clock+=ms},now};}
 async function guests(f,count=2){const players=[],room=emptyRoom();for(let n=0;n<count;n++){const player=await f.wallets.createWallet();await f.tea.saveProfile(player.token,{nickname:'Guest '+n});Object.assign(room.tables[2].seats[n],{walletId:player.id,seatedAt:f.now()+n});players.push(player);}room.tables[2].ownerId=players[0].id;await f.db.collection('tea_rooms').doc('main').set(room);return players;}
@@ -26,6 +27,11 @@ test('easy pick games resolve five server-controlled rounds without exposing cho
     }
     assert.equal(game.status,'finished');assert.equal(game.round,6);
   }
+});
+
+test('quiz has 100 questions, keeps the answer private and scores correct choices',async()=>{
+  assert.equal(QUIZ.length,100);const f=fixture(),[host]=await guests(f,1);let game=await f.tea.startTableGame(host.token,{key:'quiz',botCount:1,requestId:req()});assert.equal(game.question.en.length>0,true);assert.equal(game.question.enOptions.length,4);assert.equal('answer' in game.question,false);
+  for(let round=1;round<=5;round++){const stored=(await f.db.collection('tea_social_games').doc('t3-quiz').get()).data(),question=QUIZ[stored.questionOrder[round-1]];game=await f.tea.tableGameAction(host.token,{key:'quiz',gameId:game.id,requestId:req(),round,choice:question.answer});assert.equal('choices' in game,false);}assert.equal(game.status,'finished');assert.equal(game.players[0].score,5);
 });
 
 test('memory hides tiles, checks pairs and keeps the turn after a match',async()=>{

@@ -48,11 +48,12 @@ Trên điện thoại, bàn bài được thu gọn và các nút có hàng riê
 
 Mặt bài Tiến lên/Bài cào/Poker dùng nền trắng, số và chất lớn với một viền mảnh. Tiến lên và Bài đổi màu có hoạt ảnh lá đã được server xác nhận đi từ tay xuống bàn, nằm lại để đọc trước khi lần đánh tiếp theo phủ lên; bỏ/rút không xóa chồng bài. Server giữ nhịp 2 giây giữa thao tác, bot đánh theo mốc này và mỗi lượt người chơi vẫn đủ 30 giây sau khoảng chờ. API trả tối đa 48 thao tác công khai theo phiên bản để bắt kịp các lần poll thiếu, không lộ bài kín. Giảm chuyển động bỏ hiệu ứng bay nhưng giữ thời gian xem bài. Sau tải lại hoặc gián đoạn dài, hiện chồng bài mới nhất, không phát lại lịch sử cũ. Kiểm thử hoạt ảnh với dữ liệu giả: chạy `node tests/preview.js`, rồi chạy tệp `tests/browser/tea-card-playback.js` bằng Playwright.
 
-Mục **Trò chơi** có bốn trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
+Mục **Trò chơi** có năm trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
 
 - **Oẳn tù tì:** 5 vòng chọn bí mật, loại thắng trong vòng hai loại được 1 điểm; cùng loại hoặc đủ ba loại thì hòa. Không chọn kịp được tính bỏ lượt.
 - **Ngửa hay sấp:** chọn một phía, server tung đồng xu công bằng trong 5 vòng.
 - **Cao hay thấp:** đoán số server nằm trong 1–50 hay 51–100 trong 5 vòng.
+- **Đố vui nhanh:** 100 câu hỏi kiến thức và tính nhanh, mỗi ván chọn 5 câu.
 - **Lật cặp trí nhớ:** 12 ô, 6 cặp; đúng cặp được 1 điểm và thêm lượt, sai cặp hiện 1,8 giây rồi ẩn và qua lượt. Bot nhớ những ô đã được lật công khai.
 
 Người ngồi đầu tiên bắt đầu ván; người vào sau xem ván hiện tại. Các thao tác có ID chống trùng, bài/ô/lựa chọn bí mật do server giữ. Người rời bàn khiến ván trò mới kết thúc; khởi động lại server hủy ván cũ. Món đã mua được lưu riêng.
