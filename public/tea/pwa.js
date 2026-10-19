@@ -10,13 +10,13 @@
   function openInstall(){
     translate();const dialog=$('#install-dialog'),wallet=localStorage.getItem('locly-game-wallet')||'';$('#install-wallet-code').textContent=wallet||'—';$('#install-status').textContent='';syncInstallControls();dialog.showModal();
   }
-  async function install(){if(!installPrompt)return;const prompt=installPrompt;installPrompt=null;await prompt.prompt();await prompt.userChoice;refreshInstall();$('#install-dialog')?.close();}
+  async function install(){if(!installPrompt){$('#install-status').textContent=word('installManualHint');return;}const prompt=installPrompt;installPrompt=null;await prompt.prompt();const choice=await prompt.userChoice;refreshInstall();$('#install-status').textContent=choice?.outcome==='accepted'?word('installDone'):word('installCancelled');}
   function setOnline(){const offline=!navigator.onLine;$('#offline-banner').hidden=!offline;document.body.classList.toggle('is-offline',offline);}
   function setOrientation(){const blocked=matchMedia('(max-width: 900px) and (orientation: portrait)').matches;document.body.classList.toggle('portrait-blocked',blocked);$('#rotate-overlay').hidden=!blocked;window.dispatchEvent(new CustomEvent('tea:orientationchange',{detail:{blocked}}));}
   function showUpdate(worker){waitingWorker=worker;if(window.teaCanReload?.()){worker.postMessage({type:'SKIP_WAITING'});return;}translate();$('#update-banner').hidden=false;}
   async function activateUpdate(){if(!waitingWorker)return;if(window.teaCanReload&&!window.teaCanReload()){const status=$('#update-status');status.textContent=word('updateBusy');status.hidden=false;return;}waitingWorker.postMessage({type:'SKIP_WAITING'});}
   addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstall();if($('#install-dialog')?.open)syncInstallControls();});
-  addEventListener('appinstalled',()=>{installPrompt=null;refreshInstall();$('#install-dialog')?.close();});
+  addEventListener('appinstalled',()=>{installPrompt=null;refreshInstall();if($('#install-dialog')?.open)$('#install-status').textContent=word('installDone');});
   addEventListener('online',setOnline);addEventListener('offline',setOnline);addEventListener('resize',setOrientation);addEventListener('orientationchange',setOrientation);
   document.querySelectorAll('[data-install-cafe]').forEach(button=>button.addEventListener('click',openInstall));
   $('#install-confirm')?.addEventListener('click',install);$('#install-manual')?.addEventListener('click',()=>{$('#install-status').textContent=word('installManualHint');$('#install-platform-copy').scrollIntoView({block:'nearest'});});$('#install-copy-wallet')?.addEventListener('click',async()=>{const value=localStorage.getItem('locly-game-wallet');if(value){await navigator.clipboard.writeText(value);$('#install-copy-wallet').textContent='✓ '+word('copyWallet');}});
