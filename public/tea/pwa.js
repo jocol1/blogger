@@ -13,7 +13,7 @@
   async function install(){if(!installPrompt)return;const prompt=installPrompt;installPrompt=null;await prompt.prompt();await prompt.userChoice;refreshInstall();$('#install-dialog')?.close();}
   function setOnline(){const offline=!navigator.onLine;$('#offline-banner').hidden=!offline;document.body.classList.toggle('is-offline',offline);}
   function setOrientation(){const blocked=matchMedia('(max-width: 900px) and (orientation: portrait)').matches;document.body.classList.toggle('portrait-blocked',blocked);$('#rotate-overlay').hidden=!blocked;window.dispatchEvent(new CustomEvent('tea:orientationchange',{detail:{blocked}}));}
-  function showUpdate(worker){waitingWorker=worker;translate();$('#update-banner').hidden=false;}
+  function showUpdate(worker){waitingWorker=worker;if(window.teaCanReload?.()){worker.postMessage({type:'SKIP_WAITING'});return;}translate();$('#update-banner').hidden=false;}
   async function activateUpdate(){if(!waitingWorker)return;if(window.teaCanReload&&!window.teaCanReload()){const status=$('#update-status');status.textContent=word('updateBusy');status.hidden=false;return;}waitingWorker.postMessage({type:'SKIP_WAITING'});}
   addEventListener('beforeinstallprompt',event=>{event.preventDefault();installPrompt=event;refreshInstall();if($('#install-dialog')?.open)syncInstallControls();});
   addEventListener('appinstalled',()=>{installPrompt=null;refreshInstall();$('#install-dialog')?.close();});
