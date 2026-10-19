@@ -25,5 +25,6 @@
 .install-modal .install-status{margin:8px 0;padding:10px 12px;background:#dce9f0;border-left:4px solid #567f99;color:#243d50;font-weight:800;font-size:13px;line-height:1.45}
 .install-modal #install-platform-copy{line-height:1.55;font-size:13px;color:#405c6c}
 .install-actions{display:grid;gap:8px;margin:12px 0 18px}.install-actions button{width:100%;min-height:46px}.install-wallet-actions button{min-height:42px}
+.install-actions #install-apk{display:block;min-height:46px;padding:12px 16px;border:2px solid #1c2c37;color:#fff8e7;text-align:center;text-decoration:none;font-weight:900;box-shadow:3px 3px 0 #1c2c37}.install-actions #install-apk[hidden]{display:none}
 @media(max-width:480px){.install-modal{padding:18px}.install-icon{width:64px;height:64px}.install-wallet-actions{flex-wrap:wrap}.install-wallet-actions button{flex:1 1 130px}}
 @media(display-mode:standalone){[data-install-cafe]{display:none!important}}

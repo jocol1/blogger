@@ -26,6 +26,9 @@ function createTeaRouter({ service, isAdmin }) {
   router.get('/.well-known/assetlinks.json', (req, res) => {
     res.type('application/json').set('Cache-Control', 'public, max-age=300').sendFile(path.join(assets, 'assetlinks.json'));
   });
+  router.get('/download/locly-tea.apk', (req, res) => {
+    res.set('Cache-Control', 'no-store').redirect(302, 'https://github.com/jocol1/blogger/releases/latest/download/locly-tea.apk');
+  });
   router.get('/tra-da.webmanifest', (req, res) => {
     res.type('application/manifest+json').set('Cache-Control', 'public, max-age=300').sendFile(path.join(assets, 'manifest.webmanifest'));
   });
