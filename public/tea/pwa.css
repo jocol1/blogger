@@ -22,4 +22,8 @@
 .offline-banner button,.update-banner button{background:#668fae;color:#f4f8fa;border-color:#3d6075}
 .install-warning,.wallet-recovery{background:#e6eff4;border-color:#9bb5c3}
 .install-wallet code{background:#253540;color:#e4eff4}
+.install-modal .install-status{margin:8px 0;padding:10px 12px;background:#dce9f0;border-left:4px solid #567f99;color:#243d50;font-weight:800;font-size:13px;line-height:1.45}
+.install-modal #install-platform-copy{line-height:1.55;font-size:13px;color:#405c6c}
+.install-actions{display:grid;gap:8px;margin:12px 0 18px}.install-actions button{width:100%;min-height:46px}.install-wallet-actions button{min-height:42px}
+@media(max-width:480px){.install-modal{padding:18px}.install-icon{width:64px;height:64px}.install-wallet-actions{flex-wrap:wrap}.install-wallet-actions button{flex:1 1 130px}}
 @media(display-mode:standalone){[data-install-cafe]{display:none!important}}
