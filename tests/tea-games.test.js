@@ -17,6 +17,17 @@ test('RPS keeps choices private and resolves five rounds on the server',async()=
   const f=fixture(),[host,other]=await guests(f);let game=await f.tea.startTableGame(host.token,{key:'rps',requestId:req()});for(let round=1;round<=5;round++){game=await f.tea.tableGameAction(host.token,{key:'rps',gameId:game.id,requestId:req(),round,choice:'rock'});const peer=(await f.tea.tableGameState(other.token,'rps')).game;assert.equal(peer.myChoice,null);assert.equal('choices'in peer,false);assert.equal(peer.submitted.includes(host.id),true);game=await f.tea.tableGameAction(other.token,{key:'rps',gameId:game.id,requestId:req(),round,choice:'scissors'});}assert.equal(game.status,'finished');assert.deepEqual(game.winnerIds,[host.id]);assert.equal(game.players[0].score,5);
 });
 
+test('easy pick games resolve five server-controlled rounds without exposing choices',async()=>{
+  for(const key of ['coin','highlow']){
+    const f=fixture(),[host]=await guests(f,1);let game=await f.tea.startTableGame(host.token,{key,botCount:1,requestId:req()});
+    for(let round=1;round<=5;round++){
+      game=await f.tea.tableGameAction(host.token,{key,gameId:game.id,requestId:req(),round,choice:key==='coin'?'heads':'low'});
+      assert.equal('choices' in game,false);assert.equal(game.last.result==='heads'||game.last.result==='tails'||game.last.result==='low'||game.last.result==='high',true);
+    }
+    assert.equal(game.status,'finished');assert.equal(game.round,6);
+  }
+});
+
 test('memory hides tiles, checks pairs and keeps the turn after a match',async()=>{
   const f=fixture(),[host,other]=await guests(f);let game=await f.tea.startTableGame(host.token,{key:'memory',requestId:req()});assert.equal(game.tiles.every(tile=>tile.symbol===null),true);const stored=(await f.db.collection('tea_social_games').doc('t3-memory').get()).data(),first=0,second=stored.tiles.findIndex((symbol,index)=>index!==first&&symbol===stored.tiles[first]);game=await f.tea.tableGameAction(host.token,{key:'memory',gameId:game.id,requestId:req(),index:first});await assert.rejects(f.tea.tableGameAction(other.token,{key:'memory',gameId:game.id,requestId:req(),index:second}),error=>error.code==='not_turn');game=await f.tea.tableGameAction(host.token,{key:'memory',gameId:game.id,requestId:req(),index:second});assert.equal(game.players[0].score,1);assert.equal(game.turn,host.id);assert.equal(game.tiles.filter(tile=>tile.matched).length,2);
 });
