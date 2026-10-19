@@ -10,6 +10,20 @@ test('Locly Tea manifest installs as a standalone landscape app',()=>{
   for(const icon of manifest.icons)assert.ok(fs.statSync(path.join(root,'public/tea',icon.src.replace('/assets/tea/',''))).size>100);
 });
 
+test('Android APK ownership statement is public and matches the TWA package',async()=>{
+  const express=require('express');const {createTeaRouter}=require('../features/tea/routes');
+  const twa=JSON.parse(read('android/twa-manifest.json'));
+  const app=express();app.use(createTeaRouter({service:{},isAdmin:()=>false}));
+  const server=await new Promise(resolve=>{const listener=app.listen(0,'127.0.0.1',()=>resolve(listener));});
+  try{
+    const response=await fetch(`http://127.0.0.1:${server.address().port}/.well-known/assetlinks.json`);
+    assert.equal(response.status,200);assert.match(response.headers.get('content-type'),/application\/json/);
+    const links=await response.json();assert.equal(links[0].target.package_name,twa.packageId);
+    assert.ok(links[0].relation.includes('delegate_permission/common.handle_all_urls'));
+    assert.match(links[0].target.sha256_cert_fingerprints[0],/^([A-F0-9]{2}:){31}[A-F0-9]{2}$/);
+  }finally{await new Promise(resolve=>server.close(resolve));}
+});
+
 test('service worker caches only the public café shell and waits for an explicit update',()=>{
   const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v16/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
 });

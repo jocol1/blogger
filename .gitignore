@@ -6,3 +6,14 @@ npm-debug.log*
 .playwright-mcp/
 output/
 tmp/
+
+# Android build artifacts and private signing material
+android/keystore/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.apk
+android/*.aab
+
+android/*.idsig

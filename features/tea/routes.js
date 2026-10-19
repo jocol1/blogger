@@ -23,6 +23,9 @@ function createTeaRouter({ service, isAdmin }) {
 
   router.use('/assets/tea', express.static(assets, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
   router.get('/', (req, res) => res.redirect(302, '/tra-da'));
+  router.get('/.well-known/assetlinks.json', (req, res) => {
+    res.type('application/json').set('Cache-Control', 'public, max-age=300').sendFile(path.join(assets, 'assetlinks.json'));
+  });
   router.get('/tra-da.webmanifest', (req, res) => {
     res.type('application/manifest+json').set('Cache-Control', 'public, max-age=300').sendFile(path.join(assets, 'manifest.webmanifest'));
   });
