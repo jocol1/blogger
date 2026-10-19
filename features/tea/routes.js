@@ -23,6 +23,12 @@ function createTeaRouter({ service, isAdmin }) {
 
   router.use('/assets/tea', express.static(assets, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
   router.get('/', (req, res) => res.redirect(302, '/tra-da'));
+  router.get('/tra-da.webmanifest', (req, res) => {
+    res.type('application/manifest+json').set('Cache-Control', 'public, max-age=300').sendFile(path.join(assets, 'manifest.webmanifest'));
+  });
+  router.get('/tra-da-sw.js', (req, res) => {
+    res.type('application/javascript').set({ 'Cache-Control': 'no-cache', 'Service-Worker-Allowed': '/tra-da' }).sendFile(path.join(assets, 'sw.js'));
+  });
   router.get('/tra-da', (req, res) => {
     res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.vietqr.io data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
     res.sendFile(path.join(assets, 'index.html'));

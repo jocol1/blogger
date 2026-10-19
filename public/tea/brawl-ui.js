@@ -22,7 +22,7 @@
     const players=()=>fight?.players||fight?.fighters||[];
     const me=()=>players().find(player=>(player.id||player.walletId)===myId());
     const editing=()=>Boolean(document.activeElement?.closest('input,textarea,select,[contenteditable="true"]'));
-    const blocked=()=>!focused||document.hidden||editing()||Boolean(document.querySelector('dialog[open]'));
+    const blocked=()=>!focused||document.hidden||editing()||document.body.classList.contains('portrait-blocked')||Boolean(document.querySelector('dialog[open]'));
     const playable=()=>Boolean(fight?.status==='active'&&connected()&&!blocked()&&serverTime()>=fight.startsAt&&serverTime()<fight.endsAt);
     const ownId=player=>player.id||player.walletId;
     function paintFloor(c){
@@ -189,6 +189,6 @@
     }
     function clear(){release();fight=null;fightId=null;positions.clear();effects.length=0;seenEffects.clear();camera=null;wasPlayable=false;mustStop=false;for(const button of Object.values(buttons))if(button){button.disabled=true;button.style.setProperty('--cooldown','0%')}}
     animationFrame=requestAnimationFrame(render);
-    return{update,clear,render:()=>render(performance.now(),false),destroy(){clear();clearInterval(timer);cancelAnimationFrame(animationFrame)}};
+    return{update,clear,pause:release,render:()=>render(performance.now(),false),destroy(){clear();clearInterval(timer);cancelAnimationFrame(animationFrame)}};
   };
 })(window);

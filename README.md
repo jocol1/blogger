@@ -44,13 +44,12 @@ Kiểm tra độ mượt với dữ liệu giả: `tests/browser/tea-poker-smoot
 
 Các trò bài xếp người chơi quanh bốn cạnh theo góc nhìn từng khách: mình ở dưới, đối thủ ở trái/trên/phải; bàn ba người đặt hai đối thủ ở trái và phải, bàn đông hơn chia nhóm theo cạnh. Tiến lên có **Gom đôi và bộ / Xếp theo số**, Bài đổi màu có **Xếp theo màu / Thứ tự chia**. Sắp lại bài vẫn giữ lựa chọn và ID lá. Khi đã chia, giao diện tập trung vào bàn, có nút **Chọn trò khác** và **Về quán**; thanh thao tác đứng riêng để không che lá. Poker giữ ô nhập chip qua các lần cập nhật; thao tác chưa được xác nhận có nút gửi lại cùng mã. Sau ván Bài cào/Poker có thể chọn lại số bot để chơi tiếp.
 
-Trên điện thoại, bàn bài được thu gọn và các nút có hàng riêng ở đáy màn hình. Chỉ phần bàn, bài trên tay và luật chơi cuộn; không cuộn mất nút đánh/rút/tố. Chiều cao cập nhật theo vùng màn hình còn nhìn thấy khi mở bàn phím nhập chip, có chừa khoảng an toàn ở đáy. Mở luật hoặc chọn trò khác không che nút; bắt đầu/chơi lại đưa bàn về đầu. Kiểm tra bốn trò ở 390×844, 360×740, 320×568, 844×390 và 390×500 với `tests/browser/tea-cards-mobile.js` trên preview dữ liệu giả.
+Trên điện thoại, bàn bài được thu gọn và các nút có hàng riêng ở đáy màn hình. Chỉ phần bàn, bài trên tay và luật chơi cuộn; không cuộn mất nút đánh/rút/tố. Chiều cao cập nhật theo vùng màn hình còn nhìn thấy khi mở bàn phím nhập chip, có chừa khoảng an toàn ở đáy. Mở luật hoặc chọn trò khác không che nút; bắt đầu/chơi lại đưa bàn về đầu. Bản PWA được kiểm tra ngang ở 568×320, 740×360 và 844×390 bằng `tests/browser/tea-pwa-landscape.js`; khi cầm dọc sẽ hiện nhắc xoay máy.
 
 Mặt bài Tiến lên/Bài cào/Poker dùng nền trắng, số và chất lớn với một viền mảnh. Tiến lên và Bài đổi màu có hoạt ảnh lá đã được server xác nhận đi từ tay xuống bàn, nằm lại để đọc trước khi lần đánh tiếp theo phủ lên; bỏ/rút không xóa chồng bài. Server giữ nhịp 2 giây giữa thao tác, bot đánh theo mốc này và mỗi lượt người chơi vẫn đủ 30 giây sau khoảng chờ. API trả tối đa 48 thao tác công khai theo phiên bản để bắt kịp các lần poll thiếu, không lộ bài kín. Giảm chuyển động bỏ hiệu ứng bay nhưng giữ thời gian xem bài. Sau tải lại hoặc gián đoạn dài, hiện chồng bài mới nhất, không phát lại lịch sử cũ. Kiểm thử hoạt ảnh với dữ liệu giả: chạy `node tests/preview.js`, rồi chạy tệp `tests/browser/tea-card-playback.js` bằng Playwright.
 
-Mục **Trò chơi** có ba trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
+Mục **Trò chơi** có hai trò miễn phí, hỗ trợ tối đa 8 người tính cả tối đa 3 bot:
 
-- **Đua xúc xắc:** server tung 1–6, ai đạt 20 trước thắng; mỗi lượt 15 giây.
 - **Oẳn tù tì:** 5 vòng chọn bí mật, loại thắng trong vòng hai loại được 1 điểm; cùng loại hoặc đủ ba loại thì hòa. Không chọn kịp được tính bỏ lượt.
 - **Lật cặp trí nhớ:** 12 ô, 6 cặp; đúng cặp được 1 điểm và thêm lượt, sai cặp hiện 1,8 giây rồi ẩn và qua lượt. Bot nhớ những ô đã được lật công khai.
 
@@ -127,7 +126,13 @@ Server kiểm tra khóa bằng phép so sánh an toàn, đúng tài khoản nh�
 
 Tham khảo [Webhook SePay](https://docs.sepay.vn/tich-hop-webhooks.html) và [SePay Test Mode](https://docs.sepay.vn/test-mode.html).
 
-Ô ăn quan hiển thị năm ô của người xem ở hàng dưới. Chọn ô rồi chọn rải trái/phải; server lưu từng bước bốc, rải, ăn và bổ sung dân cùng thời điểm phát. Người chơi và bot đều chờ hoạt ảnh kết thúc rồi mới được đi, với 30 giây đầy đủ cho lượt mới. Tải lại giữa nước đi tiếp tục từ thời điểm hiện tại, không phát lại từ đầu. API nước đi Ô ăn quan gửi `expectedVersion` để từ chối thao tác trên bàn cũ. Chạy kiểm tra hai người chơi bằng `tests/browser/tea-oanquan.js` trên bản xem thử dữ liệu giả lập.
+## Cài Locly Tea trên điện thoại
+
+Trang `/tra-da` là PWA tên **Locly Tea**, mở thẳng vào quán và ưu tiên chơi ngang. Trên Android, bấm **Cài quán**; nếu trình duyệt không đưa ra hộp cài, dùng mục **Cài đặt ứng dụng / Thêm vào màn hình chính** trong menu. Trên iPhone, mở bằng Safari rồi chọn **Chia sẻ → Thêm vào Màn hình chính → Mở dưới dạng ứng dụng**. Hãy sao lưu mã ví trước khi cài vì vùng lưu trữ của bản cài có thể không dùng chung với tab trình duyệt.
+
+Manifest yêu cầu `standalone` và `landscape`. Điện thoại đang cầm dọc sẽ tạm khóa thao tác chơi, nhắc xoay ngang nhưng vẫn cho mở sao lưu/khôi phục ví và hướng dẫn cài. Service worker chỉ cache tài nguyên giao diện công khai; API, ví, chat, QR, quản trị và yêu cầu ghi dữ liệu luôn đi qua mạng. Bản cài vẫn cần Internet. Khi có phiên bản mới, người chơi chủ động bấm **Cập nhật khi chơi xong**; ứng dụng không tự tải lại giữa ván hoặc trong lúc còn đơn thanh toán.
+
+Ô ăn quan và Đổ xúc xắc đã được gỡ. API cũ của hai trò trả `410 game_removed`; khi server khởi động, ván cũ còn hoạt động được đóng an toàn mà không xóa lịch sử.
 
 Khu quán không còn danh sách bàn trống; người chơi tự nhìn ghế trong Canvas, chạm hoặc đi tới ghế rồi dùng nút Ngồi. Đồng hồ trên quán dùng giờ Việt Nam và cập nhật mỗi giây. Ánh sáng đổi mượt lúc bình minh/hoàng hôn, ban đêm phủ tối quán và bật đèn vàng. Xe máy hoặc ô tô pixel xuất hiện theo nhịp có khoảng nghỉ, chạy hai chiều trên phần đường; chế độ giảm chuyển động ẩn xe đang chạy nhưng vẫn giữ đồng hồ và ánh sáng.
 
@@ -150,7 +155,7 @@ Các collection riêng của tính năng này:
 - `tea_card_start_attempts` (chống chia bài trùng qua các lần chơi lại)
 - `tea_tienlen_games`, `tea_tienlen_actions`, `tea_tienlen_starts` (Tiến lên miền Nam và ID thao tác chống trùng)
 - `tea_classic_card_games`, `tea_classic_card_starts`, `tea_classic_card_actions` (Bài cào/Poker và ID thao tác chống trùng, không lưu tay bài trong document thao tác)
-- `tea_social_games`, `tea_social_actions` (ba trò bàn mới)
+- `tea_social_games`, `tea_social_actions` (Oẳn tù tì và Lật cặp)
 
 Firebase Admin ở server là bên duy nhất đọc/ghi các collection. Firestore Security Rules không được cấp quyền trực tiếp cho trình duyệt. Token ví và token tra cứu QR chỉ được lưu dưới dạng SHA-256.
 
@@ -176,7 +181,7 @@ Các API chính:
 - `POST /api/tea/card-games/:key`, `GET /api/tea/card-games/:key/current`, `POST /api/tea/card-games/:key/action` (`baicao`, `poker`)
 - `POST /api/tea/seats/:seatId/ask`, `GET /api/tea/seat-requests`, `POST /api/tea/seat-requests/:id/respond`
 - `/api/tea/fights`, `/api/tea/fights/current`, `/api/tea/fights/:id/respond`, `/api/tea/fights/:id/hit`
-- `POST /api/tea/games`, `GET /api/tea/games/:key`, `POST /api/tea/games/:key/action` (`dice`, `rps`, `memory`)
+- `POST /api/tea/games`, `GET /api/tea/games/:key`, `POST /api/tea/games/:key/action` (`rps`, `memory`; `dice` và `oanquan` trả `410 game_removed`)
 
 Lịch sử ví chỉ trả về khi có đúng token ví. API trạng thái đổi quà không trả thông tin liên hệ; thông tin này chỉ hiện trong phiên quản trị.
 

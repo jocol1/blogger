@@ -4,7 +4,12 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#2b1d17">
-  <link rel="icon" href="data:,">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Locly Tea">
+  <link rel="manifest" href="/tra-da.webmanifest">
+  <link rel="icon" href="/assets/tea/icons/icon-192.png">
+  <link rel="apple-touch-icon" href="/assets/tea/icons/icon-192.png">
   <title>Locly Pixel Tea Café</title>
   <link rel="stylesheet" href="/assets/tea/style.css?v=street-time1">
   <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
@@ -17,12 +22,14 @@
   <link rel="stylesheet" href="/assets/tea/card-playback.css?v=readable2">
   <link rel="stylesheet" href="/assets/tea/touch-controls.css?v=touch1">
   <link rel="stylesheet" href="/assets/tea/cards-mobile.css?v=mobile1">
+  <link rel="stylesheet" href="/assets/tea/pwa.css?v=pwa1">
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/tra-da"><span class="brand-cup">▰</span><span>LOC<span>LY</span></span><small data-i18n="brandSub">PIXEL TEA CAFÉ</small></a>
     <div class="online-pill"><i></i><b id="online-count">0</b> <span data-i18n="online">online</span></div>
     <div class="top-actions">
+      <button class="install-button" id="install-button" data-install-cafe><b>▣</b><span data-pwa-i18n="installCafe">Install café</span></button>
       <button class="icon-button" id="backup-button" title="Wallet backup">▣</button>
       <button class="language-button" id="language-button">VI</button>
       <button class="sound-button" id="sound-button" aria-pressed="false">♪</button>
@@ -62,6 +69,7 @@
     </section>
 
     <aside class="side-panel" id="side-panel">
+      <button class="panel-close" id="panel-close" type="button" aria-label="Close panel">×</button>
       <nav class="panel-tabs" aria-label="Café activities">
         <button class="active" data-tab="cafe"><span>☕</span><b data-i18n="cafe">Café</b></button>
         <button data-tab="table"><span>☺</span><b data-i18n="table">Table</b><i id="chat-badge" hidden></i></button>
@@ -193,7 +201,7 @@
         <div id="card-game" hidden><div class="card-scroll-area"><div class="card-table"><div class="card-arena color-arena"><div id="card-players" class="card-players"></div><div class="card-stage"><div class="deck-block"><small data-i18n="drawPile">DRAW PILE</small><button id="draw-pile" type="button" class="playing-card back" aria-label="Draw one and pass">LOC</button></div><div class="deck-block"><small data-i18n="inPlay">IN PLAY</small><div id="top-card" class="color-play-pile"></div></div><div class="turn-sign"><b id="turn-label"></b><span id="card-clock"></span><span id="active-color"></span></div></div></div><div class="hand-area"><div class="hand-sort-row"><small data-i18n="yourHand">Your hand</small><button id="sort-color-hand" type="button" data-i18n="sortDealt">Deal order</button></div><small data-i18n="yourHand">YOUR HAND · TAP A CARD TO PLAY</small><div id="hand" class="hand"></div></div></div></div><div class="card-action-bar"><p id="card-feedback" role="status"></p><div id="color-picker" class="color-picker" hidden><span data-i18n="chooseColor">Choose the next color</span><button data-color="red" aria-label="Red"></button><button data-color="yellow" aria-label="Yellow"></button><button data-color="green" aria-label="Green"></button><button data-color="blue" aria-label="Blue"></button><button id="cancel-wild" data-i18n="cancelChoice">Cancel</button></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="card-retry" class="primary" data-i18n="retryCard" hidden>Retry action</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button></div></div>
         </div>
       </section>
-       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="dice"><span>⚄</span><b data-i18n="diceName">Dice Dash</b><small data-i18n="diceShort">Race to 20</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button><button data-mini-game="oanquan"><span>◉</span><b data-i18n="oanquanName">Ô ăn quan</b><small data-i18n="oanquanShort">A Vietnamese sowing game</small></button></div><div id="mini-game-stage"></div></section>
+       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button></div><div id="mini-game-stage"></div></section>
     </aside>
   </main>
 
@@ -211,11 +219,15 @@
     </form>
   </dialog>
 
-  <dialog id="wallet-dialog" class="modal wallet-modal"><form method="dialog" id="wallet-form"><button class="close-modal" value="cancel">×</button><small data-i18n="walletBackup">WALLET BACKUP</small><h2 data-i18n="keepCode">Keep this code safe</h2><p data-i18n="walletCopy">It restores your character, coins and purchases if browser data is cleared.</p><textarea id="wallet-code" readonly></textarea><div class="button-row"><button type="button" id="copy-wallet" class="primary" data-i18n="copyCode">Copy code</button><button type="button" id="show-restore" data-i18n="restoreAnother">Restore another</button></div><div id="restore-box" hidden><input id="restore-code" placeholder="Paste a 64-character code"><button type="button" id="restore-wallet" data-i18n="restore">Restore</button></div></form></dialog>
+  <dialog id="wallet-dialog" class="modal wallet-modal"><form method="dialog" id="wallet-form"><button class="close-modal" value="cancel">×</button><small data-i18n="walletBackup">WALLET BACKUP</small><h2 data-i18n="keepCode">Keep this code safe</h2><p data-i18n="walletCopy">It restores your character, coins and purchases if browser data is cleared.</p><div class="wallet-recovery" id="wallet-recovery" hidden><b data-pwa-i18n="walletInvalid">This wallet code is no longer valid</b><p data-pwa-i18n="walletInvalidCopy">Restore a saved wallet code or create a new character.</p></div><textarea id="wallet-code" readonly></textarea><div class="button-row"><button type="button" id="copy-wallet" class="primary" data-i18n="copyCode">Copy code</button><button type="button" id="show-restore" data-i18n="restoreAnother">Restore another</button><button type="button" id="create-wallet" data-pwa-i18n="createNewWallet" hidden>Create new character</button></div><div id="restore-box" hidden><input id="restore-code" placeholder="Paste a 64-character code"><button type="button" id="restore-wallet" data-i18n="restore">Restore</button></div></form></dialog>
   <dialog id="qr-dialog" class="modal qr-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><small data-i18n="yourOrder">YOUR ORDER</small><h2 id="qr-title">Iced tea</h2><div class="qr-wrap"><img id="qr-image" alt="Bank transfer QR"></div><div class="payment-status"><i></i><span id="qr-status" data-i18n="unpaid">Not paid yet</span></div><dl><div><dt data-i18n="bankAccount">Bank account</dt><dd id="qr-bank"></dd></div><div><dt data-i18n="amount">Amount</dt><dd id="qr-amount"></dd></div><div><dt data-i18n="transferNote">Transfer note</dt><dd><code id="qr-code"></code><button type="button" id="copy-code">Copy</button></dd></div></dl><p class="qr-phone-help" data-i18n="qrPhoneHelp">On your phone, download the QR and choose it from your bank app’s gallery. On a computer, scan the QR with your phone.</p><div class="qr-actions"><button type="button" id="download-qr" class="primary" data-i18n="downloadQr">Download QR</button></div><button type="button" id="cancel-order" class="text-danger" data-i18n="cancelOrder">Cancel this unpaid order</button><p data-i18n="keepOpen">You can close this window. The café will keep checking your payment.</p></form></dialog>
   <dialog id="seat-dialog" class="modal choice-modal"><button class="close-modal" id="seat-close" aria-label="Close">×</button><small data-i18n="occupiedTable">OCCUPIED TABLE</small><h2 id="seat-dialog-title">Someone is already here</h2><p id="seat-dialog-copy"></p><div class="choice-grid"><button id="ask-seat" class="primary" data-i18n="askFirst">Ask first</button><button id="leave-seat" data-i18n="walkAway">Walk away</button><button id="rude-seat" class="rude-button" data-i18n="sitAnyway">Sit anyway</button></div><p id="seat-wait" class="wait-note" hidden></p></dialog>
   <dialog id="request-dialog" class="modal choice-modal"><small data-i18n="someoneAsks">SOMEONE IS ASKING</small><h2 id="request-title"></h2><p data-i18n="requestCopy">They want to pull up a chair at your table. The chair is not reserved while you decide.</p><div class="button-row"><button id="decline-seat" data-i18n="sayNo">No thanks</button><button id="accept-seat" class="primary" data-i18n="sayYes">Sure, sit down</button></div></dialog>
   <dialog id="fight-dialog" class="modal fight-modal"><small data-i18n="pixelBrawl">PIXEL BRAWL</small><h2 id="fight-title">BONK!</h2><p id="fight-message"></p><button id="fight-accept" class="primary wide" data-i18n="acceptFight" hidden>Accept challenge</button><button id="fight-decline" class="wide" data-i18n="declineFight" hidden>Nope</button></dialog>
+  <dialog id="install-dialog" class="modal install-modal"><form method="dialog"><button class="close-modal" value="cancel">×</button><img class="install-icon" src="/assets/tea/icons/icon-192.png" alt=""><small>LOCly Tea</small><h2 data-pwa-i18n="installTitle">Take Locly Tea with you</h2><p data-pwa-i18n="installCopy">Install from this website.</p><p class="install-warning" data-pwa-i18n="installBackupWarning">Back up your wallet code before installing.</p><div class="install-wallet"><span data-pwa-i18n="copyWallet">Copy wallet code</span><code id="install-wallet-code">—</code></div><p id="install-platform-copy"></p><div class="button-row"><button type="button" id="install-copy-wallet" data-pwa-i18n="copyWallet">Copy wallet code</button><button type="button" data-open-wallet data-pwa-i18n="restoreWallet">Restore wallet</button><button type="button" id="install-confirm" class="primary" data-pwa-i18n="continueInstall">Install Locly Tea</button></div></form></dialog>
+  <section id="rotate-overlay" class="rotate-overlay" hidden aria-live="polite"><div class="rotate-card"><div class="rotate-phone"></div><h1 data-pwa-i18n="rotateTitle">Turn your phone sideways</h1><p data-pwa-i18n="rotateCopy">Locly Tea plays in landscape.</p><div class="rotate-actions"><button type="button" data-open-wallet data-pwa-i18n="restoreWallet">Restore wallet</button><button type="button" data-install-cafe data-pwa-i18n="installCafe">Install café</button></div></div></section>
+  <aside id="offline-banner" class="offline-banner" hidden><p><b data-pwa-i18n="offlineTitle">You are offline</b><br><span data-pwa-i18n="offlineCopy">Reconnect to keep playing.</span></p><button type="button" id="offline-retry" data-pwa-i18n="retry">Try again</button></aside>
+  <aside id="update-banner" class="update-banner" hidden><p><b data-pwa-i18n="updateReady">A new café version is ready.</b><small id="update-status" class="update-status" hidden></small></p><button type="button" id="update-button" data-pwa-i18n="updateWhenDone">Update when finished</button></aside>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/tea/world.js?v=street1"></script>
@@ -223,10 +235,9 @@
   <script src="/assets/tea/ambience.js?v=street-time1"></script>
   <script src="/assets/tea/scene.js?v=menu1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
-  <script src="/assets/tea/oanquan-playback.js?v=oanquan2"></script>
-  <script src="/assets/tea/oanquan-ui.js?v=oanquan2"></script>
-  <script src="/assets/tea/games-ui.js?v=oanquan2"></script>
-  <script src="/assets/tea/game-words.js?v=oanquan2"></script>
+  <script src="/assets/tea/games-ui.js?v=pwa1"></script>
+  <script src="/assets/tea/game-words.js?v=pwa1"></script>
+  <script src="/assets/tea/pwa-words.js?v=pwa1"></script>
   <script src="/assets/tea/brawl-words.js?v=arena1"></script>
   <script src="/assets/tea/poker-words.js?v=poker2"></script>
   <script src="/assets/tea/brawl-view.js?v=brawl4"></script>
@@ -239,6 +250,7 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/app.js?v=street-time1"></script>
+  <script src="/assets/tea/app.js?v=pwa1"></script>
+  <script src="/assets/tea/pwa.js?v=pwa1"></script>
 </body>
 </html>
