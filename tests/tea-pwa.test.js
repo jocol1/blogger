@@ -11,7 +11,7 @@ test('Locly Tea manifest installs as a standalone landscape app',()=>{
 });
 
 test('service worker caches only the public café shell and waits for an explicit update',()=>{
-  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v13/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
+  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v14/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
 });
 
 test('tea page exposes install, rotation, offline, recovery and deferred update controls',()=>{
