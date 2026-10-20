@@ -28,7 +28,7 @@ test('Android APK ownership statement is public and matches the TWA package',asy
 });
 
 test('service worker caches only the public café shell and waits for an explicit update',()=>{
-  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v20/);assert.match(worker,/cards-fullscreen\.css/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
+  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v21/);assert.match(worker,/cards-fullscreen\.css/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
 });
 
 test('tea page exposes install, rotation, offline, recovery and deferred update controls',()=>{

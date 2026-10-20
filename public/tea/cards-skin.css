@@ -1,0 +1,112 @@
+/* One visual language for the card room; geometry stays in the layout files. */
+.cards-view{
+  --card-ink:#edf3f2;--card-muted:#b1c7ca;--card-panel:#203942;
+  --card-line:#55717a;--card-gold:#f2c26c;--card-base:#122830;
+  font-family:"Segoe UI",Arial,sans-serif;
+}
+.cards-view :is(button,b,h2,small){text-shadow:none}
+.cards-view :is(.tl-felt,.card-table,.classic-felt){
+  color:var(--card-ink);border-color:#596e70;outline-color:#243b42;
+  background:radial-gradient(ellipse at 50% 45%,#3d6269,#243f48 85%);
+}
+.cards-view :is(.tl-player,.card-player,.classic-player){
+  background:var(--card-panel);border:1px solid var(--card-line);
+  border-radius:6px;color:var(--card-ink);box-shadow:0 2px 5px #0a19252b;
+}
+.cards-view :is(.tl-player,.card-player,.classic-player).turn{
+  background:#3b4b43;border-color:var(--card-gold);
+  outline:2px solid var(--card-gold);outline-offset:1px;
+}
+.cards-view :is(.tl-player,.classic-player).mine{background:#2c4852}
+.cards-view :is(.tl-player,.classic-player).winner{background:#435447;border-color:var(--card-gold)}
+.cards-view :is(.classic-player-badge,.classic-player-info,.classic-player-action),
+.cards-view .tl-player :is(span,small){color:var(--card-muted)}
+.cards-view .classic-player.winner .classic-player-info{color:#ffe0a1}
+.cards-view .classic-player.mine .classic-player-name:after{color:var(--card-gold)}
+.cards-view :is(.tl-turn,.classic-turn,.turn-sign){color:#f4e4bc;font-variant-numeric:tabular-nums}
+.cards-view :is(.tl-turn,.classic-turn,.turn-sign)>span{
+  background:#142d36;border-color:#6c878b;color:#e8ede4;border-radius:4px;
+}
+.cards-view .poker-pot{background:#172f37;color:#ffe0a1;border-color:#8d9276;font-variant-numeric:tabular-nums}
+.cards-view .classic-results{background:#364e47;color:#ffe0a1;border-color:#bdab76}
+.cards-view :is(.tl-card,.classic-card):not(.card-back){
+  background:#fffef9;border-color:#d7dedc;box-shadow:0 2px 4px #081c304d;
+}
+.cards-view .classic-card.card-back,.cards-view .playing-card.back{
+  background:repeating-linear-gradient(135deg,#405d72 0 4px,#3b566a 4px 8px);
+  border-color:#adc2cb;color:#e3eaf0;
+}
+.cards-view .tl-hand .tl-card.selected{
+  border-color:#f2c26c;box-shadow:0 0 0 2px #f2c26c,0 4px 6px #081c3059;
+}
+.cards-view .tl-hand .tl-card.selected::after{background:#f2c26c;color:#253b42}
+.cards-view .hand .playing-card.playable{border-color:#f2c26c;box-shadow:0 2px 4px #081c304d}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar){
+  background:var(--card-base);border-color:#526b72;color:var(--card-muted);
+}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar)>p{color:var(--card-muted)}
+.cards-view #card-feedback{color:var(--card-muted)}
+.cards-view #card-feedback.error{color:#ffb7a9}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar)>p.error{color:#ffb7a9}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar) button,
+.cards-view .hand-sort-row button{
+  border:1px solid #627f88;border-radius:5px;background:#294650;
+  color:#f0f4ed;box-shadow:0 2px 0 #0a1e26;font-weight:700;
+}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar) button.primary{
+  background:#efbd70;border-color:#ffd798;color:#233b43;box-shadow:0 2px 0 #8b6b3c;
+}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar) button:disabled{
+  opacity:1;background:#233c44;border-color:#405960;color:#9aafb4;box-shadow:none;
+}
+.cards-view :is(.tl-actions,.classic-actions,.card-action-bar) button:active:not(:disabled),
+.cards-view .hand-sort-row button:active:not(:disabled){box-shadow:none;filter:brightness(1.12)}
+.cards-view :is(button,input,select):focus-visible{outline:2px solid #ffe0a1;outline-offset:2px}
+.cards-view .classic-rematch-setup{color:var(--card-muted)}
+.cards-view .classic-rematch-setup select,.cards-view #pk-controls input{
+  background:#122b34;color:#f4e4bc;border-color:#66828a;border-radius:4px;
+}
+.cards-view .color-picker>span{color:var(--card-muted)}
+/* Preserve the actual color choices; neutral action styling must not cover them. */
+.cards-view .color-picker [data-color=red]{background:#c63f41}
+.cards-view .color-picker [data-color=yellow]{background:#f2cf59}
+.cards-view .color-picker [data-color=green]{background:#29764d}
+.cards-view .color-picker [data-color=blue]{background:#285fad}
+
+@media(max-width:1100px) and (orientation:landscape){
+  body.card-fullscreen .cards-view .game-page-heading{
+    background:#172e37;border-bottom-color:#657b7b;
+  }
+  body.card-fullscreen .cards-view .game-page-heading h2{color:#f2dfb9;letter-spacing:.15px}
+  body.card-fullscreen .cards-view .card-header-actions button{
+    background:#263f49;border:1px solid #59737a;border-radius:4px;color:#d8e5e5;box-shadow:none;
+  }
+  body.card-fullscreen .cards-view .card-header-actions #card-game-switch{background:#263f49;border-color:#59737a;color:#d8e5e5}
+  body.card-fullscreen .cards-view .card-header-actions .invite-table{color:#ffe0a1}
+  body.card-fullscreen .cards-view .card-scroll-area{
+    isolation:isolate;
+    background:radial-gradient(ellipse at 50% 46%,#41646b,#29454f 78%,#213b45);
+  }
+  body.card-fullscreen .cards-view .card-scroll-area::before{
+    content:"";position:absolute;z-index:-1;inset:12% 14%;
+    border:1px solid #c3d4c722;border-radius:45%;pointer-events:none;
+    box-shadow:0 0 0 5px #c3d4c706;
+  }
+  body.card-fullscreen .cards-view :is(.tl-felt,.card-table,.classic-felt){background:transparent}
+  body.card-fullscreen .cards-view :is(.tl-player,.card-player,.classic-player){box-shadow:0 2px 5px #0a19252b}
+  body.card-fullscreen .cards-view .card-hand-dock{
+    background:#1b343e;border-top:1px solid #627c81;
+    box-shadow:inset 0 5px 12px #0c242b33;
+  }
+  body.card-fullscreen .cards-view .card-hand-dock .classic-own-hand>small{color:#b9cdd0;letter-spacing:.6px}
+  body.card-fullscreen .cards-view :is(.tl-actions,.classic-actions,.card-action-bar){
+    background:var(--card-base);border-top-color:#49656d;
+  }
+  body.card-fullscreen .cards-view .color-arena .playing-card.back{font-size:12px;letter-spacing:1px}
+  body.card-fullscreen .cards-view .classic-results{background:#364e47;color:#ffe0a1;border-color:#bdab76}
+  body.card-fullscreen .cards-view .card-mode-picker{
+    background:#1d3741;border-color:#789093;box-shadow:0 6px 18px #07182066;border-radius:6px;
+  }
+  body.card-fullscreen .cards-view .card-mode-picker button{background:#2b4852;border-color:#607e86;color:#e5efed;border-radius:4px}
+  body.card-fullscreen .cards-view .card-mode-picker button.active{background:#efbd70;color:#233b43;border-color:#ffd798}
+}

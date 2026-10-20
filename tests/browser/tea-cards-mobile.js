@@ -12,8 +12,9 @@ async(page)=>{
     let headers,live,stage='wallet';
     try{
       const wallet=await(await context.request.post(base+'/api/game/wallets',{data:{}})).json();headers={'X-Wallet-Token':wallet.token};
-      await context.request.put(base+'/api/tea/profile',{headers,data:{nickname:'Mobile QA',language:'vi'}});
-      await context.addInitScript(token=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi')},wallet.token);
+      const language=mode.key==='poker'?'en':'vi';
+      await context.request.put(base+'/api/tea/profile',{headers,data:{nickname:'Nguyễn Minh Khánh An',language}});
+      await context.addInitScript(({token,language})=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language',language)},{token:wallet.token,language});
       stage='load';live=await context.newPage();live.on('pageerror',error=>errors.push(error.message));await live.goto(base+'/tra-da');
       await live.waitForFunction(()=>document.querySelector('#connection-dot').classList.contains('live'));
       stage='chair';const seat=await live.evaluate(async index=>{const token=localStorage.getItem('locly-game-wallet'),state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':token}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},mode.table);
@@ -55,6 +56,8 @@ async(page)=>{
       }
       stage='rotate';await live.setViewportSize({width:390,height:844});await live.waitForFunction(()=>!document.body.classList.contains('card-fullscreen'));
       if(!(await live.locator(mode.hand).evaluate(el=>!!el.closest('.card-scroll-area'))))throw Error(mode.key+' hand did not restore on portrait');
+      await live.setViewportSize({width:1280,height:900});await live.waitForFunction(()=>!document.body.classList.contains('card-fullscreen'));
+      await live.screenshot({path:'E:/blogger/output/cards-desktop-'+mode.key+'.png'});
       await live.setViewportSize({width:740,height:360});await live.waitForFunction(()=>document.body.classList.contains('card-fullscreen'));
       await live.locator('.cards-view .back-cafe').click();await live.waitForFunction(()=>!document.body.classList.contains('card-fullscreen'));
       if(errors.length)throw Error(mode.key+' page errors '+errors.join('; '));
