@@ -59,7 +59,7 @@
   .brawl-action-buttons button>b{font-size:16px}.brawl-action-buttons button>small{font-size:8px;letter-spacing:0}
 }
 @media(max-width:360px){.brawl-controls{gap:9px;padding-left:11px;padding-right:11px}#brawl-stick{flex-basis:80px;width:80px;height:80px}.brawl-action-buttons{gap:6px}.brawl-action-buttons button{width:59px;min-height:72px}.brawl-action-buttons button>b{font-size:14px}.fight-hud{padding-left:11px;padding-right:11px}}
-@media(max-height:620px) and (min-width:600px){
+@media(max-height:620px) and (min-width:480px) and (orientation:landscape){
   .brawl-mode.cafe-shell{height:calc(100dvh - 58px);padding:0 12px}
   .brawl-mode .world-card{min-height:0}
   .fight-hud{height:65px;grid-template-columns:minmax(0,1fr) minmax(115px,.35fr) auto;grid-template-rows:1fr;padding:8px 16px}
