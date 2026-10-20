@@ -139,18 +139,41 @@
   function renderChatMessage(message){if($(`[data-message-id="${CSS.escape(message.id)}"]`))return;const stick=$('#chat-list').scrollHeight-$('#chat-list').scrollTop-$('#chat-list').clientHeight<40;const row=document.createElement('div');row.className=`message ${message.walletId===myId?'mine':''}`;row.dataset.messageId=message.id;const name=document.createElement('b'),text=document.createElement('p');name.textContent=message.nickname;text.textContent=message.text;row.append(name,text);$('#chat-list').append(row);if(stick)$('#chat-list').scrollTop=$('#chat-list').scrollHeight;bubbles.set(message.walletId,{text:message.text,until:Date.now()+5000});if(message.walletId!==myId)beep()}
   function updateCardClock(){cardUi?.clock();tlUi?.clock();bcUi?.clock();pkUi?.clock()}
   function renderCard(){cardUi?.render();tlUi?.render();bcUi?.render();pkUi?.render();updateCardChrome()}
-  const cardDocks=[];
+  const cardDocks=[],cardSurfaces=[];let cardFitFrame=0;
+  function scheduleCardFit(){
+    if(cardFitFrame)return;
+    cardFitFrame=requestAnimationFrame(()=>{
+      cardFitFrame=0;if(!document.body.classList.contains('card-fullscreen'))return;
+      for(const {game,stage,surface,hand,dock,board} of cardSurfaces){
+        if(!game.getClientRects().length)continue;
+        if(hand){
+          const count=Math.max(1,hand.children.length),available=dock.clientWidth-(dock.querySelector('.hand-sort-row')?.offsetWidth||0)-24,columns=Math.min(count,Math.max(1,Math.floor(available/26))),rows=Math.ceil(count/columns);
+          hand.style.setProperty('--hand-columns',columns);
+          dock.style.setProperty('--extra-hand-height',rows>1?Math.min(rows*48+12,innerHeight*.4)+'px':'0px');
+          hand.style.setProperty('--hand-rows',rows);
+        }
+        const pokerResult=board.classList.contains('classic-poker-table')&&board.querySelector('.classic-results:not([hidden])');
+        surface.style.setProperty('--center-card-height',Math.min(76,Math.max(pokerResult?16:28,stage.clientHeight-(pokerResult?90:66)))+'px');
+      }
+    });
+  }
   function setupCardDocks(){
+    const resize=new ResizeObserver(scheduleCardFit),changes=new MutationObserver(scheduleCardFit);
     for(const [gameSelector,selectors] of [['#tl-game',['.tl-hand-heading','.hand-sort-row','#tl-hand']],['#card-game',['.hand-area']],['#bc-game',['.classic-own-hand']],['#pk-game',['.classic-own-hand']]]){
       const game=$(gameSelector),dock=document.createElement('div');dock.className='card-hand-dock';game.insertBefore(dock,game.querySelector('.tl-actions,.card-action-bar,.classic-actions'));
       for(const selector of selectors){const node=game.querySelector(selector),marker=document.createComment('card-hand-home');node.before(marker);cardDocks.push({node,marker,dock})}
+      const area=game.querySelector('.card-scroll-area'),board=area.querySelector('.tl-felt,.card-table,.classic-felt'),stage=document.createElement('div'),surface=document.createElement('div');
+      stage.className='card-fit-stage';surface.className='card-fit-surface';board.before(stage);stage.append(surface);surface.append(board);
+      const hand=game.querySelector('#tl-hand,#hand');cardSurfaces.push({game,stage,surface,hand,dock,board});
+      resize.observe(area);resize.observe(surface);resize.observe(dock);if(hand){resize.observe(hand);changes.observe(hand,{childList:true})}changes.observe(board,{childList:true,subtree:true});
     }
   }
   function syncCardDocks(fullscreen){
     document.body.classList.toggle('card-fullscreen',fullscreen);
     for(const {node,marker,dock} of cardDocks){if(fullscreen){if(node.parentElement!==dock)dock.append(node)}else if(node.previousSibling!==marker)marker.after(node)}
+    scheduleCardFit();
   }
-  function updateCardChrome(){const panel=$('.cards-view'),gameSelector={tienlen:'#tl-game',color:'#card-game',baicao:'#bc-game',poker:'#pk-game'}[cardMode],shown=Boolean(gameSelector&&!$(gameSelector).hidden);panel.classList.toggle('in-card-round',shown);$('#card-game-switch').hidden=!shown;$('#card-game-switch').setAttribute('aria-expanded',String(panel.classList.contains('show-card-picker')));syncCardDocks(shown&&panel.classList.contains('active')&&matchMedia('(max-width:900px) and (orientation:landscape)').matches);placeCardRules()}
+  function updateCardChrome(){const panel=$('.cards-view'),gameSelector={tienlen:'#tl-game',color:'#card-game',baicao:'#bc-game',poker:'#pk-game'}[cardMode],shown=Boolean(gameSelector&&!$(gameSelector).hidden);panel.classList.toggle('in-card-round',shown);$('#card-game-switch').hidden=!shown;$('#card-game-switch').setAttribute('aria-expanded',String(panel.classList.contains('show-card-picker')));syncCardDocks(shown&&panel.classList.contains('active')&&matchMedia('(max-width:1100px) and (orientation:landscape)').matches);placeCardRules()}
   function placeCardRules(){const mobile=matchMedia('(max-width:900px)').matches;for(const [modeId,gameId] of [['#tienlen-mode','#tl-game'],['#baicao-mode','#bc-game'],['#poker-mode','#pk-game']]){const mode=$(modeId),game=$(gameId),rules=mode.querySelector('.tl-rules,.classic-rules'),parent=mobile&&!game.hidden?game.querySelector('.card-scroll-area'):mode;if(rules.parentElement!==parent)parent.append(rules)}}
   function syncCardViewport(){const viewport=window.visualViewport,bottom=viewport?.scale===1?Math.min(innerHeight,viewport.height+viewport.offsetTop):innerHeight,value=Math.round(bottom)+'px',shell=$('#cafe-shell');if(shell.style.getPropertyValue('--tea-visible-bottom')!==value)shell.style.setProperty('--tea-visible-bottom',value)}
   async function refreshState(){try{state=await api('/api/tea/state');$('#online-count').textContent=state.guests.filter(g=>g.connected).length;renderPanel()}catch(error){$('#connection-text').textContent=error.message}}
