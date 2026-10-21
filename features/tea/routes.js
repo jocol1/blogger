@@ -39,7 +39,14 @@ function createTeaRouter({ service, isAdmin }) {
     res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https://img.vietqr.io data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
     res.sendFile(path.join(assets, 'index.html'));
   });
+  router.get('/tra-da/farm', (req, res) => {
+    res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+    res.sendFile(path.join(assets, 'farm.html'));
+  });
   router.use('/api/tea', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  router.get('/api/tea/farm', asyncRoute(async (req, res) => res.json(await service.farmState(token(req)))));
+  router.post('/api/tea/farm/enter', json, asyncRoute(async (req, res) => res.json(await service.enterFarm(token(req)))));
+  router.post('/api/tea/farm/actions', json, asyncRoute(async (req, res) => res.json(await service.farmAction(token(req), req.body))));
   router.get('/api/tea/config', asyncRoute(async (req, res) => { const ready = service.paymentReady(); res.json({ ready, menu: await service.menu(), bankTransferOnly: true, ...(ready ? { bank: service.config.bank, account: service.config.account, accountName: service.config.accountName } : {}) }); }));
   router.get('/api/tea/profile', asyncRoute(async (req, res) => res.json(await service.profile(token(req)))));
   router.put('/api/tea/profile', json, asyncRoute(async (req, res) => res.json(await service.saveProfile(token(req), req.body))));
@@ -114,7 +121,7 @@ function createTeaRouter({ service, isAdmin }) {
   router.post('/tra-da/admin/orders/:id/redeliver', adminOnly, express.urlencoded({ extended: false, limit: '8kb' }), checkCsrf, asyncRoute(async (req, res) => { await service.redeliver(req.params.id); res.redirect('/tra-da/admin'); }));
 
   router.use((error, req, res, next) => {
-    if (error instanceof TeaError || error.tableGameError || error.tienLenError || error.classicCardError || error.brawlError) return res.status(error.status).json({ error: error.message, code: error.code });
+    if (error instanceof TeaError || error.farmError || error.tableGameError || error.tienLenError || error.classicCardError || error.brawlError) return res.status(error.status).json({ error: error.message, code: error.code });
     if (error.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON.', code: 'bad_json' });
     console.error('Tea café operation failed:', error.code || error.name);
     res.status(503).json({ error: 'The café connection is taking a break. Please try again.', code: 'storage_error' });

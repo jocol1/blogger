@@ -27,7 +27,12 @@ app.get(['/an-xin', '/tra-tien', '/xin-tien'], (req, res) => {
   const html = fs.readFileSync(path.join(__dirname, '../public/an-xin/index.html'), 'utf8');
   res.send(html.replace('<body>', '<body><div class="notice" role="note">BẢN KIỂM THỬ CỤC BỘ · KHÔNG CHUYỂN TIỀN · DỮ LIỆU GIẢ LẬP</div>'));
 });
-const teaService = createTeaService({ db, config });
+let teaClockOffset = 0;
+app.post('/__test/tea/advance', express.json(), (req, res) => {
+  if (!Number.isInteger(req.body.ms) || req.body.ms < 0 || req.body.ms > 86_400_000) return res.sendStatus(400);
+  teaClockOffset += req.body.ms; res.json({ advanced: req.body.ms });
+});
+const teaService = createTeaService({ db, config, now: () => Date.now() + teaClockOffset });
 attachTeaSockets(io, teaService);
 app.use(createTeaRouter({ service: teaService, isAdmin: req => req.session.user === 'admin' }));
 app.use(createDonationRouter({ db, config, teaService }));

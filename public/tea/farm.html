@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#354d43"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+  <title>My little farm · Locly</title>
+  <link rel="manifest" href="/tra-da.webmanifest"><link rel="icon" href="/assets/tea/icons/icon-192.png">
+  <link rel="stylesheet" href="/assets/tea/farm.css">
+</head>
+<body>
+  <header>
+    <a href="/tra-da" class="cafe-link" data-text="cafe">← Café</a>
+    <div class="brand"><small data-text="map">MAP 02 · JUST YOURS</small><strong data-text="title">My little farm</strong></div>
+    <span class="gold"><i>●</i> <b id="gold">—</b> <span data-text="gold">gold</span></span>
+    <button id="wallet" data-text="backup">Backup</button><button id="lang">VI</button>
+  </header>
+  <div id="notice" role="status"><span id="notice-text" data-text="loading">Opening your garden…</span><button id="retry" hidden data-text="retry">Try again</button><button id="update" hidden data-text="update">Update farm</button></div>
+  <main>
+    <section class="world" aria-label="Private pixel farm">
+      <canvas id="farm-canvas" tabindex="0" aria-label="Farm. Tap a plot or pond, or use the plot buttons below."></canvas>
+      <div class="world-label"><span id="owner"></span><small data-text="hint">Tap a patch or pond · WASD to walk</small></div>
+      <div id="harvest-fx" aria-live="polite"></div>
+    </section>
+    <aside id="panel" hidden><div class="panel-heading"><h2 id="panel-title"></h2><button id="close-panel" aria-label="Close">×</button></div><div id="panel-content"></div></aside>
+  </main>
+  <footer>
+    <nav aria-label="Farm tools"><button data-panel="garden" data-text="garden">Garden</button><button data-panel="pond" data-text="pond">Pond</button><button data-panel="shop" data-text="shop">Shop</button><button data-panel="bag" data-text="bag">Basket</button><button data-panel="quests" data-text="quests">Tasks</button><button data-panel="decorate" data-text="decorate">Decorate</button></nav>
+    <span class="footer-note" data-text="free">Free to play · Farm gold is separate from café coins</span>
+  </footer>
+  <section id="portrait"><div><span class="turn-phone">↻</span><h2 data-text="rotate">Turn your phone sideways</h2><p data-text="rotateHint">Your garden will be right here. Nothing stops growing.</p><button id="portrait-wallet" data-text="backup">Backup</button><a href="/tra-da" data-text="cafe">← Café</a></div></section>
+  <dialog id="wallet-dialog"><h2 data-text="backup">Backup</h2><p data-text="walletHint">This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.</p><textarea id="wallet-code" readonly aria-label="Wallet backup code"></textarea><button id="copy" data-text="copy">Copy code</button><hr><label for="restore-code" data-text="restoreLabel">Restore a saved wallet</label><textarea id="restore-code" autocomplete="off" spellcheck="false"></textarea><button id="restore" data-text="restore">Restore</button><button id="close-wallet" data-text="close">Close</button><p id="wallet-message" role="status"></p></dialog>
+  <script src="/assets/tea/scene.js"></script><script src="/assets/tea/farm.js"></script>
+</body>
+</html>

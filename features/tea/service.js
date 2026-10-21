@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const { createFarm } = require('./farm');
 const { createTableGames } = require('./table-games');
 const { createTienLen } = require('./tienlen');
 const { createClassicCards } = require('./classic-cards');
@@ -56,6 +57,7 @@ function cardMatches(card, top, activeColor) {
 }
 
 function createTeaService({ db, config, now = () => Date.now() }) {
+  const farm = db ? createFarm({ db, now }) : null;
   const tableGames=db?createTableGames({db,now}):null;
   const tienLen = db ? createTienLen({ db, now, tableIds: TABLES.map(table => table.id) }) : null;
   const classicCards = db ? createClassicCards({ db, now, tableIds: TABLES.map(table => table.id) }) : null;
@@ -239,6 +241,19 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       for (const [id, row] of fights) { resolveFight(row); if (row.finishedAt && now() - row.finishedAt > 60_000) fights.delete(id); }
     },
     walletIdFor,
+    async farmState(token) { const walletId = await walletIdFor(token); return farm.read(walletId); },
+    async farmAction(token, input) { const walletId = await walletIdFor(token); return farm.action(walletId, input); },
+    async enterFarm(token) {
+      const walletId = await walletIdFor(token);
+      if (!await profileFor(walletId)) throw new TeaError(409, 'Create your character first.', 'profile_required');
+      const state = await farm.read(walletId);
+      await service.leaveByWallet(walletId, 'map_changed');
+      const socket = sockets.get(walletId);
+      if (socket) { socket.emit('tea:map-changed'); socket.disconnect(true); }
+      sockets.delete(walletId); presence.delete(walletId);
+      io?.emit('tea:state', await service.publicState());
+      return state;
+    },
     async profile(token) { const walletId = await walletIdFor(token); return { walletId, profile: await profileFor(walletId) }; },
     async saveProfile(token, input) {
       const walletId = await walletIdFor(token); const clean = cleanProfile(input); const at = iso(now());

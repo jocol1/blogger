@@ -14,6 +14,22 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 
 ## Pixel Tea Café — `/tra-da`
 
+### Map 2 — nông trại riêng `/tra-da/farm`
+
+Nút **Map 2 · My farm / Nông trại** ở quán mở nông trại của chính mã ví hiện tại. Map 1 vẫn là quán chung để gặp nhau, chat và chơi cùng bàn. Sang nông trại sẽ trả ghế và rời ván đang tham gia; món đã mua và ví xu vẫn giữ nguyên. Nút **Về quán** luôn ở đầu màn hình nông trại. Cần tạo nhân vật ở quán trước lần đầu vào map 2.
+
+- Khởi đầu có 120 vàng nông trại, 6 hạt củ cải, 2 cá bảy màu, 6 luống và 2 ô cá. **Vàng chỉ dùng trong nông trại**, không mua bằng tiền, không quy đổi thành xu hoặc tiền thật.
+- Củ cải / cà rốt / cà chua / bắp lớn trong 1 / 3 / 10 / 30 phút. Cá bảy màu / cá chép / cá koi lớn trong 2 / 10 / 30 phút. Gieo hoặc thả giống rồi **tưới / cho ăn một lần** để bắt đầu tính giờ; nước và thức ăn miễn phí. Server giữ mốc lớn, nên đóng trang hoặc khởi động lại server vẫn tiếp tục. Cây/cá không tự héo hoặc chết.
+- Thu hoạch vào giỏ, bán lấy vàng, mua giống mới. Mở rộng tối đa 12 luống và 6 ô cá; chi phí hiện trước khi mua. Bồn hoa, đèn vườn, ghế gỗ mua một lần rồi đặt/chuyển giữa 4 góc. Năm nhiệm vụ có thưởng một lần.
+- Dùng chung nút sao lưu/khôi phục mã ví. Mỗi ví chỉ đọc/ghi nông trại của mình. Các tab tự đồng bộ mỗi 10 giây; thao tác mất phản hồi giữ mã yêu cầu qua tải lại, chỉ gửi lại khi người chơi bấm **Thử lại**. Không tự tạo ví khác khi lỗi mạng.
+- Giao diện Việt/Anh; chạm đất/ao hoặc dùng nút chọn ô, WASD/phím mũi tên để đi. Điện thoại chơi ngang; bảng thao tác nằm cạnh bản đồ. Chế độ dọc vẫn mở được mã ví. Nông trại cần mạng để thao tác; cây/cá vẫn lớn khi offline.
+
+API dùng `X-Wallet-Token`: `GET /api/tea/farm`, `POST /api/tea/farm/enter`, `POST /api/tea/farm/actions`. Action có `requestId` duy nhất (UUID), `type` và trường tương ứng: `item`, `slot`, `cycleId`, `quantity`, `quest`. Server bỏ qua số dư/thời gian/owner do client gửi. Các loại gồm `buy`, `plant`, `stock`, `water`, `feed`, `harvest`, `catch`, `sell`, `upgradePlots`, `upgradePond`, `decorate`, `claim`. Tưới/cho ăn/thu hoạch phải gửi `cycleId` của lứa hiện tại để không tác động nhầm lứa mới.
+
+Firestore thêm `tea_farms/{walletId}` và `tea_farm_actions/{sha256(walletId:requestId)}`. Một transaction cập nhật nông trại và biên nhận chống lặp; cùng mã khác nội dung trả `409`. Biên nhận chỉ lưu fingerprint và thời gian, được giữ để chống gửi lại lâu ngày. Không đổi collection ví, thanh toán, không cần bucket hay biến môi trường mới, không cần migration; nông trại khởi tạo khi chủ ví vào lần đầu. Chỉ Firebase Admin ở server truy cập; không mở Firestore Rules trực tiếp cho client. PWA cache v27 chỉ thêm HTML/CSS/JS công khai của map; API vẫn `no-store`. APK hiện tại mở nội dung web nên nhận map mới sau khi cập nhật nội dung, không cần bản APK riêng.
+
+Kiểm thử: `node --test tests/tea-farm.test.js`; `tests/browser/tea-farm.js` chạy bằng Playwright trên `node tests/preview.js`, kiểm tra trọn luồng, hai tab, mất phản hồi sau ghi, xoay máy, 568×320 / 740×360 / 844×390 / 1024×768 và về quán. Preview có `POST /__test/tea/advance` với `{ "ms": 121000 }` để tăng giờ giả (tối đa một ngày mỗi lần); endpoint này **không có trong server production**. Kiểm tra viewport là mô phỏng trình duyệt, chưa thay thế thử trên thiết bị Android/iOS thật.
+
 Quán là sân trà 2D có tranh pixel gốc: sân gạch, cây và hoa, quầy trà mái ngói, bàn gỗ và đủ ghế có lưng tựa. Mặc định tiếng Anh, có nút Tiếng Việt. Khách dùng chung mã ví hiện tại để lưu biệt danh, tóc, quần áo và giày; vào quán miễn phí. Máy tính dùng WASD/phím mũi tên hoặc bấm điểm muốn đến; đường đi tự vòng vật cản. Điện thoại có camera theo nhân vật và cụm phím ảo. Khách tự đi tới ghế trống rồi bấm **Sit/Ngồi**. Tám bàn có sức chứa 2, 4 hoặc 8 người, tổng 34 ghế cho tối đa 32 khách. Bàn đều công cộng; bàn có người cho chọn hỏi trước, bỏ đi hoặc ngồi luôn. Hỏi trước không giữ ghế; server vẫn quyết định ai giành ghế trước bằng transaction. Chủ bàn chuyển cho người ngồi lâu nhất khi chủ rời đi.
 
 Nút di chuyển, cần và nút đánh dùng pointer capture, dừng khi thả ngoài vùng bấm, hủy chạm hoặc rời tab. Chỉ vùng điều khiển/canvas chặn chọn chữ, kéo và menu nhấn giữ của Chrome; chat, mã ví và nội dung chuyển khoản vẫn sao chép được. Kiểm thử giữ/thả: `tests/browser/tea-touch-controls.js`.

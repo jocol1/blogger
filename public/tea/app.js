@@ -42,6 +42,7 @@
   }
   function toast(message) { const el = $('#toast'); el.textContent = message; el.classList.add('show'); clearTimeout(toast.timer); toast.timer = setTimeout(() => el.classList.remove('show'), 2600); }
   function applyLocale() {
+    const farmLink = $('#farm-link'); if (farmLink) farmLink.textContent = locale === 'vi' ? 'Map 2 · Nông trại' : 'Map 2 · My farm';
     document.documentElement.lang = locale; renderMenu();updateCafeClock(); $$('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); }); $$('[data-i18n-placeholder]').forEach(el => { el.placeholder = t(el.dataset.i18nPlaceholder); }); $('#language-button').textContent = locale === 'en' ? 'VI' : 'EN';$('#connection-text').textContent=t(socket?.connected?'connected':'connecting'); localStorage.setItem(LOCALE_KEY, locale); renderPanel();gameUi?.render();if(fightData)renderFight();brawlUi?.render();
   }
   function beep(freq = 620) { if (!sound) return; const Audio = window.AudioContext || window.webkitAudioContext; if (!Audio) return; const audio = new Audio(), osc = audio.createOscillator(), gain = audio.createGain(); osc.frequency.value = freq; gain.gain.setValueAtTime(.035,audio.currentTime); gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.13); osc.connect(gain).connect(audio.destination); osc.start(); osc.stop(audio.currentTime+.14); }
