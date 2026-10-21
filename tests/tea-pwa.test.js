@@ -28,7 +28,7 @@ test('Android APK ownership statement is public and matches the TWA package',asy
 });
 
 test('service worker caches only the public café shell and waits for an explicit update',()=>{
-  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v25/);assert.match(worker,/cards-fullscreen\.css/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
+  const worker=read('public/tea/sw.js');assert.match(worker,/locly-tea-v26/);assert.match(worker,/cards-fullscreen\.css/);assert.match(worker,/SKIP_WAITING/);assert.doesNotMatch(worker,/sync|BackgroundSync/i);assert.match(worker,/request\.method!=='GET'/);assert.match(worker,/startsWith\('\/api\/'\)/);assert.match(worker,/assets\/tea/);assert.doesNotMatch(worker,/api\/game|api\/tea\/|admin\/orders/);assert.doesNotMatch(worker,/skipWaiting\(\).*install/s);
 });
 
 test('tea page exposes install, rotation, offline, recovery and deferred update controls',()=>{
@@ -38,4 +38,5 @@ test('tea page exposes install, rotation, offline, recovery and deferred update 
 
 test('portrait mode pauses controls instead of rotating the interface',()=>{
   const css=read('public/tea/pwa.css'),app=read('public/tea/app.js'),brawl=read('public/tea/brawl-ui.js');assert.match(css,/orientation:portrait/);assert.doesNotMatch(css,/rotate\(90deg\).*cafe-shell/);assert.match(app,/tea:orientationchange/);assert.match(app,/padController\?\.reset/);assert.match(brawl,/portrait-blocked/);assert.match(brawl,/pause:release/);
+  assert.match(read('public/tea/all-games-fullscreen.css'),/game-page-heading\{display:flex!important\}/);
 });

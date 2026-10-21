@@ -6,6 +6,7 @@
   body.mini-game-fullscreen .side-panel{position:fixed!important;z-index:45;inset:0!important;width:100%!important;height:var(--tea-visible-bottom,100dvh)!important;max-height:none;min-height:0;padding:0!important;border:0;box-shadow:none!important}
   body.mini-game-fullscreen .world-card,body.mini-game-fullscreen .panel-tabs{display:none!important}
   body.mini-game-fullscreen .games-view.active{display:flex!important;flex-direction:column;height:100%!important;min-height:0;overflow:hidden;padding:0!important;background:#203b45}
+  body.mini-game-fullscreen .games-view .game-page-heading{display:flex!important}
   body.mini-game-fullscreen .games-view .game-page-heading{flex:none;min-height:39px;margin:0!important;padding:3px max(8px,env(safe-area-inset-right)) 3px max(8px,env(safe-area-inset-left));background:#172e37;border-bottom:1px solid #657b7b}
   body.mini-game-fullscreen .games-view .game-page-heading h2{margin:0;color:#f2dfb9;font-size:clamp(12px,2.5vw,17px);line-height:1.15}
   body.mini-game-fullscreen .games-view .game-page-heading small{display:none}
