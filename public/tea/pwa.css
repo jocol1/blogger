@@ -87,3 +87,5 @@
 .install-actions #install-apk{display:block;min-height:46px;padding:12px 16px;border:2px solid #1c2c37;color:#fff8e7;text-align:center;text-decoration:none;font-weight:900;box-shadow:3px 3px 0 #1c2c37}.install-actions #install-apk[hidden]{display:none}
 @media(max-width:480px){.install-modal{padding:18px}.install-icon{width:64px;height:64px}.install-wallet-actions{flex-wrap:wrap}.install-wallet-actions button{flex:1 1 130px}}
 @media(display-mode:standalone){[data-install-cafe]{display:none!important}}
+/* Keep the triple-memory pictures readable on the compact landscape board. */
+.games-view .memory-tile{font-size:28px!important}.games-view .memory-tile.revealed,.games-view .memory-tile.matched{font-size:28px!important}

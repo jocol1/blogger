@@ -1,6 +1,6 @@
 window.TeaGamesUI=function({api,t,toast,id,myId,myTable,isVisible}){
   const $=s=>document.querySelector(s),box=$('#mini-game-stage');let key=null,game=null,botCount=1,busy=false,offset=0,fingerprint='',fetching=false;
-  const symbols={tea:'🥤',cake:'🍰',leaf:'🍃',sun:'☀',flower:'🌸',moon:'☾',rock:'✊',paper:'✋',scissors:'✌',heads:'🪙',tails:'🔄',low:'⬇️',high:'⬆️',missed:'—'};
+  const symbols={apple:'🍎',orange:'🍊',peach:'🍑',lemon:'🍋',pear:'🍐',cherry:'🍒',tea:'🥤',cake:'🍰',leaf:'🍃',sun:'☀',flower:'🌸',moon:'☾',rock:'✊',paper:'✋',scissors:'✌',missed:'—'};
   function update(value){if(value&&value.key!==key)return;if(value&&game?.id===value.id&&(game.version||0)>(value.version||0))return;game=value;if(value?.serverNow)offset=value.serverNow-Date.now();render();}
   async function refresh(){if(!key||!myTable()||fetching)return;fetching=true;try{const data=await api('/api/tea/games/'+key);update(data.game);}catch(error){toast(error.message);}finally{fetching=false;}}
   async function action(input){if(busy||!game)return;busy=true;try{const data=await api('/api/tea/games/'+key+'/action',{method:'POST',body:JSON.stringify({...input,gameId:game.id,requestId:id(),round:game.round})});update(data.game);}catch(error){toast(error.message);await refresh();}finally{busy=false;}}
