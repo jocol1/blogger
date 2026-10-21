@@ -1,0 +1,50 @@
+/* Give every active café game its own clear play surface. */
+@media(max-width:1100px) and (orientation:landscape){
+  body.mini-game-fullscreen{overflow:hidden}
+  body.mini-game-fullscreen .topbar{display:none!important}
+  body.mini-game-fullscreen .cafe-shell{position:fixed;inset:0!important;height:var(--tea-visible-bottom,100dvh)!important;max-width:none;margin:0;padding:0}
+  body.mini-game-fullscreen .side-panel{position:fixed!important;z-index:45;inset:0!important;width:100%!important;height:var(--tea-visible-bottom,100dvh)!important;max-height:none;min-height:0;padding:0!important;border:0;box-shadow:none!important}
+  body.mini-game-fullscreen .world-card,body.mini-game-fullscreen .panel-tabs{display:none!important}
+  body.mini-game-fullscreen .games-view.active{display:flex!important;flex-direction:column;height:100%!important;min-height:0;overflow:hidden;padding:0!important;background:#203b45}
+  body.mini-game-fullscreen .games-view .game-page-heading{flex:none;min-height:39px;margin:0!important;padding:3px max(8px,env(safe-area-inset-right)) 3px max(8px,env(safe-area-inset-left));background:#172e37;border-bottom:1px solid #657b7b}
+  body.mini-game-fullscreen .games-view .game-page-heading h2{margin:0;color:#f2dfb9;font-size:clamp(12px,2.5vw,17px);line-height:1.15}
+  body.mini-game-fullscreen .games-view .game-page-heading small{display:none}
+  body.mini-game-fullscreen .games-view .back-cafe{min-height:32px;padding:4px 8px;background:#263f49;border:1px solid #59737a;color:#e4eeee;border-radius:4px}
+  body.mini-game-fullscreen .games-view .mini-game-picker{display:none}
+  body.mini-game-fullscreen #mini-game-stage{display:flex;flex:1;min-height:0;width:100%;max-width:none;margin:0;overflow:hidden}
+  body.mini-game-fullscreen #mini-game-stage .mini-playing,body.mini-game-fullscreen #mini-game-stage .mini-lobby{display:flex;flex:1;min-height:0;width:100%;max-width:none;overflow:hidden;flex-direction:column;justify-content:flex-start;border:0;box-shadow:none;background:radial-gradient(ellipse at center,#41646b,#29454f 85%);padding:10px max(10px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-left));color:#edf3f2}
+  body.mini-game-fullscreen #mini-game-stage .mini-lobby{justify-content:center;text-align:center}
+  body.mini-game-fullscreen .mini-playing .mini-scorebar{flex:none;border-color:#5d777d;padding-bottom:6px}
+  body.mini-game-fullscreen .mini-playing .mini-scorebar h3{font-size:clamp(14px,2.4vw,20px);color:#f2dfb9}
+  body.mini-game-fullscreen .mini-playing .mini-scorebar>b{background:#294650;border-color:#627f88;color:#f0f4ed}
+  body.mini-game-fullscreen .mini-playing .mini-invite{flex:none;margin:6px auto;padding:5px 8px;background:#203a43;border-color:#5c777d;color:#c5d5d4}
+  body.mini-game-fullscreen .mini-playing .mini-invite button{background:#efbd70;border-color:#ffd798;color:#233b43;border-radius:4px}
+  body.mini-game-fullscreen .mini-playing .mini-turn{flex:none;margin:4px 0;color:#f4e4bc;font-size:12px}
+  body.mini-game-fullscreen .mini-playing .mini-players{flex:none;overflow:hidden;padding:2px;gap:5px}
+  body.mini-game-fullscreen .mini-playing .mini-player{min-width:0;flex:1;padding:5px;background:#203942;border-color:#55717a;color:#edf3f2}
+  body.mini-game-fullscreen .mini-playing .mini-player.turn{outline:2px solid #f2c26c}
+  body.mini-game-fullscreen .mini-playing .mini-board{flex:1;min-height:0;width:100%;max-width:none;margin:5px auto;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  body.mini-game-fullscreen .mini-playing .mini-rules{display:none}
+  body.mini-game-fullscreen .mini-playing .mini-result{flex:none;margin:4px 0 0;padding:5px;border-color:#627f88;color:#ffe0a1}
+  body.mini-game-fullscreen .mini-playing .rps-choices{margin:4px auto;gap:clamp(6px,2vw,18px)}
+  body.mini-game-fullscreen .mini-playing .rps-choices button{width:clamp(80px,17vw,140px);padding:clamp(8px,2vw,17px) 6px;background:#294650;border-color:#627f88;color:#f0f4ed;box-shadow:0 2px #0a1e26;border-radius:5px}
+  body.mini-game-fullscreen .mini-playing .rps-choices span{font-size:clamp(30px,6vw,48px)}
+  body.mini-game-fullscreen .mini-playing .rps-choices b{color:#f2dfb9}
+  body.mini-game-fullscreen .mini-playing .rps-choices button.selected{outline:2px solid #f2c26c;background:#3b4b43}
+  body.mini-game-fullscreen .mini-playing .memory-board{width:min(440px,70vh);height:min(440px,70vh);grid-template-columns:repeat(4,minmax(0,1fr));gap:clamp(4px,1.3vw,10px);margin:auto}
+  body.mini-game-fullscreen .mini-playing .memory-tile{font-size:clamp(21px,5vh,36px);border:2px solid #627f88;box-shadow:0 2px #0a1e26;border-radius:5px}
+  body.mini-game-fullscreen .mini-playing .quiz-question{font-size:clamp(15px,2.5vw,22px);color:#f2dfb9;margin:0 auto 6px}
+}
+@media(max-width:570px) and (max-height:320px) and (orientation:landscape){
+  body.mini-game-fullscreen .games-view .game-page-heading{min-height:35px}
+  body.mini-game-fullscreen #mini-game-stage .mini-playing{padding-top:5px}
+  body.mini-game-fullscreen .mini-playing .mini-invite{display:none}
+  body.mini-game-fullscreen .mini-playing .mini-players{max-height:38px}
+}
+
+@media(max-width:1100px) and (orientation:landscape){
+  body.brawl-fullscreen{overflow:hidden}
+  body.brawl-fullscreen .topbar{display:none!important}
+  body.brawl-fullscreen .brawl-mode.cafe-shell{position:fixed;inset:0!important;height:var(--tea-visible-bottom,100dvh)!important;max-width:none;padding:0}
+  body.brawl-fullscreen .brawl-mode .world-card{position:absolute;inset:0;width:100%;height:100%;border:0;outline:0;box-shadow:none}
+}
