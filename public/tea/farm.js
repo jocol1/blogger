@@ -156,7 +156,10 @@
     }
     const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
     if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
-    const scale=Math.max(.72,Math.min(rect.width/1000,rect.height/700));camera.scale=scale;camera.x=Math.max(0,Math.min(1000-rect.width/scale,player.x-rect.width/scale/2));camera.y=Math.max(0,Math.min(700-rect.height/scale,player.y-rect.height/scale/2));
+    const scale=Math.max(.72,Math.min(rect.width/1000,rect.height/700));camera.scale=scale;
+    const visibleWidth=rect.width/scale,visibleHeight=rect.height/scale;
+    camera.x=visibleWidth>=1000?(1000-visibleWidth)/2:Math.max(0,Math.min(1000-visibleWidth,player.x-visibleWidth/2));
+    camera.y=visibleHeight>=700?(700-visibleHeight)/2:Math.max(0,Math.min(700-visibleHeight,player.y-visibleHeight/2));
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);ctx.scale(scale,scale);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;ctx.drawImage(staticMap,0,0);
     const f=state?.farm;
     for(let i=0;i<12;i++){const pos=plotPos(i),unlocked=i<(f?.plots.length||6),row=f?.plots[i];p(ctx,unlocked?'#9e784e':'#89975c',pos.x-45,pos.y-32,90,62);p(ctx,unlocked?'#b28b58':'#829454',pos.x-41,pos.y-28,82,54);for(let j=0;j<4;j++)p(ctx,unlocked?'#9f794f':'#788d51',pos.x-35,pos.y-19+j*12,70,3);

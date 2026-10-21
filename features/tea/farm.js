@@ -43,6 +43,7 @@ function createFarm({ db, now = () => Date.now() }) {
   async function action(id, input) {
     if (!input || typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{12,80}$/.test(input.requestId)) fail('farm_bad_request', 400);
     const { type, item, slot, cycleId, quantity, quest } = input;
+    if (item !== undefined && item !== null && typeof item !== 'string') fail('farm_bad_item', 400);
     const allowed = ['buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
