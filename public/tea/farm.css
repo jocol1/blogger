@@ -2,5 +2,50 @@
 @media(max-width:900px){header{height:56px;padding:5px 12px;gap:8px}.brand strong{font-size:17px}.brand small{font-size:8px;letter-spacing:1px}header button,.cafe-link{padding:7px 9px;font-size:12px;min-height:38px}.gold{font-size:11px}.gold b{font-size:17px}aside{flex-basis:290px;max-width:46%}footer{padding:5px 10px}nav{gap:5px;flex:1}nav button{font-size:12px;padding:6px 10px;flex:1}.footer-note{display:none}.world-label{top:8px;left:8px;padding:6px 10px}.world-label small{display:none}#notice{font-size:11px;min-height:24px}.panel-heading{padding:7px 10px}.panel-heading h2{font-size:16px}#panel-content{padding:10px}.card{padding:10px}.intro{font-size:12px}.slots{gap:4px}.slots button{font-size:12px;padding:5px}#update{top:62px}}
 @media(max-height:400px) and (orientation:landscape){header{height:47px}.brand small{display:none}footer{padding:3px 8px}nav button{min-height:38px}.world-label{padding:4px 8px}.world-label span{font-size:11px}#notice{min-height:22px}.panel-heading button{min-height:32px}.timer{font-size:21px}}
 @media(orientation:portrait) and (max-width:700px){#portrait{display:grid;position:fixed;inset:0;background:#344e43;place-items:center;color:#fff2ce;z-index:20;padding:30px;text-align:center}#portrait p{line-height:1.7}#portrait a{display:inline-block;padding:15px}.turn-phone{font-size:60px}dialog{z-index:25}}
+#fishing-switch{font-size:12px;padding:5px 9px}
+#panel[aria-busy=true] .panel-heading h2::after{content:' …';color:#789477}
+#panel[aria-busy=true] #panel-content{cursor:progress}
+.slots button{transition:background .15s,color .15s}.card button:enabled:active{transform:translateY(1px)}
+#panel-content[data-mode=fishing]{background:linear-gradient(180deg,#eef0dc,#faf3df);}
+.fishing-card{background:#fffcf1;border:1px solid #c3d0b8;box-shadow:0 3px 0 #d5ddc6;padding:16px;border-radius:14px}
+.fishing-card h3{color:#6c8069;font-size:10px;letter-spacing:1.2px}
+.fishing-card .fishing-help{line-height:1.65;margin:12px 0 18px}
+.fishing-steps{display:flex;gap:4px;margin-bottom:12px;white-space:nowrap}
+.fishing-steps span{flex:1;font-size:10px;font-weight:700;text-align:center;padding:7px 2px;border-radius:6px;background:#edf0e4;color:#85917e}
+.fishing-steps .current{background:#3d6754;color:#fff9df}.fishing-steps .done{background:#dfebd2;color:#526f44}
+.fishing-card .fishing-status{font-weight:750;color:#355d41;min-height:42px;margin:0 0 8px;line-height:1.5}
+.fishing-meter{width:100%;height:28px;image-rendering:pixelated;margin:0 0 12px}
+.fishing-controls{display:grid;grid-template-columns:1fr;gap:7px}.fishing-controls.has-line{grid-template-columns:minmax(0,1fr) auto}
+.fishing-card .fishing-controls button{margin:0;min-height:46px;transition:background .15s,box-shadow .15s,transform .12s}
+.fishing-card #fishing-action{background:#426c57;border:1px solid #365b48;box-shadow:0 3px 0 #2d4e3d;color:#fff9e7;font-size:16px;padding:8px}
+.fishing-card #fishing-action:disabled{opacity:1;background:#dfe7d7;border-color:#d0dac6;box-shadow:0 2px 0 #c9d3bf;color:#63765b}
+.fishing-card #fishing-action:enabled:active{transform:translateY(2px);box-shadow:none}
+.fishing-card .fishing-stop{padding:6px 9px;font-size:11px;color:#6f7865;background:transparent;border-color:#d7ddca}
+.fishing-card[data-phase=bite] #fishing-action:enabled{background:#b66e35;border-color:#9b5b2c;box-shadow:0 3px 0 #854b23;animation:fishing-bite 1s ease-in-out infinite}
+.fishing-card[aria-busy=true] #fishing-action{cursor:progress}
+@keyframes fishing-bite{50%{box-shadow:0 3px 0 #854b23,0 0 0 4px #eacba2}}
+@media(max-height:450px) and (orientation:landscape){
+  .fishing-card h3,.fishing-card .fishing-help{display:none}
+  #panel-content[data-mode=fishing]{padding:7px 9px}
+  .fishing-card{padding:8px;margin-bottom:0;border-radius:10px}
+  .fishing-steps{margin-bottom:6px;gap:3px}.fishing-steps span{font-size:9px;padding:4px 1px}
+  .fishing-card .fishing-status{min-height:31px;font-size:11px;margin-bottom:3px;line-height:1.35}
+  .fishing-meter{margin-bottom:7px;height:24px}
+  .fishing-card .fishing-controls button{min-height:38px;padding:6px}
+  .fishing-card #fishing-action{font-size:14px}.fishing-card .fishing-stop{font-size:10px}
+}
+@media(prefers-reduced-motion:reduce){.fishing-card .fishing-controls button{transition:none;animation:none!important}}
+@media(max-height:350px) and (orientation:landscape){
+  #panel-content[data-mode=fishing]{padding:5px 8px}
+  #panel-content .fishing-card{padding:6px;margin-bottom:0}
+  .fishing-steps{margin-bottom:4px}.fishing-steps span{padding:3px 1px}
+  .fishing-card .fishing-status{min-height:30px}
+  .fishing-meter{height:20px;margin-bottom:4px}
+}
+@media(max-height:450px) and (orientation:landscape){
+  .growing-card>p{display:none}
+  #panel-content[data-mode=garden]>.card,#panel-content[data-mode=pond]>.card{padding:8px}
+  #panel-content[data-mode=garden] .card h3,#panel-content[data-mode=pond] .card h3{font-size:12px}
+  .growing-card .big-icon{width:32px;height:32px}
+}
 @media(max-height:450px) and (orientation:landscape){#panel-content[data-mode=garden],#panel-content[data-mode=pond]{display:flex;flex-direction:column}#panel-content[data-mode=garden]>.intro,#panel-content[data-mode=pond]>.intro{display:none}#panel-content>.slots{order:2;flex-shrink:0}#panel-content>.card{flex-shrink:0}#panel-content>button{order:3;flex-shrink:0}.choices button{min-height:38px}.card{margin-bottom:8px}.card p{margin-bottom:6px}.timer{margin:5px 0}}
-#fishing-switch{font-size:12px;padding:5px 9px}.fishing-meter{width:100%;height:28px;image-rendering:pixelated}.fishing-status{font-weight:800!important;color:#355d41!important}.fishing-card .fishing-stop{min-height:30px;padding:5px;font-size:12px}.fishing-card #fishing-action{background:#426c4f;color:#fff5db;font-size:17px}@media(max-height:450px) and (orientation:landscape){.fishing-card h3,.fishing-card .fishing-help{display:none}.fishing-card{padding:8px}.fishing-card .fishing-status{margin:0 0 5px;line-height:1.3}.fishing-card #fishing-action{margin-top:5px;min-height:38px;padding:6px}.fishing-card .fishing-stop{margin-top:4px;min-height:26px}}

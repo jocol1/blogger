@@ -4,10 +4,10 @@
   let token = localStorage.getItem(WALLET), locale = localStorage.getItem(LANGUAGE) === 'vi' ? 'vi' : 'en';
   const outbox = TeaFarmOutbox.create(localStorage, token);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let careEffect = null;
+  let careEffect = null, fishingUi = null, cameraReady = false;
   let state, profile, offset = 0, pending = null, busy = false, panel = '', selected = 0, entered = false, waitingWorker, updateRequested = false;
   const keys = new Set(), player = { x: 500, y: 550 }, camera = { x: 0, y: 0, scale: 1 };
-  let path = [], effectUntil = 0, frameAt = performance.now(), walk = false, cameraFocus = null;
+  let path = [], effectUntil = 0, frameAt = performance.now(), walk = false, cameraFocus = null, facing='down', stride=0, destination=null;
   const canvas = $('#farm-canvas'), ctx = canvas.getContext('2d');
   const words = {
     en: { cafe:'← Café',map:'MAP 02 · JUST YOURS',title:'My little farm',gold:'gold',backup:'Backup',loading:'Opening your garden…',retry:'Try again',hint:'Tap a patch or pond · WASD to walk',garden:'Garden',pond:'Pond',shop:'Shop',bag:'Basket',quests:'Tasks',decorate:'Decorate',free:'Free to play · Farm gold is separate from café coins',rotate:'Turn your phone sideways',rotateHint:'Your garden will be right here. Nothing stops growing.',walletHint:'This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.',copy:'Copy code',restoreLabel:'Restore a saved wallet',restore:'Restore',close:'Close',update:'Update farm',welcome:'Your own little corner. Plants and fish grow while you are away.',intro:'Start with 120 gold, 6 radish seeds and 2 guppies. Plant → water → harvest → sell. Stock → feed → catch. Nothing withers!',empty:'Empty',patch:'Patch',pool:'Fish spot',plant:'Plant',stock:'Add fish',water:'Water',feed:'Feed',harvest:'Harvest',catch:'Catch',ready:'Ready!',thirsty:'Water once to start growing. Water is free.',hungry:'Feed once to start growing. Feed is free.',growing:'Growing even while you are away. No more care needed.',seeds:'seeds / young fish',product:'harvested',buy:'Buy',sell:'Sell',sellAll:'Sell all',each:'each',upgradePlots:'Add 2 patches',upgradePond:'Add 2 fish spots',max:'Fully upgraded',shopHint:'Farm gold only. No café coins or bank transfer needed.',bagHint:'Harvested goods stay here until you sell them. Seeds and young fish are for planting and stocking.',noProducts:'Your basket is empty. Grow something first!',reward:'Claim',claimed:'Claimed',taskHint:'One-time rewards for getting to know your farm.',decorHint:'Buy ornaments in the shop, then choose a garden corner. One of each, yours forever.',corner:'Corner',place:'Place',remove:'Remove',noDecor:'Your garden has room for flowers, a lantern and a bench. Find them in the shop.',saved:'Saved',offline:'Connection lost. Your farm and wallet are safe. Reconnect and try again.',uncertain:'Not confirmed yet. Retry the same action safely.',needWallet:'Open the café to create a character, or restore your wallet.',invalidWallet:'This code is invalid. Restore your saved wallet; your current code has not been erased.',copied:'Code copied. Keep it somewhere private.',confirmRestore:'Switch to this wallet? Your current farm stays with its old backup code.',restoreFirst:'Back up your current code before switching wallets.',plotHint:'Choose a patch. Each plant needs one watering before its timer starts.',pondHint:'Choose a fish spot. Feed a young fish once; catch it when it has grown.',full:'Your farm is fully expanded.',newProfile:'Create your character in the café first.',pendingSwitch:'Retry the pending action before switching wallets.',farm_bad_request:'Please refresh and try again.',farm_request_conflict:'This request was already used. Refresh to see your farm.',farm_not_enough_gold:'Not enough farm gold. Sell produce or claim a task reward.',farm_no_seed:'You need more seeds or young fish. Visit the shop.',farm_slot_busy:'This spot is already in use. The farm has refreshed.',farm_stale_slot:'This spot changed in another tab. Choose it again.',farm_not_ready:'Still growing. Please wait for the timer.',farm_already_cared:'Already cared for. Just let it grow.',farm_no_product:'No products to sell. Your basket has refreshed.',farm_already_owned:'You already own this ornament.',farm_bad_item:'Choose a valid item.',farm_bad_slot:'Choose an unlocked spot.',farm_max_level:'Already fully upgraded.',farm_already_claimed:'Reward already collected.',farm_quest_not_ready:'Complete the task first.',farm_inventory_full:'Sell or use some items to make space.',private:'PRIVATE FARM',minutes:'min',view:'View',returnHint:'Your farm saves automatically. Meet everyone at the café.' },
@@ -40,7 +40,9 @@
     const attempt = pending;
     const fish = ['stock','feed','catch'].includes(attempt.type);
     const effectItem = attempt.item || state?.farm[fish ? 'ponds' : 'plots'][attempt.slot]?.item;
-    busy = true; renderPanel();
+    busy = true;
+    if(panel==='fishing')renderPanel();
+    else{ $('#panel').setAttribute('aria-busy','true');$('#panel-content').querySelectorAll('button').forEach(node=>{node.disabled=true;}); }
     try {
       const type = attempt.type; accept(await api('/api/tea/farm/actions', { method:'POST', body:JSON.stringify(attempt) }));
       outbox.remove(attempt.requestId); loadPending(); notice(pending ? 'uncertain' : 'saved', Boolean(pending));
@@ -49,13 +51,13 @@
         canvas.dataset.careEffect = type;
       }
       if(type==='reelFish'&&state.farm.fishing?.reason==='caught'){
-        careEffect={type:'catch',item:state.farm.fishing.caught,x:780,y:440,started:performance.now()};canvas.dataset.careEffect='catch';
+        careEffect={type:'catch',rod:true,item:state.farm.fishing.caught,x:795,y:440,started:performance.now()};canvas.dataset.careEffect='catch';
       }
       if (['harvest','catch','sell','claim'].includes(type)) { $('#harvest-fx').textContent = t(type === 'claim' ? 'reward' : type === 'sell' ? 'sell' : type); effectUntil = performance.now() + 1800; }
     } catch (error) {
       if (error.status && error.status < 500) { outbox.remove(attempt.requestId); loadPending(); if (error.status !== 401) { try { accept(await api('/api/tea/farm')); } catch {} } notice(pending ? 'uncertain' : words[locale][error.code] ? error.code : error.status === 401 ? 'invalidWallet' : 'offline', true); }
       else notice('uncertain', true);
-    } finally { busy = false; renderPanel(); }
+    } finally { busy = false; $('#panel').removeAttribute('aria-busy');renderPanel(); }
   }
   function el(tag, text, className, parent) { const node = document.createElement(tag); if (text !== undefined) node.textContent = text; if (className) node.className = className; parent?.append(node); return node; }
   function button(parent, label, onClick, disabled = false) { const node = el('button', label, '', parent); node.disabled = disabled || busy || Boolean(pending); node.onclick = onClick; return node; }
@@ -67,7 +69,10 @@
   function renderPanel() {
     $('#panel').hidden = !panel; document.querySelectorAll('[data-panel]').forEach(b => b.setAttribute('aria-pressed', b.dataset.panel === panel));
     $('#fishing-switch').hidden=!['pond','fishing'].includes(panel);$('#fishing-switch').textContent=t(panel==='fishing'?'raiseFish':'fishing');
-    if (!panel) return; $('#panel-title').textContent = t(panel); const root = $('#panel-content'); root.dataset.mode = panel; root.replaceChildren();
+    if (!panel) return; $('#panel-title').textContent = t(panel); const root = $('#panel-content');
+    if(panel==='fishing'&&root.dataset.mode==='fishing'&&root.dataset.locale===locale&&fishingUi){syncFishingUi();return;}
+    root.dataset.mode = panel;root.dataset.locale=locale;root.replaceChildren();fishingUi=null;
+    if(panel==='garden'||panel==='pond')root.scrollTop=0;
     if (!state) { el('p', t('needWallet'), 'intro', root); return; }
     const f = state.farm;
     if (f.version === 1 && panel === 'garden') el('p', t('intro'), 'intro', root);
@@ -82,7 +87,7 @@
         Object.entries(state.catalog).filter(([,v]) => v.type === (fish ? 'fish' : 'crop')).forEach(([key]) => button(choices, `${t(fish ? 'stock' : 'plant')} ${name(key)} (${f.seeds[key] || 0})`, () => act({ type:fish ? 'stock' : 'plant', item:key, slot:selected }), !(f.seeds[key] > 0)));
       } else {
         el('p', t(row.readyAt === null ? fish ? 'hungry' : 'thirsty' : 'growing'), '', box);
-        if (row.readyAt !== null) { const timer = el('div', remaining(row), 'timer', box); timer.dataset.readyAt = row.readyAt; }
+        if (row.readyAt !== null) { box.classList.add('growing-card');const timer = el('div', remaining(row), 'timer', box); timer.dataset.readyAt = row.readyAt; }
         const type = row.readyAt === null ? fish ? 'feed' : 'water' : fish ? 'catch' : 'harvest';
         const b = button(box, t(type), () => act({ type, slot:selected, cycleId:row.cycleId }), row.readyAt !== null && row.readyAt > now());
         if (row.readyAt !== null) b.dataset.readyAt = row.readyAt;
@@ -91,15 +96,16 @@
       if (area.length < max) button(root, `${t(fish ? 'upgradePond' : 'upgradePlots')} · ${cost} ${t('gold')}`, () => act({ type:fish ? 'upgradePond' : 'upgradePlots' }), f.gold < cost);
       else el('p', t('max'), 'intro', root);
     } else if(panel==='fishing') {
-      const round=f.fishing;
       const box=card(root,t('fishingFree'),'');box.classList.add('fishing-card');
       el('p',t('fishingHint'),'fishing-help',box);
-      el('p','','fishing-status',box).id='fishing-status';
+      const steps=el('div',undefined,'fishing-steps',box);
+      const stepNodes=['castLine','hookFish','reelFish'].map((key,i)=>el('span',`${i+1} · ${t(key).replace('!','')}`,'',steps));
+      const status=el('p','','fishing-status',box);status.id='fishing-status';status.setAttribute('role','status');
       const meter=el('canvas',undefined,'fishing-meter',box);meter.id='fishing-meter';meter.width=260;meter.height=28;meter.setAttribute('aria-label',t('fishingReel'));
-      const active=round&&round.status!=='finished';
-      const primary=button(box,'',()=>act(active?{type:round.status==='waiting'?'hookFish':'reelFish',roundId:round.id}:{type:'castLine'}));primary.id='fishing-action';
-      if(active)button(box,t('stopFishing'),()=>act({type:'stopFishing',roundId:round.id})).classList.add('fishing-stop');
-      if(round?.caught)drawItem(meter.getContext('2d'),round.caught,130,13,.8,1);
+      const controls=el('div',undefined,'fishing-controls',box);
+      const primary=button(controls,'',()=>{const round=state?.farm.fishing;act(round&&round.status!=='finished'?{type:round.status==='waiting'?'hookFish':'reelFish',roundId:round.id}:{type:'castLine'});});primary.id='fishing-action';
+      const stop=button(controls,t('stopFishing'),()=>{const round=state?.farm.fishing;if(round&&round.status!=='finished')act({type:'stopFishing',roundId:round.id});});stop.classList.add('fishing-stop');
+      fishingUi={box,status,meter,primary,stop,stepNodes,controls};
       syncFishingUi();
     } else if (panel === 'shop') {
       el('p', t('shopHint'), 'intro', root);
@@ -130,6 +136,7 @@
     } else if (item === 'lantern') { p(c,'#6a5542',-3,-12,6,33);p(c,'#715d44',-10,-24,20,5);p(c,'#e5bb69',-7,-19,14,14);p(c,'#ffe4a3',-3,-17,6,10); }
     else if (item === 'bench') { p(c,'#74563e',-23,-15,46,7);p(c,'#b18857',-25,-17,50,5);p(c,'#b18857',-25,-3,50,8);p(c,'#74563e',-20,5,5,13);p(c,'#74563e',16,5,5,13); }
     else {
+      const growth=.45+.55*Math.min(1,progress);c.scale(growth,growth);if(time&&!reducedMotion.matches)c.rotate(Math.sin(time/1200+x)*.035);
       p(c,'#426b3b',-2,-12,4,19);p(c,'#66974f',-13,-12,12,6);p(c,'#7ea55b',2,-17,12,7);
       if(progress>.25){p(c,'#3b703b',-14,-22,12,8);p(c,'#84aa58',0,-25,11,8);}
       if(progress>.65){const color=def?.color||'#eee8bf';if(item==='corn'){p(c,color,-7,-14,15,23);p(c,'#b38c3c',-3,-10,2,15);p(c,'#e9dc83',2,-11,2,17);}else if(item==='tomato'){p(c,color,-13,-9,13,12);p(c,color,3,-13,13,12);p(c,'#f29771',-11,-8,4,3);}else{p(c,color,-8,0,16,14);p(c,color,-4,14,8,5);p(c,'#e2b47c',-5,5,8,2);}}
@@ -137,6 +144,7 @@
   }
   function plotPos(i) { return { x:130+(i%4)*110, y:290+Math.floor(i/4)*90 }; }
   function fishPos(i) { return { x:720+(i%2)*110, y:290+Math.floor(i/2)*90 }; }
+  const plotCenters=Array.from({length:12},(_,i)=>plotPos(i));
   const decorations = [{x:130,y:160},{x:830,y:150},{x:170,y:580},{x:820,y:580}];
   const staticMap = document.createElement('canvas'); staticMap.width=1000; staticMap.height=700;
   function makeMap() {
@@ -165,34 +173,53 @@
     p(c,'#775b41',410,584,6,42);p(c,'#b69a65',376,576,78,30);p(c,'#e2c68b',380,580,70,21);
     c.font='bold 12px system-ui';c.fillStyle='#4b5f40';c.textAlign='center';c.fillText('CAFÉ ↓',415,596);
   }
-  function blocked(x,y){return x<75||x>930||y<220||y>625||(x>365&&x<665&&y<224)||(x>648&&x<906&&y>225&&y<522)||Array.from({length:12},(_,i)=>plotPos(i)).some(s=>Math.abs(x-s.x)<45&&Math.abs(y-s.y)<32);}
+  function blocked(x,y){return x<75||x>930||y<220||y>625||(x>365&&x<665&&y<224)||(x>648&&x<906&&y>225&&y<522)||plotCenters.some(s=>Math.abs(x-s.x)<45&&Math.abs(y-s.y)<32);}
   function routeTo(x,y){
-    const step=20,start=[Math.round(player.x/step),Math.round(player.y/step)],end=[Math.round(x/step),Math.round(y/step)];
-    if(blocked(end[0]*step,end[1]*step))return;const queue=[start],prev=new Map([[start.join(','),null]]);let found;
-    for(let n=0;n<queue.length&&n<2000;n++){const at=queue[n];if(at[0]===end[0]&&at[1]===end[1]){found=at;break;}for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const next=[at[0]+dx,at[1]+dy],key=next.join(',');if(!prev.has(key)&&!blocked(next[0]*step,next[1]*step)){prev.set(key,at);queue.push(next);}}}
-    if(found){const result=[];while(prev.get(found.join(','))){result.push({x:found[0]*step,y:found[1]*step});found=prev.get(found.join(','));}path=result.reverse();}
+    const next=TeaFarmMotion.findPath(player,{x,y},blocked);
+    if(next.length){path=next;destination={x,y,started:performance.now()};}
   }
   function badge(text,x,y,color='#fff3cc'){ctx.font='bold 11px system-ui';ctx.textAlign='center';const width=ctx.measureText(text).width+14;p(ctx,'#4c6746',x-width/2,y-12,width,20);p(ctx,color,x-width/2+1,y-11,width-2,17);ctx.fillStyle='#34543b';ctx.fillText(text,x,y+1);}
   function fishingPosition(at,start){return 1-Math.abs(((Math.max(0,at-start)/1000)%2)-1);}
   function syncFishingUi(){
-    const button=$('#fishing-action');if(!button)return;
-    const round=state?.farm.fishing,at=now(),status=$('#fishing-status'),meter=$('#fishing-meter');
+    if(!fishingUi||panel!=='fishing')return;
+    const {primary:button,status,meter,box,stop,stepNodes,controls}=fishingUi;
+    const round=state?.farm.fishing,at=now(),active=round&&round.status!=='finished';
     let message=t('fishingHint'),label=t('castLine'),disabled=false;
-    meter.hidden=true;
+    let phase=round?.status||'idle',step=0;
+    const c=meter.getContext('2d');c.clearRect(0,0,260,28);
     if(round?.status==='waiting'){
       const bitten=at>=round.biteAt;
       message=t(at>round.expiresAt?'fishingEscaped':bitten?'fishingBite':'fishingWait');
       label=t(bitten?'hookFish':'fishingWait');disabled=!bitten||at>round.expiresAt;
+      if(bitten){phase='bite';step=1;}
     }else if(round?.status==='reeling'){
       message=t(at>round.expiresAt?'fishingEscaped':'fishingReel');label=t('reelFish');disabled=at<round.reelAt||at>round.expiresAt;
-      meter.hidden=false;const c=meter.getContext('2d'),pos=fishingPosition(at,round.reelAt);c.clearRect(0,0,260,28);
+      step=2;const pos=fishingPosition(at,round.reelAt);
       p(c,'#d2b98c',0,5,260,18);p(c,'#72a966',86,5,88,18);p(c,'#def1bc',88,7,84,3);p(c,'#345044',Math.round(pos*252),0,8,28);p(c,'#fff6d6',Math.round(pos*252)+2,2,4,7);
     }else if(round?.status==='finished'){
       message=round.reason==='caught'?`${t('fishingCaught')} ${name(round.caught)} · ${t('fishingValue')} ${state.catalog[round.caught].sell} ${t('gold')}`:t({early:'fishingEarly',missed:'fishingMissed',stopped:'fishingStopped',escaped:'fishingEscaped'}[round.reason]||'fishingEscaped');
       const remaining=Math.ceil((round.finishedAt+3000-at)/1000);if(remaining>0){label=`${t('fishingCooldown')} ${remaining}s`;disabled=true;}
     }
+    if(round?.status!=='reeling'){
+      if(round?.caught){drawItem(c,round.caught,130,14,.85,1);}
+      else{p(c,'#d8e5d7',0,12,260,3);for(let i=0;i<5;i++){const x=reducedMotion.matches?i*55:(performance.now()/35+i*55)%260;p(c,'#8cb3a7',x,12,15,3);}p(c,phase==='bite'?'#d48d45':'#6c9991',126,4,8,10);p(c,'#fff8df',126,4,8,4);}
+    }
+    if(busy)label=locale==='vi'?'Đang xử lý…':'One moment…';
+    if(box.dataset.phase!==phase)box.dataset.phase=phase;
+    if(box.getAttribute('aria-busy')!==String(busy))box.setAttribute('aria-busy',String(busy));
+    stop.disabled=!active||busy||Boolean(pending);controls.classList.toggle('has-line',Boolean(active));stop.hidden=!active;
+    stepNodes.forEach((node,i)=>{node.classList.toggle('current',i===step);node.classList.toggle('done',i<step||round?.reason==='caught');});
     if(status.textContent!==message)status.textContent=message;if(button.textContent!==label)button.textContent=label;
     button.disabled=disabled||busy||Boolean(pending);button.dataset.phase=round?.status||'idle';
+  }
+  function drawPondWater(time){
+    ctx.save();ctx.beginPath();ctx.rect(680,262,188,223);ctx.clip();
+    for(let i=0;i<9;i++){
+      const phase=reducedMotion.matches?.4:(time/3500+i*.17)%1,x=688+(i*47)%160,y=275+(i*53)%196;
+      ctx.globalAlpha=.13+Math.sin(phase*Math.PI)*.23;p(ctx,'#e2efd0',x+phase*8,y,12+phase*12,2);
+    }
+    ctx.globalAlpha=1;p(ctx,'#5f9663',684,466,17,7);p(ctx,'#8ab476',686,463,13,5);p(ctx,'#e9b9aa',689,460,5,4);
+    p(ctx,'#5f9663',847,272,15,7);p(ctx,'#91bb7a',849,270,11,4);ctx.restore();
   }
   function drawFishing(time){
     const round=state?.farm.fishing,active=round&&round.status!=='finished';
@@ -200,9 +227,18 @@
     p(ctx,'#856747',746,506,85,45);p(ctx,'#c2a075',742,508,94,7);p(ctx,'#b38c60',742,521,94,7);p(ctx,'#b38c60',742,534,94,7);
     if(panel!=='fishing'&&!active){badge(t('fishing'),789,489);return;}
     const bite=active&&round.status==='waiting'&&now()>=round.biteAt&&now()<=round.expiresAt;
-    const floatY=440+(reducedMotion.matches?0:Math.sin(time/(bite?65:400))*(bite?6:2));
-    ctx.strokeStyle='#755238';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(789,526);ctx.lineTo(763,480);ctx.stroke();
-    if(active){ctx.strokeStyle='#ecdfb3';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(763,480);ctx.quadraticCurveTo(768,450,795,floatY);ctx.stroke();p(ctx,'#fff5cd',792,floatY-5,7,6);p(ctx,bite?'#f09144':'#c65745',792,floatY+1,7,6);ctx.strokeStyle='#c6e8d3';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(795,floatY+9,bite?15:10,4,0,0,Math.PI*2);ctx.stroke();if(bite)badge('!',795,floatY-21,'#ffe28e');}
+    const cast=active&&!reducedMotion.matches?Math.min(1,Math.max(0,(now()-round.castAt)/500)):1;
+    const reeling=active&&round.status==='reeling',tug=reducedMotion.matches?0:reeling?Math.sin(time/180)*3:0;
+    const floatX=763+32*cast,floatY=480-40*cast-Math.sin(cast*Math.PI)*32+(reducedMotion.matches?0:Math.sin(time/(bite?65:400))*(bite?6:2));
+    const tipX=763-tug,tipY=480-(reeling?12:0);
+    ctx.strokeStyle='#755238';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(789,526);ctx.lineTo(tipX,tipY);ctx.stroke();
+    ctx.strokeStyle='#c4a36d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(789,523);ctx.lineTo(tipX,tipY);ctx.stroke();
+    if(active){
+      ctx.strokeStyle='#ecdfb3';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(tipX,tipY);ctx.quadraticCurveTo(768,reeling?430:450,floatX,floatY);ctx.stroke();
+      if(cast===1)for(let i=0;i<2;i++){const ripple=reducedMotion.matches?.5:(time/1100+i*.5)%1;ctx.globalAlpha=(1-ripple)*.55;ctx.strokeStyle='#e2f0d8';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(floatX,449,9+ripple*22,3+ripple*7,0,0,Math.PI*2);ctx.stroke();}ctx.globalAlpha=1;
+      p(ctx,'#fff5cd',floatX-3,floatY-5,7,6);p(ctx,bite?'#f09144':'#c65745',floatX-3,floatY+1,7,6);
+      if(bite)badge('!',floatX,floatY-21,'#ffe28e');
+    }
   }
   function drawCareEffect(time) {
     if (!careEffect) return;
@@ -220,6 +256,11 @@
       ctx.strokeStyle='#d4eee0';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,12,12+progress*25,4+progress*8,0,0,Math.PI*2);ctx.stroke();
     } else if (type === 'plant') {
       for(let i=0;i<6;i++){const spread=i*1.05;p(ctx,'#efcf8c',Math.cos(spread)*progress*24,-24+progress*32+Math.sin(spread)*9,4,4);}
+    } else if(careEffect.rod) {
+      const flight=Math.min(1,progress*1.5),fishX=-15*flight,fishY=100*flight-Math.sin(flight*Math.PI)*90;
+      if(item)drawItem(ctx,item,fishX,fishY,1.7,1);
+      badge('+1',fishX+24,fishY-25,'#fff0ac');
+      for(let i=0;i<6;i++){const angle=i*Math.PI/3;p(ctx,'#d8efdc',Math.cos(angle)*(10+progress*27),Math.sin(angle)*(4+progress*14),3,3);}
     } else {
       const lift = reducedMotion.matches ? 25 : Math.sin(progress*Math.PI)*45;
       if(item)drawItem(ctx,item,0,-lift,1.7,1);
@@ -232,32 +273,46 @@
     const dt=Math.min(.04,(time-frameAt)/1000);frameAt=time;walk=false;
     if(!portrait()&&!document.querySelector('dialog[open]')){
       let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
-      if(dx||dy){path=[];cameraFocus=null;}else if(path.length){dx=path[0].x-player.x;dy=path[0].y-player.y;if(Math.hypot(dx,dy)<5){path.shift();dx=dy=0;}}
-      const len=Math.hypot(dx,dy);if(len){const nx=player.x+dx/len*145*dt,ny=player.y+dy/len*145*dt;if(!blocked(nx,player.y))player.x=nx;if(!blocked(player.x,ny))player.y=ny;walk=true;}
+      let travelled=0;
+      if(dx||dy){path=[];destination=null;cameraFocus=null;const len=Math.hypot(dx,dy),oldX=player.x,oldY=player.y,nx=player.x+dx/len*145*dt,ny=player.y+dy/len*145*dt;
+        if(TeaFarmMotion.clear(player,{x:nx,y:player.y},blocked))player.x=nx;
+        if(TeaFarmMotion.clear(player,{x:player.x,y:ny},blocked))player.y=ny;
+        travelled=Math.hypot(player.x-oldX,player.y-oldY);
+      }else if(path.length){const moved=TeaFarmMotion.follow(player,path,145*dt,blocked);travelled=moved.travelled;dx=moved.dx;dy=moved.dy;}
+      walk=travelled>.001;stride+=travelled;if(walk)facing=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
     }
     const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
-    if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+    const resized=canvas.width!==width||canvas.height!==height;
+    if(resized){canvas.width=width;canvas.height=height;}
     const scale=Math.max(.72,Math.min(rect.width/1000,rect.height/700));camera.scale=scale;
     const visibleWidth=rect.width/scale,visibleHeight=rect.height/scale;
     const focus = cameraFocus || player;
-    camera.x=visibleWidth>=1000?(1000-visibleWidth)/2:Math.max(0,Math.min(1000-visibleWidth,focus.x-visibleWidth/2));
-    camera.y=visibleHeight>=700?(700-visibleHeight)/2:Math.max(0,Math.min(700-visibleHeight,focus.y-visibleHeight/2));
+    const targetX=visibleWidth>=1000?(1000-visibleWidth)/2:Math.max(0,Math.min(1000-visibleWidth,focus.x-visibleWidth/2));
+    const targetY=visibleHeight>=700?(700-visibleHeight)/2:Math.max(0,Math.min(700-visibleHeight,focus.y-visibleHeight/2));
+    const ease=!cameraReady||resized||reducedMotion.matches?1:1-Math.exp(-10*dt);
+    camera.x+=(targetX-camera.x)*ease;camera.y+=(targetY-camera.y)*ease;cameraReady=true;
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);ctx.scale(scale,scale);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;ctx.drawImage(staticMap,0,0);
     const f=state?.farm;
-    for(let i=0;i<12;i++){const pos=plotPos(i),unlocked=i<(f?.plots.length||6),row=f?.plots[i];p(ctx,unlocked?'#9e784e':'#89975c',pos.x-45,pos.y-32,90,62);p(ctx,unlocked?'#b28b58':'#829454',pos.x-41,pos.y-28,82,54);for(let j=0;j<4;j++)p(ctx,unlocked?'#9f794f':'#788d51',pos.x-35,pos.y-19+j*12,70,3);
+    drawPondWater(time);
+    if(destination&&path.length){const pulse=reducedMotion.matches?0:Math.sin(time/220)*2;ctx.strokeStyle='#f1e3aa';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(destination.x,destination.y+8,10+pulse,4+pulse*.3,0,0,Math.PI*2);ctx.stroke();}
+    for(let i=0;i<12;i++){const pos=plotPos(i),unlocked=i<(f?.plots.length||6),row=f?.plots[i],wet=row?.readyAt!=null;p(ctx,unlocked?'#9e784e':'#89975c',pos.x-45,pos.y-32,90,62);p(ctx,unlocked?wet?'#876746':'#b28b58':'#829454',pos.x-41,pos.y-28,82,54);for(let j=0;j<4;j++)p(ctx,unlocked?wet?'#70573c':'#9f794f':'#788d51',pos.x-35,pos.y-19+j*12,70,3);
       if(panel==='garden'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=3;ctx.strokeRect(pos.x-46,pos.y-33,92,64);}
-      if(row){const progress=row.readyAt===null?.1:Math.min(1,1-(row.readyAt-now())/(state.catalog[row.item].seconds*1000));for(const dx of [-22,20])drawItem(ctx,row.item,pos.x+dx,pos.y+3,1.1,progress);badge(row.readyAt===null?t('water'):remaining(row),pos.x,pos.y-36,row.readyAt!==null&&row.readyAt<=now()?'#ffe5a0':'#ecf0ce');}
-      else badge(unlocked?String(i+1):'+',pos.x,pos.y,unlocked?'#d5be8b':'#a9b57c');
+      if(row){const progress=row.readyAt===null?.1:Math.min(1,1-(row.readyAt-now())/(state.catalog[row.item].seconds*1000));for(const dx of [-22,20])drawItem(ctx,row.item,pos.x+dx,pos.y+3,1.1,progress,time);if((panel==='garden'&&selected===i)||row.readyAt===null||row.readyAt<=now())badge(row.readyAt===null?t('water'):remaining(row),pos.x,pos.y-36,row.readyAt!==null&&row.readyAt<=now()?'#ffe5a0':'#ecf0ce');}
+      else if(panel==='garden'||!unlocked)badge(unlocked?String(i+1):'+',pos.x,pos.y,unlocked?'#d5be8b':'#a9b57c');
     }
-    for(let i=0;i<(f?.ponds.length||2);i++){const pos=fishPos(i),row=f?.ponds[i];if(row){drawItem(ctx,row.item,pos.x+Math.sin(time/1800+i)*13,pos.y,1.4,1,time);badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-28);}else badge(`${i+1} +`,pos.x,pos.y,'#b9d8bd');if(panel==='pond'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=2;ctx.strokeRect(pos.x-42,pos.y-40,84,72);}}
+    for(let i=0;i<(f?.ponds.length||2);i++){const pos=fishPos(i),row=f?.ponds[i];if(row){const phase=reducedMotion.matches?i:time/1800+i,swim=Math.sin(phase)*19;
+      ctx.save();ctx.translate(pos.x+swim,pos.y+Math.sin(phase*.7)*5);ctx.scale(Math.cos(phase)>0?-1:1,1);drawItem(ctx,row.item,0,0,1.25,1,reducedMotion.matches?0:time);ctx.restore();
+      if((panel==='pond'&&selected===i)||row.readyAt===null||row.readyAt<=now())badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-28);
+    }else if(panel==='pond')badge(`${i+1} +`,pos.x,pos.y,'#b9d8bd');if(panel==='pond'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=2;ctx.strokeRect(pos.x-42,pos.y-40,84,72);}}
     f?.placed.forEach((item,i)=>{if(item)drawItem(ctx,item,decorations[i].x,decorations[i].y,1.6);});
     drawFishing(time);
-    TeaScene.avatar(ctx,player.x,player.y,profile||{hair:1,clothes:2,shoes:0},1.15,false,walk,time);
-    if(walk&&time%450<200){p(ctx,'#d3c797',player.x-6,player.y+7,4,3);p(ctx,'#d3c797',player.x+7,player.y+11,3,2);}
+    const fishingPose=!walk&&f?.fishing&&f.fishing.status!=='finished';
+    TeaFarmAvatar(ctx,player.x,player.y,profile||{hair:1,clothes:2,shoes:0},fishingPose?'up':facing,stride,walk,reducedMotion.matches,Boolean(careEffect));
+    if(walk&&!reducedMotion.matches&&stride%25<10){p(ctx,'#d3c797',player.x-6,player.y+15,3,2);p(ctx,'#d3c797',player.x+7,player.y+17,3,2);}
     drawCareEffect(time);
     syncFishingUi();
     $('#harvest-fx').classList.toggle('show',time<effectUntil);
-    document.querySelectorAll('[data-ready-at]').forEach(node=>{const at=Number(node.dataset.readyAt);if(node.tagName==='BUTTON')node.disabled=at>now()||busy||Boolean(pending);else node.textContent=remaining({readyAt:at});});
+    document.querySelectorAll('[data-ready-at]').forEach(node=>{const at=Number(node.dataset.readyAt);if(node.tagName==='BUTTON')node.disabled=at>now()||busy||Boolean(pending);else{const text=remaining({readyAt:at});if(node.textContent!==text)node.textContent=text;}});
     requestAnimationFrame(frame);
   }
   canvas.addEventListener('pointerdown',event=>{
@@ -267,6 +322,7 @@
     for(let i=0;i<state.farm.ponds.length;i++){const pos=fishPos(i);if(Math.abs(x-pos.x)<52&&Math.abs(y-pos.y)<42){openPanel('pond',i);routeTo(620,pos.y);return;}}
     if(x>370&&x<460&&y>570){location.assign('/tra-da');return;}cameraFocus=null;routeTo(x,y);
   });
+  canvas.addEventListener('contextmenu',event=>event.preventDefault());
   window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();keys.add(key);}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(panel===b.dataset.panel?'':b.dataset.panel));$('#close-panel').onclick=()=>openPanel('');
