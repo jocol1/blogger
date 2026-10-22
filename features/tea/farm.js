@@ -51,13 +51,13 @@ function createFarm({ db, now = () => Date.now() }) {
   }
   async function action(id, input) {
     if (!input || typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{12,80}$/.test(input.requestId)) fail('farm_bad_request', 400);
-    const { type, item, slot, cycleId, quantity, quest, roundId } = input;
+    const { type, item, slot, cycleId, quantity, quest, roundId, targets, sale } = input;
     if (item !== undefined && item !== null && typeof item !== 'string') fail('farm_bad_item', 400);
     const fishingAction = ['castLine','hookFish','reelFish','stopFishing'].includes(type);
-    const allowed = ['castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
+    const allowed = ['waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale })).digest('hex');
     const attempt = db.collection('tea_farm_actions').doc(crypto.createHash('sha256').update(id + ':' + input.requestId).digest('hex'));
     // Judge the reel when its request reaches the service, not after database latency/retries.
     const actionAt = now();
@@ -73,7 +73,23 @@ function createFarm({ db, now = () => Date.now() }) {
       const def = Object.hasOwn(CATALOG, item || '') ? CATALOG[item] : null;
       const qty = quantity === undefined ? 1 : quantity;
       const spend = amount => { if (farm.gold < amount) fail('farm_not_enough_gold'); farm.gold -= amount; };
-      if (fishingAction) {
+      if(['waterAll','feedAll','harvestAll','catchAll'].includes(type)){
+        const fish=type==='feedAll'||type==='catchAll',care=type==='waterAll'||type==='feedAll',area=fish?farm.ponds:farm.plots;
+        if(!Array.isArray(targets)||!targets.length||targets.length>24||new Set(targets.map(t=>t?.slot)).size!==targets.length)fail('farm_bad_request',400);
+        for(const target of targets){
+          if(!target||!Number.isInteger(target.slot)||target.slot<0||target.slot>=area.length)fail('farm_bad_slot',400);
+          const row=area[target.slot];if(!row||row.cycleId!==target.cycleId)fail('farm_stale_slot');
+          if(care){if(row.readyAt!==null)fail('farm_already_cared');row.readyAt=actionAt+CATALOG[row.item].seconds*1000;}
+          else{if(row.readyAt===null||row.readyAt>actionAt)fail('farm_not_ready');if((farm.products[row.item]||0)>=9999)fail('farm_inventory_full');farm.products[row.item]=(farm.products[row.item]||0)+1;farm.stats[fish?'fish':'crops']++;area[target.slot]=null;}
+        }
+      }else if(type==='sellAll'){
+        if(!Array.isArray(sale)||!sale.length||sale.length>20||new Set(sale.map(s=>s?.item)).size!==sale.length)fail('farm_bad_request',400);
+        for(const entry of sale){
+          if(!entry||typeof entry.item!=='string'||!Object.hasOwn(CATALOG,entry.item)||CATALOG[entry.item].type==='decor'||!Number.isInteger(entry.quantity)||entry.quantity<1||entry.quantity>9999)fail('farm_bad_item',400);
+          if((farm.products[entry.item]||0)<entry.quantity)fail('farm_no_product');
+          farm.products[entry.item]-=entry.quantity;farm.gold+=entry.quantity*CATALOG[entry.item].sell;farm.stats.sold+=entry.quantity;
+        }
+      }else if (fishingAction) {
         if(expired&&type!=='castLine'&&input.roundId!==farm.fishing.id)fail('fishing_stale');
         // A timed-out action returns the terminal round without creating a reward.
         if (!expired || type==='castLine') fishing.play(farm,input,actionAt,fail);
@@ -114,7 +130,7 @@ function createFarm({ db, now = () => Date.now() }) {
           }
         }
       } else if (type === 'upgradePlots' || type === 'upgradePond') {
-        const area = type === 'upgradePlots' ? farm.plots : farm.ponds, max = type === 'upgradePlots' ? 12 : 6;
+        const area = type === 'upgradePlots' ? farm.plots : farm.ponds, max = type === 'upgradePlots' ? 24 : 12;
         if (area.length >= max) fail('farm_max_level');
         spend(type === 'upgradePlots' ? 120 + (area.length - 6) * 30 : 100 + (area.length - 2) * 60);
         area.push(null, null);

@@ -7,7 +7,7 @@
     if(clear(origin,target,blocked))return [{...target}];
     const start=near(origin),end=near(target);if(!start||!end)return [];
     const key=p=>`${p.x},${p.y}`,queue=[start],prev=new Map([[key(start),null]]);let found;
-    for(let n=0;n<queue.length&&n<2000;n++){
+    for(let n=0;n<queue.length&&n<10000;n++){
       const at=queue[n];if(key(at)===key(end)){found=at;break;}
       for(const [dx,dy] of [[step,0],[-step,0],[0,step],[0,-step]]){const next={x:at.x+dx,y:at.y+dy};if(!prev.has(key(next))&&!blocked(next.x,next.y)&&clear(at,next,blocked)){prev.set(key(next),at);queue.push(next);}}
     }
