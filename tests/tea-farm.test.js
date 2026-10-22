@@ -31,7 +31,7 @@ test('farm is private to wallet, starter grant is once, paid wallet is untouched
 });
 
 test('all crop and fish types require care, mature offline and can be harvested and sold', async () => {
-  for (const [item, def] of Object.entries(CATALOG).filter(([,d]) => d.type !== 'decor')) {
+  for (const [item, def] of Object.entries(CATALOG).filter(([,d]) => ['crop','fish'].includes(d.type))) {
     const f = await fixture(), fish = def.type === 'fish';
     await f.send({ type: 'buy', item });
     const planted = await f.send({ type: fish ? 'stock' : 'plant', item, slot: 0 });

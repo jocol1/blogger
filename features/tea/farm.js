@@ -1,4 +1,5 @@
 const crypto = require('node:crypto');
+const fishing = require('./fishing');
 
 // All prices are play-only farm gold. This module never writes to paid wallets.
 const CATALOG = {
@@ -9,6 +10,9 @@ const CATALOG = {
   guppy: { en: 'Guppy', vi: 'Cá bảy màu', type: 'fish', price: 10, sell: 18, seconds: 120, color: '#f2a66b' },
   carp: { en: 'Carp', vi: 'Cá chép', type: 'fish', price: 24, sell: 46, seconds: 600, color: '#e0c1a2' },
   koi: { en: 'Koi', vi: 'Cá koi', type: 'fish', price: 45, sell: 90, seconds: 1800, color: '#fff0d5' },
+  perch: { en:'Perch', vi:'Cá rô', type:'caught', sell:5, color:'#a4b789' },
+  tilapia: { en:'Tilapia', vi:'Cá rô phi', type:'caught', sell:8, color:'#9ab6c4' },
+  snakehead: { en:'Snakehead', vi:'Cá lóc', type:'caught', sell:12, color:'#8b9982' },
   flowers: { en: 'Flower bed', vi: 'Bồn hoa', type: 'decor', price: 35 },
   lantern: { en: 'Garden lantern', vi: 'Đèn vườn', type: 'decor', price: 65 },
   bench: { en: 'Wooden bench', vi: 'Ghế gỗ', type: 'decor', price: 90 },
@@ -19,6 +23,7 @@ const QUESTS = [
   { id: 'gardener', stat: 'crops', target: 12, reward: 60, en: 'Harvest 12 vegetables', vi: 'Thu hoạch 12 cây rau' },
   { id: 'fishkeeper', stat: 'fish', target: 6, reward: 70, en: 'Raise 6 fish', vi: 'Nuôi lớn 6 con cá' },
   { id: 'market', stat: 'sold', target: 20, reward: 100, en: 'Sell 20 products', vi: 'Bán 20 nông sản' },
+  { id:'angler', stat:'angled', target:3, reward:15, en:'Catch 3 fish with your rod', vi:'Câu được 3 con cá' },
 ];
 class FarmError extends Error {
   constructor(status, code) { super(code); this.status = status; this.code = code; this.farmError = true; }
@@ -31,37 +36,51 @@ function initialFarm(at) {
 }
 function createFarm({ db, now = () => Date.now() }) {
   const refFor = id => db.collection('tea_farms').doc(id);
-  const view = farm => ({ farm, catalog: CATALOG, quests: QUESTS, serverNow: now() });
+  const view = farm => ({ farm:{...farm,fishing:fishing.publicRound(farm.fishing)}, catalog: CATALOG, quests: QUESTS, serverNow: now() });
   async function read(id) {
     const farm = await db.runTransaction(async tx => {
       const ref = refFor(id), snap = await tx.get(ref);
-      if (snap.exists) return snap.data();
+      if (snap.exists) {
+        const row=snap.data();
+        if(fishing.expire(row,now())) { row.version++;row.updatedAt=now();tx.set(ref,row); }
+        return row;
+      }
       const row = initialFarm(now()); tx.create(ref, row); return row;
     });
     return view(farm);
   }
   async function action(id, input) {
     if (!input || typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{12,80}$/.test(input.requestId)) fail('farm_bad_request', 400);
-    const { type, item, slot, cycleId, quantity, quest } = input;
+    const { type, item, slot, cycleId, quantity, quest, roundId } = input;
     if (item !== undefined && item !== null && typeof item !== 'string') fail('farm_bad_item', 400);
-    const allowed = ['buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
+    const fishingAction = ['castLine','hookFish','reelFish','stopFishing'].includes(type);
+    const allowed = ['castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId })).digest('hex');
     const attempt = db.collection('tea_farm_actions').doc(crypto.createHash('sha256').update(id + ':' + input.requestId).digest('hex'));
+    // Judge the reel when its request reaches the service, not after database latency/retries.
+    const actionAt = now();
     const result = await db.runTransaction(async tx => {
       const ref = refFor(id), [snap, prior] = await Promise.all([tx.get(ref), tx.get(attempt)]);
       const farm = snap.exists ? snap.data() : initialFarm(now());
+      const expired=fishing.expire(farm,actionAt);
       if (prior.exists) {
         if (prior.data().fingerprint !== fingerprint) fail('farm_request_conflict');
+        if(expired){farm.version++;farm.updatedAt=now();tx.set(ref,farm);}
         return farm;
       }
       const def = Object.hasOwn(CATALOG, item || '') ? CATALOG[item] : null;
       const qty = quantity === undefined ? 1 : quantity;
       const spend = amount => { if (farm.gold < amount) fail('farm_not_enough_gold'); farm.gold -= amount; };
-      if (['buy', 'sell'].includes(type)) {
+      if (fishingAction) {
+        if(expired&&type!=='castLine'&&input.roundId!==farm.fishing.id)fail('fishing_stale');
+        // A timed-out action returns the terminal round without creating a reward.
+        if (!expired || type==='castLine') fishing.play(farm,input,actionAt,fail);
+      } else if (['buy', 'sell'].includes(type)) {
         if (!Number.isInteger(qty) || qty < 1 || qty > 99 || !def) fail('farm_bad_item', 400);
         if (type === 'buy') {
+          if(def.type==='caught') fail('farm_bad_item',400);
           if (def.type === 'decor') {
             if (qty !== 1 || farm.decorations.includes(item)) fail('farm_already_owned');
             spend(def.price); farm.decorations.push(item);
@@ -105,7 +124,7 @@ function createFarm({ db, now = () => Date.now() }) {
         farm.placed = farm.placed.map(value => item !== null && value === item ? null : value); farm.placed[slot] = item;
       } else if (type === 'claim') {
         const task = QUESTS.find(q => q.id === quest);
-        if (!task || farm.stats[task.stat] < task.target) fail('farm_quest_not_ready');
+        if (!task || (farm.stats[task.stat]||0) < task.target) fail('farm_quest_not_ready');
         if (farm.claimed.includes(quest)) fail('farm_already_claimed');
         farm.claimed.push(quest); farm.gold += task.reward;
       }

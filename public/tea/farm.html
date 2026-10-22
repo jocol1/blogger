@@ -21,7 +21,7 @@
       <div class="world-label"><span id="owner"></span><small data-text="hint">Tap a patch or pond · WASD to walk</small></div>
       <div id="harvest-fx" aria-live="polite"></div>
     </section>
-    <aside id="panel" hidden><div class="panel-heading"><h2 id="panel-title"></h2><button id="close-panel" aria-label="Close">×</button></div><div id="panel-content"></div></aside>
+    <aside id="panel" hidden><div class="panel-heading"><h2 id="panel-title"></h2><button id="fishing-switch" hidden>Fishing</button><button id="close-panel" aria-label="Close">×</button></div><div id="panel-content"></div></aside>
   </main>
   <footer>
     <nav aria-label="Farm tools"><button data-panel="garden" data-text="garden">Garden</button><button data-panel="pond" data-text="pond">Pond</button><button data-panel="shop" data-text="shop">Shop</button><button data-panel="bag" data-text="bag">Basket</button><button data-panel="quests" data-text="quests">Tasks</button><button data-panel="decorate" data-text="decorate">Decorate</button></nav>
@@ -29,6 +29,6 @@
   </footer>
   <section id="portrait"><div><span class="turn-phone">↻</span><h2 data-text="rotate">Turn your phone sideways</h2><p data-text="rotateHint">Your garden will be right here. Nothing stops growing.</p><button id="portrait-wallet" data-text="backup">Backup</button><a href="/tra-da" data-text="cafe">← Café</a></div></section>
   <dialog id="wallet-dialog"><h2 data-text="backup">Backup</h2><p data-text="walletHint">This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.</p><textarea id="wallet-code" readonly aria-label="Wallet backup code"></textarea><button id="copy" data-text="copy">Copy code</button><hr><label for="restore-code" data-text="restoreLabel">Restore a saved wallet</label><textarea id="restore-code" autocomplete="off" spellcheck="false"></textarea><button id="restore" data-text="restore">Restore</button><button id="close-wallet" data-text="close">Close</button><p id="wallet-message" role="status"></p></dialog>
-  <script src="/assets/tea/scene.js"></script><script src="/assets/tea/farm-outbox.js"></script><script src="/assets/tea/farm.js?v=care2"></script>
+  <script src="/assets/tea/scene.js"></script><script src="/assets/tea/farm-outbox.js"></script><script src="/assets/tea/farm.js?v=fishing1"></script>
 </body>
 </html>
