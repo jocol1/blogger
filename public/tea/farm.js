@@ -2,9 +2,12 @@
   'use strict';
   const $ = s => document.querySelector(s), WALLET = 'locly-game-wallet', LANGUAGE = 'locly-tea-language';
   let token = localStorage.getItem(WALLET), locale = localStorage.getItem(LANGUAGE) === 'vi' ? 'vi' : 'en';
+  const outbox = TeaFarmOutbox.create(localStorage, token);
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let careEffect = null;
   let state, profile, offset = 0, pending = null, busy = false, panel = '', selected = 0, entered = false, waitingWorker, updateRequested = false;
   const keys = new Set(), player = { x: 500, y: 550 }, camera = { x: 0, y: 0, scale: 1 };
-  let path = [], effectUntil = 0, frameAt = performance.now(), walk = false;
+  let path = [], effectUntil = 0, frameAt = performance.now(), walk = false, cameraFocus = null;
   const canvas = $('#farm-canvas'), ctx = canvas.getContext('2d');
   const words = {
     en: { cafe:'← Café',map:'MAP 02 · JUST YOURS',title:'My little farm',gold:'gold',backup:'Backup',loading:'Opening your garden…',retry:'Try again',hint:'Tap a patch or pond · WASD to walk',garden:'Garden',pond:'Pond',shop:'Shop',bag:'Basket',quests:'Tasks',decorate:'Decorate',free:'Free to play · Farm gold is separate from café coins',rotate:'Turn your phone sideways',rotateHint:'Your garden will be right here. Nothing stops growing.',walletHint:'This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.',copy:'Copy code',restoreLabel:'Restore a saved wallet',restore:'Restore',close:'Close',update:'Update farm',welcome:'Your own little corner. Plants and fish grow while you are away.',intro:'Start with 120 gold, 6 radish seeds and 2 guppies. Plant → water → harvest → sell. Stock → feed → catch. Nothing withers!',empty:'Empty',patch:'Patch',pool:'Fish spot',plant:'Plant',stock:'Add fish',water:'Water',feed:'Feed',harvest:'Harvest',catch:'Catch',ready:'Ready!',thirsty:'Water once to start growing. Water is free.',hungry:'Feed once to start growing. Feed is free.',growing:'Growing even while you are away. No more care needed.',seeds:'seeds / young fish',product:'harvested',buy:'Buy',sell:'Sell',sellAll:'Sell all',each:'each',upgradePlots:'Add 2 patches',upgradePond:'Add 2 fish spots',max:'Fully upgraded',shopHint:'Farm gold only. No café coins or bank transfer needed.',bagHint:'Harvested goods stay here until you sell them. Seeds and young fish are for planting and stocking.',noProducts:'Your basket is empty. Grow something first!',reward:'Claim',claimed:'Claimed',taskHint:'One-time rewards for getting to know your farm.',decorHint:'Buy ornaments in the shop, then choose a garden corner. One of each, yours forever.',corner:'Corner',place:'Place',remove:'Remove',noDecor:'Your garden has room for flowers, a lantern and a bench. Find them in the shop.',saved:'Saved',offline:'Connection lost. Your farm and wallet are safe. Reconnect and try again.',uncertain:'Not confirmed yet. Retry the same action safely.',needWallet:'Open the café to create a character, or restore your wallet.',invalidWallet:'This code is invalid. Restore your saved wallet; your current code has not been erased.',copied:'Code copied. Keep it somewhere private.',confirmRestore:'Switch to this wallet? Your current farm stays with its old backup code.',restoreFirst:'Back up your current code before switching wallets.',plotHint:'Choose a patch. Each plant needs one watering before its timer starts.',pondHint:'Choose a fish spot. Feed a young fish once; catch it when it has grown.',full:'Your farm is fully expanded.',newProfile:'Create your character in the café first.',pendingSwitch:'Retry the pending action before switching wallets.',farm_bad_request:'Please refresh and try again.',farm_request_conflict:'This request was already used. Refresh to see your farm.',farm_not_enough_gold:'Not enough farm gold. Sell produce or claim a task reward.',farm_no_seed:'You need more seeds or young fish. Visit the shop.',farm_slot_busy:'This spot is already in use. The farm has refreshed.',farm_stale_slot:'This spot changed in another tab. Choose it again.',farm_not_ready:'Still growing. Please wait for the timer.',farm_already_cared:'Already cared for. Just let it grow.',farm_no_product:'No products to sell. Your basket has refreshed.',farm_already_owned:'You already own this ornament.',farm_bad_item:'Choose a valid item.',farm_bad_slot:'Choose an unlocked spot.',farm_max_level:'Already fully upgraded.',farm_already_claimed:'Reward already collected.',farm_quest_not_ready:'Complete the task first.',farm_inventory_full:'Sell or use some items to make space.',private:'PRIVATE FARM',minutes:'min',view:'View',returnHint:'Your farm saves automatically. Meet everyone at the café.' },
@@ -19,8 +22,7 @@
     const body = await res.json(); if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status, code: body.code }); return body;
   }
   function accept(next) { offset = next.serverNow - Date.now(); if (!state || next.farm.version >= state.farm.version) state = next; $('#gold').textContent = state.farm.gold.toLocaleString(locale); }
-  function pendingKey() { return 'locly-farm-pending-' + token; }
-  function loadPending() { try { pending = JSON.parse(localStorage.getItem(pendingKey()) || 'null'); } catch { pending = null; } }
+  function loadPending() { pending = outbox.first(); }
   async function refresh() {
     if (!entered || busy) return;
     try { const version = state?.farm.version; accept(await api('/api/tea/farm')); if (version !== state.farm.version) renderPanel(); if (!pending) notice('welcome'); }
@@ -31,15 +33,22 @@
     if (pending && input) { notice('uncertain', true); return; }
     if (!pending) {
       pending = { ...input, requestId: crypto.randomUUID() };
-      try { localStorage.setItem(pendingKey(), JSON.stringify(pending)); } catch { pending = null; notice('offline', true); return; }
+      try { outbox.save(pending); } catch { pending = null; notice('offline', true); return; }
     }
+    const attempt = pending;
+    const fish = ['stock','feed','catch'].includes(attempt.type);
+    const effectItem = attempt.item || state?.farm[fish ? 'ponds' : 'plots'][attempt.slot]?.item;
     busy = true; renderPanel();
     try {
-      const type = pending.type; accept(await api('/api/tea/farm/actions', { method:'POST', body:JSON.stringify(pending) }));
-      localStorage.removeItem(pendingKey()); pending = null; notice('saved');
+      const type = attempt.type; accept(await api('/api/tea/farm/actions', { method:'POST', body:JSON.stringify(attempt) }));
+      outbox.remove(attempt.requestId); loadPending(); notice(pending ? 'uncertain' : 'saved', Boolean(pending));
+      if (['plant','stock','water','feed','harvest','catch'].includes(type)) {
+        careEffect = { type, item: effectItem, ... (fish ? fishPos(attempt.slot) : plotPos(attempt.slot)), started: performance.now() };
+        canvas.dataset.careEffect = type;
+      }
       if (['harvest','catch','sell','claim'].includes(type)) { $('#harvest-fx').textContent = t(type === 'claim' ? 'reward' : type === 'sell' ? 'sell' : type); effectUntil = performance.now() + 1800; }
     } catch (error) {
-      if (error.status && error.status < 500) { pending = null; localStorage.removeItem(pendingKey()); if (error.status !== 401) { try { accept(await api('/api/tea/farm')); } catch {} } notice(words[locale][error.code] ? error.code : error.status === 401 ? 'invalidWallet' : 'offline', true); }
+      if (error.status && error.status < 500) { outbox.remove(attempt.requestId); loadPending(); if (error.status !== 401) { try { accept(await api('/api/tea/farm')); } catch {} } notice(pending ? 'uncertain' : words[locale][error.code] ? error.code : error.status === 401 ? 'invalidWallet' : 'offline', true); }
       else notice('uncertain', true);
     } finally { busy = false; renderPanel(); }
   }
@@ -48,8 +57,8 @@
   function card(parent, title, description, item) { const box = el('section', undefined, 'card', parent); if (item) { const icon = el('canvas', undefined, 'big-icon', box); icon.width = 48; icon.height = 48; drawItem(icon.getContext('2d'), item, 24, 29, 1.3, 1); } el('h3', title, '', box); if (description) el('p', description, '', box); return box; }
   function duration(seconds) { return seconds < 60 ? `${seconds}s` : `${seconds / 60} ${t('minutes')}`; }
   function remaining(row) { const s = Math.max(0, Math.ceil((row.readyAt - now()) / 1000)); return s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2,'0')}` : t('ready'); }
-  function openPanel(key, slot) { panel = key; if (slot !== undefined) selected = slot; else selected = 0; if (state && (key === 'garden' || key === 'pond')) focusSpot(key === 'pond', selected); renderPanel(); }
-  function focusSpot(fish, index) { const spot = fish ? fishPos(index) : plotPos(index); routeTo(fish ? 620 : spot.x, fish ? spot.y : spot.y + 43); }
+  function openPanel(key, slot) { panel = key; if (slot !== undefined) selected = slot; else selected = 0; if (state && (key === 'garden' || key === 'pond')) focusSpot(key === 'pond', selected); else cameraFocus = null; renderPanel(); }
+  function focusSpot(fish, index) { const spot = fish ? fishPos(index) : plotPos(index); cameraFocus = spot; routeTo(fish ? 620 : spot.x, fish ? spot.y : spot.y + 43); }
   function renderPanel() {
     $('#panel').hidden = !panel; document.querySelectorAll('[data-panel]').forEach(b => b.setAttribute('aria-pressed', b.dataset.panel === panel));
     if (!panel) return; $('#panel-title').textContent = t(panel); const root = $('#panel-content'); root.dataset.mode = panel; root.replaceChildren();
@@ -147,19 +156,44 @@
     if(found){const result=[];while(prev.get(found.join(','))){result.push({x:found[0]*step,y:found[1]*step});found=prev.get(found.join(','));}path=result.reverse();}
   }
   function badge(text,x,y,color='#fff3cc'){ctx.font='bold 11px system-ui';ctx.textAlign='center';const width=ctx.measureText(text).width+14;p(ctx,'#4c6746',x-width/2,y-12,width,20);p(ctx,color,x-width/2+1,y-11,width-2,17);ctx.fillStyle='#34543b';ctx.fillText(text,x,y+1);}
+  function drawCareEffect(time) {
+    if (!careEffect) return;
+    const elapsed = time - careEffect.started;
+    if (elapsed > 1600) { careEffect = null; delete canvas.dataset.careEffect; return; }
+    const { type, item, x, y } = careEffect, progress = reducedMotion.matches ? .5 : elapsed / 1600;
+    ctx.save(); ctx.translate(x,y); ctx.globalAlpha = reducedMotion.matches ? 1 : Math.min(1,(1600-elapsed)/300);
+    if (type === 'water') {
+      // Small watering can and individual droplets, above the selected patch.
+      p(ctx,'#527d83',-38,-49,23,17);p(ctx,'#8ac2bf',-36,-48,19,12);p(ctx,'#486d74',-43,-45,7,10);p(ctx,'#7ca9a7',-17,-43,15,5);p(ctx,'#8ac2bf',-5,-40,7,8);
+      for(let i=0;i<9;i++){const fall=(progress*2.4+i*.13)%1;p(ctx,i%2?'#b9e4e2':'#74bed2',-3+i*4,-28+fall*48,3,5);}
+      p(ctx,'#54775c',-24,22,50,3);
+    } else if (type === 'feed' || type === 'stock') {
+      for(let i=0;i<7;i++){const fall=(progress+i*.12)%1;p(ctx,type==='feed'?'#e7c47a':'#c2e7da',-22+i*7,-37+fall*40,4,4);}
+      ctx.strokeStyle='#d4eee0';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(0,12,12+progress*25,4+progress*8,0,0,Math.PI*2);ctx.stroke();
+    } else if (type === 'plant') {
+      for(let i=0;i<6;i++){const spread=i*1.05;p(ctx,'#efcf8c',Math.cos(spread)*progress*24,-24+progress*32+Math.sin(spread)*9,4,4);}
+    } else {
+      const lift = reducedMotion.matches ? 25 : Math.sin(progress*Math.PI)*45;
+      if(item)drawItem(ctx,item,0,-lift,1.7,1);
+      badge('+1',23,-lift-25,'#fff0ac');
+      for(let i=0;i<5;i++){const angle=i*Math.PI*.4;p(ctx,'#f4db7e',Math.cos(angle)*(15+progress*26),-lift+Math.sin(angle)*(15+progress*20),4,4);}
+    }
+    ctx.restore();
+  }
   function frame(time){
     const dt=Math.min(.04,(time-frameAt)/1000);frameAt=time;walk=false;
     if(!portrait()&&!document.querySelector('dialog[open]')){
       let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
-      if(dx||dy)path=[];else if(path.length){dx=path[0].x-player.x;dy=path[0].y-player.y;if(Math.hypot(dx,dy)<5){path.shift();dx=dy=0;}}
+      if(dx||dy){path=[];cameraFocus=null;}else if(path.length){dx=path[0].x-player.x;dy=path[0].y-player.y;if(Math.hypot(dx,dy)<5){path.shift();dx=dy=0;}}
       const len=Math.hypot(dx,dy);if(len){const nx=player.x+dx/len*145*dt,ny=player.y+dy/len*145*dt;if(!blocked(nx,player.y))player.x=nx;if(!blocked(player.x,ny))player.y=ny;walk=true;}
     }
     const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
     if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
     const scale=Math.max(.72,Math.min(rect.width/1000,rect.height/700));camera.scale=scale;
     const visibleWidth=rect.width/scale,visibleHeight=rect.height/scale;
-    camera.x=visibleWidth>=1000?(1000-visibleWidth)/2:Math.max(0,Math.min(1000-visibleWidth,player.x-visibleWidth/2));
-    camera.y=visibleHeight>=700?(700-visibleHeight)/2:Math.max(0,Math.min(700-visibleHeight,player.y-visibleHeight/2));
+    const focus = cameraFocus || player;
+    camera.x=visibleWidth>=1000?(1000-visibleWidth)/2:Math.max(0,Math.min(1000-visibleWidth,focus.x-visibleWidth/2));
+    camera.y=visibleHeight>=700?(700-visibleHeight)/2:Math.max(0,Math.min(700-visibleHeight,focus.y-visibleHeight/2));
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);ctx.scale(scale,scale);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;ctx.drawImage(staticMap,0,0);
     const f=state?.farm;
     for(let i=0;i<12;i++){const pos=plotPos(i),unlocked=i<(f?.plots.length||6),row=f?.plots[i];p(ctx,unlocked?'#9e784e':'#89975c',pos.x-45,pos.y-32,90,62);p(ctx,unlocked?'#b28b58':'#829454',pos.x-41,pos.y-28,82,54);for(let j=0;j<4;j++)p(ctx,unlocked?'#9f794f':'#788d51',pos.x-35,pos.y-19+j*12,70,3);
@@ -171,6 +205,7 @@
     f?.placed.forEach((item,i)=>{if(item)drawItem(ctx,item,decorations[i].x,decorations[i].y,1.6);});
     TeaScene.avatar(ctx,player.x,player.y,profile||{hair:1,clothes:2,shoes:0},1.15,false,walk,time);
     if(walk&&time%450<200){p(ctx,'#d3c797',player.x-6,player.y+7,4,3);p(ctx,'#d3c797',player.x+7,player.y+11,3,2);}
+    drawCareEffect(time);
     $('#harvest-fx').classList.toggle('show',time<effectUntil);
     document.querySelectorAll('[data-ready-at]').forEach(node=>{const at=Number(node.dataset.readyAt);if(node.tagName==='BUTTON')node.disabled=at>now()||busy||Boolean(pending);else node.textContent=remaining({readyAt:at});});
     requestAnimationFrame(frame);
@@ -179,7 +214,7 @@
     if(!state||portrait())return;event.preventDefault();canvas.focus();const r=canvas.getBoundingClientRect(),x=(event.clientX-r.left)/camera.scale+camera.x,y=(event.clientY-r.top)/camera.scale+camera.y;
     for(let i=0;i<state.farm.plots.length;i++){const pos=plotPos(i);if(Math.abs(x-pos.x)<48&&Math.abs(y-pos.y)<36){openPanel('garden',i);routeTo(pos.x,pos.y+44);return;}}
     for(let i=0;i<state.farm.ponds.length;i++){const pos=fishPos(i);if(Math.abs(x-pos.x)<52&&Math.abs(y-pos.y)<42){openPanel('pond',i);routeTo(620,pos.y);return;}}
-    if(x>370&&x<460&&y>570){location.assign('/tra-da');return;}routeTo(x,y);
+    if(x>370&&x<460&&y>570){location.assign('/tra-da');return;}cameraFocus=null;routeTo(x,y);
   });
   window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright'].includes(key)){e.preventDefault();keys.add(key);}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
@@ -194,7 +229,12 @@
     try{await api('/api/game/wallet',{headers:{'X-Wallet-Token':value}});localStorage.setItem(WALLET,value);location.reload();}catch(error){$('#wallet-message').textContent=t(error.status===401?'invalidWallet':'offline');}
   };
   $('#retry').onclick=()=>pending?act():entered?refresh():boot();window.addEventListener('online',refresh);window.addEventListener('offline',()=>notice('offline',true));
-  window.addEventListener('storage',event=>{if(event.key===WALLET){keys.clear();location.reload();}else if(event.key===pendingKey()){loadPending();renderPanel();} });
+  window.addEventListener('storage',event=>{
+    if(event.key===WALLET || (event.key===null&&localStorage.getItem(WALLET)!==token)){keys.clear();location.reload();}
+    else if((event.key===null||outbox.matches(event.key))&&!busy){
+      loadPending();renderPanel();if(pending)notice('uncertain',true);else refresh();
+    }
+  });
   async function boot(){
     if(busy)return;if(!token){notice('needWallet',true);openPanel('garden');return;}
     busy=true;
