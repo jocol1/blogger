@@ -8,7 +8,7 @@ async(page)=>{
     await context.addInitScript(token=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi');},wallet.token);
     const farm=await context.newPage();farm.on('pageerror',error=>errors.push(error.message));
     await farm.goto(base+'/tra-da/farm');await farm.waitForFunction(()=>document.querySelector('#gold').textContent==='120');
-    await farm.locator('[data-panel=pond]').click();await farm.locator('#fishing-switch').click();
+    await farm.locator('#map-toggle').click();await farm.locator('#map-destination').selectOption('lake');await farm.locator('#map-go').click();await farm.locator('#interact').click();
     await farm.evaluate(()=>{window.originalFishingButton=document.querySelector('#fishing-action');window.originalFishingMeter=document.querySelector('#fishing-meter');});
     let delayed=false;await farm.route('**/api/tea/farm/actions',async route=>{if(!delayed){delayed=true;await new Promise(resolve=>setTimeout(resolve,500));}await route.continue();});
     await farm.locator('#fishing-action').click();
@@ -20,7 +20,7 @@ async(page)=>{
     const initial=await(await context.request.get(base+'/api/tea/farm',{headers})).json();
     check(initial.farm.fishing.status==='waiting'&&!('prize' in initial.farm.fishing),'cast persisted without revealing prize');
     await farm.reload();await farm.waitForFunction(()=>document.querySelector('#gold').textContent==='120');
-    await farm.locator('[data-panel=pond]').click();await farm.locator('#fishing-switch').click();
+    await farm.locator('#map-toggle').click();await farm.locator('#map-destination').selectOption('lake');await farm.locator('#map-go').click();await farm.locator('#interact').click();
     const restored=await(await context.request.get(base+'/api/tea/farm',{headers})).json();check(restored.farm.fishing.id===initial.farm.fishing.id,'reload resumes same cast');
     await farm.waitForFunction(()=>document.querySelector('#fishing-action')?.textContent==='Giật cần!'&&!document.querySelector('#fishing-action').disabled,null,{timeout:10000});
     await farm.evaluate(()=>{window.originalFishingButton=document.querySelector('#fishing-action');window.originalFishingMeter=document.querySelector('#fishing-meter');window.waitingButtonTop=document.querySelector('#fishing-action').getBoundingClientRect().top;});
@@ -49,9 +49,9 @@ async(page)=>{
       check(fit,'visible fishing control and unobscured world '+viewport.width+'x'+viewport.height);
       await farm.screenshot({path:`E:/blogger/output/fishing-${viewport.width}.png`});
     }
-    await farm.setViewportSize({width:844,height:390});await farm.locator('[data-panel=bag]').click();await farm.getByRole('button',{name:`Bán ×1 · ${caught.catalog[caught.farm.fishing.caught].sell} vàng`,exact:true}).click();
+    await farm.setViewportSize({width:844,height:390});await farm.locator('#map-toggle').click();await farm.locator('#map-destination').selectOption('market');await farm.locator('#map-go').click();await farm.keyboard.down('ArrowRight');await farm.waitForTimeout(600);await farm.keyboard.up('ArrowRight');await farm.waitForFunction(()=>document.querySelector('#interact').dataset.target==='bag');await farm.locator('#interact').click();await farm.getByRole('button',{name:`Bán ×1 · ${caught.catalog[caught.farm.fishing.caught].sell} vàng`,exact:true}).click();
     await farm.waitForFunction(gold=>Number(document.querySelector('#gold').textContent)===gold,120+caught.catalog[caught.farm.fishing.caught].sell);checks.push('caught fish can be sold for farm gold');
-    await farm.locator('[data-panel=pond]').click();await farm.locator('#fishing-switch').click();
+    await farm.locator('#map-toggle').click();await farm.locator('#map-destination').selectOption('lake');await farm.locator('#map-go').click();await farm.locator('#interact').click();
     await farm.waitForFunction(()=>!document.querySelector('#fishing-action').disabled);await farm.locator('#fishing-action').click();
     await farm.locator('.fishing-stop').click();await farm.waitForFunction(()=>document.querySelector('#fishing-status')?.textContent==='Đã cất cần.');checks.push('put rod away without penalty');
     await farm.locator('header .cafe-link').click();await farm.waitForFunction(()=>document.querySelector('#connection-dot').classList.contains('live'));checks.push('return to cafe');

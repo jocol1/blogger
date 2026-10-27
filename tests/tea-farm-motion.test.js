@@ -2,6 +2,12 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {findPath,follow,clear}=require('../public/tea/farm-motion');
 const plots=Array.from({length:12},(_,i)=>({x:130+i%4*110,y:290+Math.floor(i/4)*90}));
 const blocked=(x,y)=>x<75||x>930||y<220||y>625||(x>365&&x<665&&y<224)||(x>648&&x<906&&y>225&&y<522)||plots.some(p=>Math.abs(x-p.x)<45&&Math.abs(y-p.y)<32);
+test('diagonal approach does not clip a plot corner between path samples',()=>{
+  for(const budget of [1,2.4,5.8]){const player={x:540,y:419},goal={x:460,y:333},path=findPath(player,goal,blocked);assert.ok(path.length);
+    for(let frame=0;path.length&&frame<1000;frame++)assert.ok(follow(player,path,budget,blocked).travelled>0,'path stopped at '+JSON.stringify(player));
+    assert.ok(Math.hypot(player.x-goal.x,player.y-goal.y)<.001);
+  }
+});
 test('walking consumes the frame budget across waypoints without a pause or overshoot',()=>{
   const player={x:0,y:0},path=[{x:1,y:0},{x:2,y:0},{x:2,y:6}];
   const move=follow(player,path,5,()=>false);assert.equal(move.travelled,5);assert.deepEqual(player,{x:2,y:3});

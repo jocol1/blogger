@@ -2,9 +2,12 @@
   const distance=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y);
   function clear(a,b,blocked){const steps=Math.max(1,Math.ceil(distance(a,b)/3));for(let i=1;i<=steps;i++)if(blocked(a.x+(b.x-a.x)*i/steps,a.y+(b.y-a.y)*i/steps))return false;return true;}
   function findPath(origin,target,blocked){
+    // Leave a small margin when smoothing grid paths. A diagonal that merely
+    // grazes a corner can pass coarse samples but fail at a later frame step.
+    const shortcutClear=(a,b)=>clear(a,b,(x,y)=>blocked(x,y)||blocked(x-2,y)||blocked(x+2,y)||blocked(x,y-2)||blocked(x,y+2));
     const step=20,near=point=>{const cells=[];for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const cell={x:(Math.round(point.x/step)+dx)*step,y:(Math.round(point.y/step)+dy)*step};if(!blocked(cell.x,cell.y)&&clear(point,cell,blocked))cells.push(cell);}return cells.sort((a,b)=>distance(point,a)-distance(point,b))[0];};
     if(blocked(target.x,target.y))return [];
-    if(clear(origin,target,blocked))return [{...target}];
+    if(shortcutClear(origin,target))return [{...target}];
     const start=near(origin),end=near(target);if(!start||!end)return [];
     const key=p=>`${p.x},${p.y}`,queue=[start],prev=new Map([[key(start),null]]);let found;
     for(let n=0;n<queue.length&&n<10000;n++){
@@ -14,7 +17,7 @@
     if(!found)return [];
     const points=[target];while(found){points.push(found);found=prev.get(key(found));}points.reverse();
     const result=[];let anchor=origin,index=0;
-    while(index<points.length){let last=points.length-1;while(last>index&&!clear(anchor,points[last],blocked))last--;result.push(points[last]);anchor=points[last];index=last+1;}
+    while(index<points.length){let last=points.length-1;while(last>index&&!shortcutClear(anchor,points[last]))last--;result.push(points[last]);anchor=points[last];index=last+1;}
     return result;
   }
   function follow(player,path,budget,blocked){

@@ -17,10 +17,12 @@
   Object.assign(words.vi,{fishing:'Câu cá',raiseFish:'Nuôi cá',castLine:'Thả cần',hookFish:'Giật cần!',reelFish:'Kéo cá!',stopFishing:'Cất cần',fishingHint:'Cần và mồi miễn phí. Chờ phao động, giật cần rồi canh kim vào vùng xanh để kéo.',fishingWait:'Chờ phao động nhé…',fishingBite:'Cá cắn rồi! Giật cần!',fishingReel:'Canh kim vào vùng XANH rồi kéo',fishingValue:'Bán được',fishingCaught:'Đã vào giỏ:',fishingEarly:'Giật sớm quá, cá chạy mất rồi.',fishingMissed:'Hụt vùng xanh rồi. Thử lại nhé!',fishingEscaped:'Cá chạy mất rồi. Thả cần lại nhé!',fishingStopped:'Đã cất cần.',fishingCooldown:'Thả tiếp sau',fishingFree:'MIỄN PHÍ · VÀNG NÔNG TRẠI',fishing_active:'Bạn đang thả một cần rồi.',fishing_cooldown:'Chờ một chút rồi thả tiếp nhé.',fishing_stale:'Lượt câu đã đổi. Xem lượt hiện tại nhé.',fishing_finished:'Lượt câu đã kết thúc.',fishing_not_ready:'Chờ kim kéo cá xuất hiện nhé.'});
   Object.assign(words.en,{worldMap:'Map',run:'Run',walking:'Walk',mapHint:'Free fast travel · Plants keep growing.',go:'Go here',waterAll:'Water all',feedAll:'Feed all',harvestAll:'Harvest ready',catchAll:'Catch ready',sellBasket:'Sell basket',sellConfirm:'Sell these harvested goods for',farm_bad_action:'Update your farm to use this tool.'});
   Object.assign(words.vi,{worldMap:'Bản đồ',run:'Chạy',walking:'Đi bộ',mapHint:'Đi nhanh miễn phí · Cây vẫn lớn.',go:'Tới đây',waterAll:'Tưới tất cả',feedAll:'Cho ăn tất cả',harvestAll:'Thu hoạch chín',catchAll:'Bắt cá lớn',sellBasket:'Bán cả giỏ',sellConfirm:'Bán số nông sản này để nhận',farm_bad_action:'Cập nhật nông trại để dùng tiện ích này nhé.'});
+  Object.assign(words.en,{interact:'Interact',hint:'Tap to walk · E to interact',chicken:'Chicken pen',pig:'Pig pen',chooseSeed:'Choose a seed',chooseFish:'Choose young fish',raise:'Add animal',buyRaise:'Buy & raise',collectEgg:'Collect egg',collectPig:'Move to basket',animalHint:'Feed once, then wait. Nothing gets sick or runs away.',chickenHint:'Feed → collect an egg → feed again. Your chicken stays.',pigHint:'Feed → let it grow → move to basket and sell.',moreTools:'More tools',readyStatus:'Ready',careStatus:'Needs care',growingStatus:'Growing',buyAtMarket:'Get more seeds and young fish at the market.',crop:'Seeds',fish:'Young fish',animal:'Animals',decor:'Decorations'});
+  Object.assign(words.vi,{interact:'Tương tác',hint:'Chạm để đi · E để tương tác',chicken:'Chuồng gà',pig:'Chuồng heo',chooseSeed:'Chọn hạt giống',chooseFish:'Chọn cá giống',raise:'Thả vào chuồng',buyRaise:'Mua & nuôi',collectEgg:'Nhặt trứng',collectPig:'Đưa vào giỏ',animalHint:'Cho ăn một lần rồi chờ lớn. Không bệnh, không bỏ chạy.',chickenHint:'Cho ăn → nhặt trứng → cho ăn tiếp. Gà vẫn ở trong chuồng.',pigHint:'Cho ăn → chờ lớn → đưa vào giỏ để bán.',moreTools:'Tiện ích khác',readyStatus:'Sẵn sàng',careStatus:'Cần chăm sóc',growingStatus:'Đang lớn',buyAtMarket:'Ghé quầy hàng để mua thêm hạt và cá giống.',crop:'Hạt giống',fish:'Cá giống',animal:'Vật nuôi',decor:'Trang trí'});
   const t = key => words[locale][key] || key, now = () => Date.now() + offset;
   const name = key => state?.catalog[key]?.[locale] || key;
   const portrait = () => matchMedia('(orientation:portrait) and (max-width:700px)').matches;
-  function notice(key, error = false) { $('#notice-text').textContent = t(key); $('#notice').classList.toggle('error', error); $('#retry').hidden = !error; }
+  function notice(key, error = false) { $('#notice-text').textContent = t(key); $('#notice').classList.toggle('error', error);$('#notice').classList.toggle('quiet',!error&&['welcome','saved'].includes(key)); $('#retry').hidden = !error; }
   async function api(url, options = {}) {
     const res = await fetch(url, { ...options, headers: { 'Content-Type':'application/json', 'X-Wallet-Token': token || '', ...options.headers }, signal: AbortSignal.timeout(12000) });
     const body = await res.json(); if (!res.ok) throw Object.assign(new Error(body.error), { status: res.status, code: body.code }); return body;
@@ -34,6 +36,7 @@
   }
   async function act(input) {
     if (busy || !entered || portrait()) return;
+    if(input&&(!panelTarget||Math.hypot(player.x-panelTarget.x,player.y-panelTarget.y)>70))return;
     if (pending && input) { notice('uncertain', true); return; }
     if (!pending) {
       pending = { ...input, requestId: crypto.randomUUID() };
@@ -57,6 +60,7 @@
         careEffect={type:'catch',rod:true,item:state.farm.fishing.caught,x:795+fishingSite*685,y:440+fishingSite*600,started:performance.now()};canvas.dataset.careEffect='catch';
       }
       if(bulkRows){bulkEffects=bulkRows.map(row=>({type:type.replace('All',''),item:row.item,...(bulkFish?fishPos(row.slot):plotPos(row.slot)),started:performance.now()}));}
+      if(['raiseAnimal','feedAnimal','collectAnimal'].includes(type)){careEffect={type:type==='collectAnimal'?'harvest':type==='feedAnimal'?'feed':'stock',item:type==='collectAnimal'?(attempt.kind==='chicken'?'egg':'grownPig'):attempt.kind,...TeaFarmWorld.animalPos(attempt.kind,attempt.slot),started:performance.now()};canvas.dataset.careEffect=type;}
       if (['harvest','catch','sell','claim'].includes(type)) { $('#harvest-fx').textContent = t(type === 'claim' ? 'reward' : type === 'sell' ? 'sell' : type); effectUntil = performance.now() + 1800; }
     } catch (error) {
       if (error.status && error.status < 500) { outbox.remove(attempt.requestId); loadPending(); if (error.status !== 401) { try { accept(await api('/api/tea/farm')); } catch {} } notice(pending ? 'uncertain' : words[locale][error.code] ? error.code : error.status === 401 ? 'invalidWallet' : 'offline', true); }
@@ -68,20 +72,34 @@
   function card(parent, title, description, item) { const box = el('section', undefined, 'card', parent); if (item) { const icon = el('canvas', undefined, 'big-icon', box); icon.width = 48; icon.height = 48; drawItem(icon.getContext('2d'), item, 24, 29, 1.3, 1); } el('h3', title, '', box); if (description) el('p', description, '', box); return box; }
   function duration(seconds) { return seconds < 60 ? `${seconds}s` : `${seconds / 60} ${t('minutes')}`; }
   function remaining(row) { const s = Math.max(0, Math.ceil((row.readyAt - now()) / 1000)); return s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2,'0')}` : t('ready'); }
-  function openPanel(key, slot) { panel = key; if (slot !== undefined) selected = slot; else selected = 0; if(key==='fishing'){cameraFocus={x:780+685*fishingSite,y:420+600*fishingSite};routeTo(780+685*fishingSite,540+600*fishingSite);}else if (state && (key === 'garden' || key === 'pond')) focusSpot(key === 'pond', selected); else cameraFocus = null; renderPanel(); }
-  function focusSpot(fish, index) { const spot = fish ? fishPos(index) : plotPos(index); cameraFocus = spot; routeTo(fish ? 620+(index>=6?685:0) : spot.x, fish ? spot.y : spot.y + 43); }
+  function careTimer(box,row,item){const status=el('p',t(row.readyAt===null?'careStatus':row.readyAt<=now()?'readyStatus':'growingStatus'),'care-status',box);if(row.readyAt!==null){status.dataset.statusAt=row.readyAt;const timer=el('div',remaining(row),'timer',box);timer.dataset.readyAt=row.readyAt;const progress=el('progress',undefined,'care-progress',box);progress.max=state.catalog[item].seconds*1000;progress.value=Math.max(0,progress.max-(row.readyAt-now()));progress.dataset.progressAt=row.readyAt;progress.setAttribute('aria-label',t('growingStatus'));}}
+  let preferredTarget=null, panelTarget=null, shopType='crop';
+  function targetLabel(target){if(target.panel==='garden'||target.panel==='pond')return `${t(target.panel==='garden'?'patch':'pool')} ${target.slot+1}`;if(target.panel==='chicken'||target.panel==='pig')return `${t(target.panel)} ${target.slot+1}`;return t(target.panel);}
+  function nearby(){return state?TeaFarmWorld.nearest(player,state.farm,preferredTarget):null;}
+  function openPanel(key,slot){
+    if(key&&key!=='worldMap'){
+      const target=nearby();if(!target||target.panel!==key||(slot!==undefined&&slot!==target.slot))return;
+      panelTarget=target;selected=target.slot||0;if(target.site!==undefined)fishingSite=target.site;cameraFocus=target.look||target;
+    }else{panelTarget=null;cameraFocus=null;}
+    panel=key;path=[];keys.clear();renderPanel();
+  }
+  function interact(){if(busy||portrait()||pending)return;const target=nearby();if(target){preferredTarget=target.id;openPanel(target.panel,target.slot);}}
+  function updateInteraction(){
+    if(panelTarget&&Math.hypot(player.x-panelTarget.x,player.y-panelTarget.y)>70)openPanel('');
+    const target=nearby(),button=$('#interact');button.hidden=!target||Boolean(panel)||!entered||portrait();
+    if(target){const label=`${t('interact')} · ${targetLabel(target)}`;if(button.textContent!==label)button.textContent=label;button.dataset.target=target.id;button.disabled=busy||Boolean(pending);}
+  }
   function bulkAction(type){const fish=type==='feedAll'||type==='catchAll',care=type==='feedAll'||type==='waterAll',targets=[];state.farm[fish?'ponds':'plots'].forEach((row,slot)=>{if(row&&(care?row.readyAt===null:row.readyAt!==null&&row.readyAt<=now()))targets.push({slot,cycleId:row.cycleId});});if(targets.length)act({type,targets});}
   function sellBasket(){const sale=Object.entries(state.farm.products).filter(([,quantity])=>quantity>0).map(([item,quantity])=>({item,quantity})),total=sale.reduce((sum,row)=>sum+row.quantity*state.catalog[row.item].sell,0);if(total&&confirm(`${t('sellConfirm')} ${total} ${t('gold')}?`))act({type:'sellAll',sale});}
   function renderPanel() {
     $('#panel').hidden = !panel;$('#map-toggle').setAttribute('aria-pressed',String(panel==='worldMap')); document.querySelectorAll('[data-panel]').forEach(b => b.setAttribute('aria-pressed', b.dataset.panel === panel));
-    $('#fishing-switch').hidden=!['pond','fishing'].includes(panel);$('#fishing-switch').textContent=t(panel==='fishing'?'raiseFish':'fishing');
-    if (!panel) return; $('#panel-title').textContent = t(panel); const root = $('#panel-content');
+    $('#fishing-switch').hidden=true;
+    if (!panel) return; $('#panel-title').textContent = panelTarget?targetLabel(panelTarget):t(panel); const root = $('#panel-content');
     if(panel==='fishing'&&root.dataset.mode==='fishing'&&root.dataset.locale===locale&&fishingUi){syncFishingUi();return;}
     root.dataset.mode = panel;root.dataset.locale=locale;root.replaceChildren();fishingUi=null;
     if(panel==='garden'||panel==='pond')root.scrollTop=0;
     if (!state) { el('p', t('needWallet'), 'intro', root); return; }
     const f = state.farm;
-    if (f.version === 1 && panel === 'garden') el('p', t('intro'), 'intro', root);
     if(panel==='worldMap'){
       el('p',t('mapHint'),'intro map-hint',root);
       const mini=el('canvas',undefined,'farm-minimap',root);mini.id='farm-minimap';mini.width=400;mini.height=280;mini.setAttribute('aria-label',t('worldMap'));
@@ -90,24 +108,26 @@
       button(row,t('go'),()=>{if(portrait()||busy||pending)return;const place=TeaFarmWorld.places.find(p=>p.id===select.value);if(place&&!blocked(place.x,place.y)){Object.assign(player,{x:place.x,y:place.y});path=[];keys.clear();destination=null;cameraFocus=null;cameraReady=false;if(place.id==='lake')fishingSite=1;else if(place.id==='pond'||place.id==='home')fishingSite=0;openPanel('');}}).id='map-go';
     }else if (panel === 'garden' || panel === 'pond') {
       const fish = panel === 'pond', area = fish ? f.ponds : f.plots; selected = Math.min(selected, area.length - 1);
-      el('p', t(fish ? 'pondHint' : 'plotHint'), 'intro', root);
-      const slots = el('div', undefined, 'slots', root);
-      area.forEach((row, i) => { const b = button(slots, `${i + 1} ${row ? (row.readyAt && row.readyAt <= now() ? '✓' : '•') : '+'}`, () => { selected = i; focusSpot(fish, i); renderPanel(); }); b.classList.toggle('active', selected === i); b.setAttribute('aria-label', `${t(fish ? 'pool' : 'patch')} ${i + 1}`); });
-      const row = area[selected], box = card(root, `${t(fish ? 'pool' : 'patch')} ${selected + 1} · ${row ? name(row.item) : t('empty')}`, '', row?.item);
+      const row = area[selected], box = card(root,row?name(row.item):t(fish?'chooseFish':'chooseSeed'),'',row?.item);box.classList.add('care-card');
       if (!row) {
         const choices = el('div', undefined, 'choices', box);
         Object.entries(state.catalog).filter(([,v]) => v.type === (fish ? 'fish' : 'crop')).forEach(([key]) => button(choices, `${t(fish ? 'stock' : 'plant')} ${name(key)} (${f.seeds[key] || 0})`, () => act({ type:fish ? 'stock' : 'plant', item:key, slot:selected }), !(f.seeds[key] > 0)));
       } else {
-        el('p', t(row.readyAt === null ? fish ? 'hungry' : 'thirsty' : 'growing'), '', box);
-        if (row.readyAt !== null) { box.classList.add('growing-card');const timer = el('div', remaining(row), 'timer', box); timer.dataset.readyAt = row.readyAt; }
+        careTimer(box,row,row.item);
         const type = row.readyAt === null ? fish ? 'feed' : 'water' : fish ? 'catch' : 'harvest';
         const b = button(box, t(type), () => act({ type, slot:selected, cycleId:row.cycleId }), row.readyAt !== null && row.readyAt > now());
         if (row.readyAt !== null) b.dataset.readyAt = row.readyAt;
       }
+      const extras=el('details',undefined,'care-extras',root);el('summary',t('moreTools'),'',extras);
       const max = fish ? TeaFarmWorld.maxPonds : TeaFarmWorld.maxPlots, cost = fish ? 100 + (area.length - 2) * 60 : 120 + (area.length - 6) * 30;
-      for(const type of fish?['feedAll','catchAll']:['waterAll','harvestAll']){const care=type==='waterAll'||type==='feedAll',count=area.filter(row=>row&&(care?row.readyAt===null:row.readyAt!==null&&row.readyAt<=now())).length;if(count>1)button(root,`${t(type)} (${count})`,()=>bulkAction(type)).classList.add('bulk-action');}
-      if (area.length < max) button(root, `${t(fish ? 'upgradePond' : 'upgradePlots')} · ${cost} ${t('gold')}`, () => act({ type:fish ? 'upgradePond' : 'upgradePlots' }), f.gold < cost);
-      else el('p', t('max'), 'intro', root);
+      for(const type of fish?['feedAll','catchAll']:['waterAll','harvestAll']){const care=type==='waterAll'||type==='feedAll',count=area.filter(row=>row&&(care?row.readyAt===null:row.readyAt!==null&&row.readyAt<=now())).length;if(count>1)button(extras,`${t(type)} (${count})`,()=>bulkAction(type)).classList.add('bulk-action');}
+      if (area.length < max) button(extras, `${t(fish ? 'upgradePond' : 'upgradePlots')} · ${cost} ${t('gold')}`, () => act({ type:fish ? 'upgradePond' : 'upgradePlots' }), f.gold < cost);
+      else el('p', t('max'), 'intro', extras);
+      el('p',t('buyAtMarket'),'intro',extras);
+    } else if(panel==='chicken'||panel==='pig'){
+      const row=f.animals[panel][selected],def=state.catalog[panel],box=card(root,name(panel),'',panel);box.classList.add('care-card');
+      if(!row){const owned=f.seeds[panel]||0;el('p',t(panel==='chicken'?'chickenHint':'pigHint'),'animal-help',box);button(box,owned?`${t('raise')} (${owned})`:`${t('buyRaise')} · ${def.price} ${t('gold')}`,()=>act({type:'raiseAnimal',kind:panel,slot:selected,purchase:!owned}),!owned&&f.gold<def.price);}
+      else{careTimer(box,row,panel);const type=row.readyAt===null?'feedAnimal':'collectAnimal',label=type==='feedAnimal'?'feed':panel==='chicken'?'collectEgg':'collectPig';const b=button(box,t(label),()=>act({type,kind:panel,slot:selected,cycleId:row.cycleId}),row.readyAt!==null&&row.readyAt>now());if(row.readyAt!==null)b.dataset.readyAt=row.readyAt;}
     } else if(panel==='fishing') {
       const box=card(root,t('fishingFree'),'');box.classList.add('fishing-card');
       el('p',t('fishingHint'),'fishing-help',box);
@@ -121,8 +141,8 @@
       fishingUi={box,status,meter,primary,stop,stepNodes,controls};
       syncFishingUi();
     } else if (panel === 'shop') {
-      el('p', t('shopHint'), 'intro', root);
-      Object.entries(state.catalog).filter(([,def])=>def.type!=='caught').forEach(([key, def]) => { const box = card(root, name(key), def.type === 'decor' ? t('decorate') : `${duration(def.seconds)} · ${t('sell')} ${def.sell} ${t('gold')}`, key); button(box, `${t('buy')} · ${def.price} ${t('gold')}`, () => act({ type:'buy', item:key }), f.gold < def.price || f.decorations.includes(key)); });
+      const filter=el('select',undefined,'shop-filter',root);filter.setAttribute('aria-label',t('shop'));for(const type of ['crop','fish','animal','decor']){const option=el('option',t(type),'',filter);option.value=type;}filter.value=shopType;filter.onchange=()=>{shopType=filter.value;renderPanel();};
+      Object.entries(state.catalog).filter(([,def])=>def.type===shopType).forEach(([key, def]) => { const box = card(root, name(key), def.type === 'decor' ? t('decorate') : def.type==='animal'?t(key==='chicken'?'chickenHint':'pigHint'):`${duration(def.seconds)} · ${t('sell')} ${def.sell} ${t('gold')}`, key); button(box, `${t('buy')} · ${def.price} ${t('gold')}`, () => act({ type:'buy', item:key }), f.gold < def.price || f.decorations.includes(key)); });
     } else if (panel === 'bag') {
       el('p', t('bagHint'), 'intro', root); let count = 0;
       const total=Object.entries(f.products).reduce((sum,[key,qty])=>sum+qty*state.catalog[key].sell,0);if(total)button(root,`${t('sellBasket')} · ${total} ${t('gold')}`,sellBasket).classList.add('bulk-action');
@@ -143,7 +163,8 @@
   function drawItem(c, item, x, y, scale = 1, progress = 1, time = 0) {
     c.save(); c.translate(x,y); c.scale(scale,scale); c.imageSmoothingEnabled = false;
     const def = state?.catalog[item];
-    if (def?.type === 'fish' || def?.type === 'caught') {
+    if(def?.type==='animal'||def?.type==='produce'){TeaFarmRanch.item(c,p,item,time);}
+    else if (def?.type === 'fish' || def?.type === 'caught') {
       c.translate(0, Math.sin(time / 700 + x) * 2); p(c,'#244f55',-16,1,31,9); p(c,def.color,-12,-5,24,13); p(c,def.color,12,-9,6,20); p(c,'#e27c53',-4,-6,7,4); p(c,'#283e36',-10,-2,3,3); p(c,'#fff4cf',-8,-4,9,2);
     } else if (item === 'flowers') {
       p(c,'#966a49',-20,5,40,12); p(c,'#5c763f',-17,-2,34,8); for(let i=-12;i<=12;i+=12){p(c,i===0?'#e8c45c':'#e89a91',i-4,-12,8,9);p(c,'#fae8a1',i-1,-9,3,3);}
@@ -187,6 +208,7 @@
     p(c,'#775b41',410,584,6,42);p(c,'#b69a65',376,576,78,30);p(c,'#e2c68b',380,580,70,21);
     c.font='bold 12px system-ui';c.fillStyle='#4b5f40';c.textAlign='center';c.fillText('CAFÉ ↓',415,596);
     TeaFarmExpansion(c,p,tree,TeaFarmWorld,locale);
+    TeaFarmRanch.scenery(c,p,locale);
   }
   const blocked=TeaFarmWorld.blocked;
   function routeTo(x,y){
@@ -332,6 +354,11 @@
       if((panel==='pond'&&selected===i)||row.readyAt===null||row.readyAt<=now())badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-28);
     }else if(panel==='pond')badge(`${i+1} +`,pos.x,pos.y,'#b9d8bd');if(panel==='pond'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=2;ctx.strokeRect(pos.x-42,pos.y-40,84,72);}}
     f?.placed.forEach((item,i)=>{if(item)drawItem(ctx,item,decorations[i].x,decorations[i].y,1.6);});
+    for(const kind of ['chicken','pig'])for(let slot=0;slot<2;slot++){
+      const row=f?.animals?.[kind]?.[slot],pos=TeaFarmWorld.animalPos(kind,slot);if(row){const moving=!reducedMotion.matches,drift=moving?Math.sin(time/1700+slot)*12:0;ctx.save();ctx.translate(pos.x+drift,pos.y);if(moving&&Math.cos(time/1700+slot)<0)ctx.scale(-1,1);drawItem(ctx,kind,0,0,kind==='chicken'?1.3:1.1,1,moving?time:0);ctx.restore();
+        if(row.readyAt!==null&&row.readyAt<=now())badge(t(kind==='chicken'?'collectEgg':'readyStatus'),pos.x,pos.y-40,'#ffe5a0');else if(panel===kind&&selected===slot)badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-40);
+      }else{badge('+',pos.x,pos.y,'#e4d7b0');}
+    }
     drawFishing(time);
     ctx.save();ctx.translate(685,600);drawFishing(time,1);ctx.restore();
     const fishingPose=!walk&&f?.fishing&&f.fishing.status!=='finished';
@@ -341,25 +368,25 @@
     bulkEffects=bulkEffects.filter(effect=>time-effect.started<1600);bulkEffects.forEach(effect=>drawCareEffect(time,effect));
     drawMinimap(time);
     syncFishingUi();
+    updateInteraction();
     $('#harvest-fx').classList.toggle('show',time<effectUntil);
     document.querySelectorAll('[data-ready-at]').forEach(node=>{const at=Number(node.dataset.readyAt);if(node.tagName==='BUTTON')node.disabled=at>now()||busy||Boolean(pending);else{const text=remaining({readyAt:at});if(node.textContent!==text)node.textContent=text;}});
+    document.querySelectorAll('[data-status-at]').forEach(node=>{const text=t(Number(node.dataset.statusAt)<=now()?'readyStatus':'growingStatus');if(node.textContent!==text)node.textContent=text;});
+    document.querySelectorAll('[data-progress-at]').forEach(node=>{node.value=Math.min(node.max,Math.max(0,node.max-(Number(node.dataset.progressAt)-now())));});
     requestAnimationFrame(frame);
   }
   canvas.addEventListener('pointerdown',event=>{
     if(!state||portrait())return;event.preventDefault();canvas.focus();const r=canvas.getBoundingClientRect(),x=(event.clientX-r.left)/camera.scale+camera.x,y=(event.clientY-r.top)/camera.scale+camera.y;
-    for(let site=0;site<2;site++)if(x>=738+site*685&&x<=840+site*685&&y>=468+site*600&&y<=557+site*600){fishingSite=site;openPanel('fishing');return;}
-    if(x>1640&&x<1870&&y>300&&y<480){openPanel('shop');return;}
-    if(x>1770&&x<1860&&y>=480&&y<565){openPanel('bag');return;}
-    if(x>590&&x<710&&y>740&&y<850){openPanel('quests');return;}
-    for(let i=0;i<state.farm.plots.length;i++){const pos=plotPos(i);if(Math.abs(x-pos.x)<48&&Math.abs(y-pos.y)<36){openPanel('garden',i);routeTo(pos.x,pos.y+44);return;}}
-    for(let i=0;i<state.farm.ponds.length;i++){const pos=fishPos(i);if(Math.abs(x-pos.x)<52&&Math.abs(y-pos.y)<42){openPanel('pond',i);return;}}
-    if(x>370&&x<460&&y>570&&y<630){location.assign('/tra-da');return;}cameraFocus=null;routeTo(x,y);
+    const target=TeaFarmWorld.hitAt(x,y,state.farm);
+    if(target){openPanel('');preferredTarget=target.id;routeTo(target.x,target.y);return;}
+    if(x>370&&x<460&&y>570&&y<630){location.assign('/tra-da');return;}
+    openPanel('');preferredTarget=null;routeTo(x,y);
   });
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
-  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key)){e.preventDefault();keys.add(key);}});
+  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel)interact();return;}if(key==='escape'){openPanel('');return;}if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key)){e.preventDefault();keys.add(key);}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(panel===b.dataset.panel?'':b.dataset.panel));$('#close-panel').onclick=()=>openPanel('');
-  $('#fishing-switch').onclick=()=>openPanel(panel==='fishing'?'pond':'fishing');
+  $('#interact').onclick=interact;
   $('#map-toggle').onclick=()=>openPanel(panel==='worldMap'?'':'worldMap');
   $('#run-toggle').onclick=()=>{running=!running;$('#run-toggle').setAttribute('aria-pressed',String(running));$('#run-toggle').textContent=t(running?'walking':'run');};
   $('#lang').onclick=()=>{locale=locale==='en'?'vi':'en';applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));};
@@ -379,9 +406,9 @@
     }
   });
   async function boot(){
-    if(busy)return;if(!token){notice('needWallet',true);openPanel('garden');return;}
+    if(busy)return;if(!token){notice('needWallet',true);return;}
     busy=true;
-    try{const data=await api('/api/tea/profile');profile=data.profile;if(!profile){notice('newProfile',true);return;}accept(await api('/api/tea/farm/enter',{method:'POST',body:'{}'}));entered=true;loadPending();applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));if(state.farm.version===1){openPanel('garden');el('p',t('intro'),'intro',$('#panel-content'));}}
+    try{const data=await api('/api/tea/profile');profile=data.profile;if(!profile){notice('newProfile',true);return;}accept(await api('/api/tea/farm/enter',{method:'POST',body:'{}'}));entered=true;loadPending();applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));}
     catch(error){notice(error.status===401?'invalidWallet':'offline',true);}finally{busy=false;renderPanel();}
   }
   // Only the public shell is cached by the shared worker. No offline action queue.

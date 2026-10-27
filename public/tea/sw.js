@@ -1,6 +1,6 @@
-const CACHE='locly-tea-v32';
+const CACHE='locly-tea-v33';
 const SHELL=['/tra-da','/tra-da.webmanifest','/assets/tea/style.css','/assets/tea/courtyard.css','/assets/tea/games.css','/assets/tea/pwa.css','/assets/tea/cards-mobile.css','/assets/tea/cards-fullscreen.css','/assets/tea/cards-skin.css','/assets/tea/all-games-fullscreen.css','/assets/tea/world.js','/assets/tea/menu.js','/assets/tea/scene.js','/assets/tea/touch-controls.js','/assets/tea/games-ui.js','/assets/tea/game-words.js','/assets/tea/pwa-words.js','/assets/tea/app.js','/assets/tea/pwa.js','/assets/tea/icons/icon-192.png','/assets/tea/icons/icon-512.png','/assets/tea/icons/icon-maskable-512.png'];
-SHELL.push('/tra-da/farm','/assets/tea/farm.css','/assets/tea/farm-outbox.js','/assets/tea/farm-world.js','/assets/tea/farm-expansion.js','/assets/tea/farm-motion.js','/assets/tea/farm-avatar.js','/assets/tea/farm.js');
+SHELL.push('/tra-da/farm','/assets/tea/farm.css','/assets/tea/farm-outbox.js','/assets/tea/farm-world.js','/assets/tea/farm-expansion.js','/assets/tea/farm-ranch.js','/assets/tea/farm-motion.js','/assets/tea/farm-avatar.js','/assets/tea/farm.js');
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL.map(url=>new Request(url,{cache:'reload'}))))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('locly-tea-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('message',event=>{if(event.data?.type==='SKIP_WAITING')self.skipWaiting();});

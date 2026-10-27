@@ -3,6 +3,15 @@
 @media(max-height:400px) and (orientation:landscape){header{height:47px}.brand small{display:none}footer{padding:3px 8px}nav button{min-height:38px}.world-label{padding:4px 8px}.world-label span{font-size:11px}#notice{min-height:22px}.panel-heading button{min-height:32px}.timer{font-size:21px}}
 @media(orientation:portrait) and (max-width:700px){#portrait{display:grid;position:fixed;inset:0;background:#344e43;place-items:center;color:#fff2ce;z-index:20;padding:30px;text-align:center}#portrait p{line-height:1.7}#portrait a{display:inline-block;padding:15px}.turn-phone{font-size:60px}dialog{z-index:25}}
 #fishing-switch{font-size:12px;padding:5px 9px}
+#notice.quiet:not(:has(#update:not([hidden]))){display:none}
+#interact{position:absolute;bottom:12px;right:12px;max-width:calc(100% - 24px);min-height:46px;background:#fff1cc;border:2px solid #799061;box-shadow:0 3px 0 #42634d;color:#2f513c;font-size:13px;z-index:2}
+#interact:active{transform:translateY(2px);box-shadow:none}
+.care-card .choices{grid-template-columns:1fr 1fr}.care-card .choices button{min-height:44px;line-height:1.35}
+.care-card .care-status{font-weight:700;color:#6b815d;font-size:12px;margin:6px 0}.care-card .timer{margin:4px 0;font-size:24px}
+.care-progress{display:block;width:100%;height:9px;margin:7px 0 12px;accent-color:#6f9461;border:0;border-radius:5px;overflow:hidden}.care-progress::-webkit-progress-bar{background:#e3e6d2}.care-progress::-webkit-progress-value{background:#7b9c66}
+.care-extras{border-top:1px solid #d2c6a5;padding:8px 0}.care-extras summary{font-size:12px;cursor:pointer;color:#617757;padding:5px 0}.care-extras button{width:100%;font-size:12px;margin:5px 0}.care-extras .intro{margin-top:8px}
+.shop-filter{width:100%;font:inherit;color:#355d41;background:#fff9e9;border:1px solid #c3d0b8;border-radius:7px;padding:9px;margin-bottom:10px}
+@media(max-height:450px) and (orientation:landscape){#panel-content>.care-card{padding:9px}.care-card h3{font-size:13px}.care-card .timer{font-size:21px}.care-card .big-icon{width:32px;height:32px}.care-card .care-status{font-size:11px}.care-card button{min-height:40px}.care-card .animal-help{font-size:11px;line-height:1.4}#interact{min-height:42px;font-size:12px;bottom:9px;right:9px}}
 .world-tools{position:absolute;right:8px;top:8px;display:flex;gap:5px}.world-tools button{font-size:11px;min-height:34px;padding:5px 8px;background:#faf3dfed}
 .world-tools button[aria-pressed=true]{background:#426c57;color:#fff8df}
 .world-label{max-width:calc(100% - 150px)}.world-label span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

@@ -13,6 +13,10 @@ const CATALOG = {
   perch: { en:'Perch', vi:'Cá rô', type:'caught', sell:5, color:'#a4b789' },
   tilapia: { en:'Tilapia', vi:'Cá rô phi', type:'caught', sell:8, color:'#9ab6c4' },
   snakehead: { en:'Snakehead', vi:'Cá lóc', type:'caught', sell:12, color:'#8b9982' },
+  chicken: { en:'Chick',vi:'Gà con',type:'animal',price:20,seconds:180,color:'#eed9a1' },
+  pig: { en:'Piglet',vi:'Heo con',type:'animal',price:35,seconds:600,color:'#e5a5a0' },
+  egg: { en:'Egg',vi:'Trứng gà',type:'produce',sell:8,color:'#f5e8c6' },
+  grownPig: { en:'Grown pig',vi:'Heo trưởng thành',type:'produce',sell:65,color:'#d59993' },
   flowers: { en: 'Flower bed', vi: 'Bồn hoa', type: 'decor', price: 35 },
   lantern: { en: 'Garden lantern', vi: 'Đèn vườn', type: 'decor', price: 65 },
   bench: { en: 'Wooden bench', vi: 'Ghế gỗ', type: 'decor', price: 90 },
@@ -31,12 +35,12 @@ class FarmError extends Error {
 const fail = (code, status = 409) => { throw new FarmError(status, code); };
 function initialFarm(at) {
   return { version: 1, gold: 120, plots: Array(6).fill(null), ponds: Array(2).fill(null),
-    seeds: { radish: 6, guppy: 2 }, products: {}, decorations: [], placed: [null, null, null, null],
+    seeds: { radish: 6, guppy: 2 }, products: {}, animals:{chicken:[null,null],pig:[null,null]}, decorations: [], placed: [null, null, null, null],
     stats: { crops: 0, fish: 0, sold: 0 }, claimed: [], createdAt: at, updatedAt: at };
 }
 function createFarm({ db, now = () => Date.now() }) {
   const refFor = id => db.collection('tea_farms').doc(id);
-  const view = farm => ({ farm:{...farm,fishing:fishing.publicRound(farm.fishing)}, catalog: CATALOG, quests: QUESTS, serverNow: now() });
+  const view = farm => ({ farm:{...farm,animals:farm.animals||{chicken:[null,null],pig:[null,null]},fishing:fishing.publicRound(farm.fishing)}, catalog: CATALOG, quests: QUESTS, serverNow: now() });
   async function read(id) {
     const farm = await db.runTransaction(async tx => {
       const ref = refFor(id), snap = await tx.get(ref);
@@ -51,19 +55,20 @@ function createFarm({ db, now = () => Date.now() }) {
   }
   async function action(id, input) {
     if (!input || typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{12,80}$/.test(input.requestId)) fail('farm_bad_request', 400);
-    const { type, item, slot, cycleId, quantity, quest, roundId, targets, sale } = input;
+    const { type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase } = input;
     if (item !== undefined && item !== null && typeof item !== 'string') fail('farm_bad_item', 400);
     const fishingAction = ['castLine','hookFish','reelFish','stopFishing'].includes(type);
-    const allowed = ['waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
+    const allowed = ['raiseAnimal','feedAnimal','collectAnimal','waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase })).digest('hex');
     const attempt = db.collection('tea_farm_actions').doc(crypto.createHash('sha256').update(id + ':' + input.requestId).digest('hex'));
     // Judge the reel when its request reaches the service, not after database latency/retries.
     const actionAt = now();
     const result = await db.runTransaction(async tx => {
       const ref = refFor(id), [snap, prior] = await Promise.all([tx.get(ref), tx.get(attempt)]);
       const farm = snap.exists ? snap.data() : initialFarm(now());
+      farm.animals ||= {chicken:[null,null],pig:[null,null]};
       const expired=fishing.expire(farm,actionAt);
       if (prior.exists) {
         if (prior.data().fingerprint !== fingerprint) fail('farm_request_conflict');
@@ -73,7 +78,26 @@ function createFarm({ db, now = () => Date.now() }) {
       const def = Object.hasOwn(CATALOG, item || '') ? CATALOG[item] : null;
       const qty = quantity === undefined ? 1 : quantity;
       const spend = amount => { if (farm.gold < amount) fail('farm_not_enough_gold'); farm.gold -= amount; };
-      if(['waterAll','feedAll','harvestAll','catchAll'].includes(type)){
+      if(['raiseAnimal','feedAnimal','collectAnimal'].includes(type)){
+        if(!['chicken','pig'].includes(kind))fail('farm_bad_item',400);
+        if(!Number.isInteger(slot)||slot<0||slot>=2)fail('farm_bad_slot',400);
+        const pens=farm.animals[kind],animal=pens[slot];
+        if(type==='raiseAnimal'){
+          if(animal)fail('farm_slot_busy');
+          if((farm.seeds[kind]||0)>0)farm.seeds[kind]--;else if(purchase===true)spend(CATALOG[kind].price);else fail('farm_no_seed');
+          pens[slot]={item:kind,cycleId:input.requestId,startedAt:actionAt,readyAt:null};
+        }else{
+          if(!animal||animal.cycleId!==cycleId)fail('farm_stale_slot');
+          if(type==='feedAnimal'){
+            if(animal.readyAt!==null)fail('farm_already_cared');animal.readyAt=actionAt+CATALOG[kind].seconds*1000;
+          }else{
+            if(animal.readyAt===null||animal.readyAt>actionAt)fail('farm_not_ready');
+            const product=kind==='chicken'?'egg':'grownPig';if((farm.products[product]||0)>=9999)fail('farm_inventory_full');
+            farm.products[product]=(farm.products[product]||0)+1;farm.stats[product]=(farm.stats[product]||0)+1;
+            if(kind==='chicken'){animal.cycleId=input.requestId;animal.readyAt=null;}else pens[slot]=null;
+          }
+        }
+      }else if(['waterAll','feedAll','harvestAll','catchAll'].includes(type)){
         const fish=type==='feedAll'||type==='catchAll',care=type==='waterAll'||type==='feedAll',area=fish?farm.ponds:farm.plots;
         if(!Array.isArray(targets)||!targets.length||targets.length>24||new Set(targets.map(t=>t?.slot)).size!==targets.length)fail('farm_bad_request',400);
         for(const target of targets){
@@ -96,7 +120,7 @@ function createFarm({ db, now = () => Date.now() }) {
       } else if (['buy', 'sell'].includes(type)) {
         if (!Number.isInteger(qty) || qty < 1 || qty > 99 || !def) fail('farm_bad_item', 400);
         if (type === 'buy') {
-          if(def.type==='caught') fail('farm_bad_item',400);
+          if(['caught','produce'].includes(def.type)) fail('farm_bad_item',400);
           if (def.type === 'decor') {
             if (qty !== 1 || farm.decorations.includes(item)) fail('farm_already_owned');
             spend(def.price); farm.decorations.push(item);
