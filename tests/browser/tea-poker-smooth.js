@@ -12,7 +12,7 @@ async(page)=>{
       if(!seat)throw Error('No free test chair');const bounds=await live.locator('#cafe-canvas').boundingBox();await live.locator('#cafe-canvas').click({position:{x:seat.x*bounds.width/960,y:seat.y*bounds.height/640}});
       await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await live.setViewportSize(viewport);
     })();await live.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
-    const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('[data-tab=cards]').click();await live.locator('[data-card-mode=poker]').click();return entry;
+    const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('#context-button').click();await live.locator('[data-tab=cards]').click();await live.locator('[data-card-mode=poker]').click();return entry;
   }
   const state=async entry=>(await(await entry.context.request.get(base+'/api/tea/card-games/poker/current',{headers:entry.headers})).json()).game;
   async function mutations(entry){

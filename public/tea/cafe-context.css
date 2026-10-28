@@ -1,0 +1,42 @@
+/* Explore first. Only an explicitly opened station gets a panel. */
+.cafe-context{--cafe-bar:70px;--cafe-panel:min(360px,40vw);overflow:hidden}
+.cafe-context .cafe-shell:not(.play-mode):not(.brawl-mode){display:grid!important;grid-template-columns:minmax(0,1fr) var(--cafe-panel);gap:0;position:fixed;inset:var(--cafe-bar) 0 0;max-width:none;margin:0;padding:0;height:auto!important}
+.cafe-context.landscape-panel-closed .cafe-shell:not(.play-mode):not(.brawl-mode){grid-template-columns:minmax(0,1fr)}
+.cafe-context.landscape-panel-closed #side-panel{display:none!important}
+.cafe-context .cafe-shell:not(.play-mode):not(.brawl-mode) .world-card{position:relative!important;inset:auto!important;width:100%!important;height:100%!important;aspect-ratio:auto;max-height:none;border:0;outline:0;box-shadow:none}
+.cafe-context .cafe-shell:not(.play-mode):not(.brawl-mode) .side-panel{position:relative!important;inset:auto!important;width:auto!important;height:100%!important;min-height:0;max-height:none!important;border:0;border-left:2px solid #879b9b;outline:0;box-shadow:none;padding:0!important;overflow:hidden}
+.cafe-context .cafe-shell:not(.play-mode) .panel-tabs{position:relative!important;inset:auto!important;width:auto!important;height:52px!important;display:flex!important;flex-direction:row!important;gap:0!important;padding:0 44px 0 0!important;flex:none;background:#dce5e5!important}
+.cafe-context .cafe-shell:not(.play-mode) .panel-tabs button{flex:1;min-width:0!important;min-height:44px!important;padding:4px 2px!important;color:#334e50;font-size:10px!important}
+.cafe-context .cafe-shell:not(.play-mode) .panel-tabs button span{font-size:16px!important;margin:0}
+.cafe-context .cafe-shell:not(.play-mode) .panel-tabs button b{font-size:10px}
+.cafe-context .cafe-shell:not(.play-mode) .panel-view{min-height:0;height:auto!important;padding:14px!important;overflow:auto!important}
+.cafe-context .cafe-shell:not(.play-mode) .panel-close{display:block;top:7px;right:5px;width:34px;height:36px;z-index:60}
+.cafe-context .ticker,.cafe-context .world-caption{display:none}
+.cafe-context .interact-button,.cafe-context .context-button{position:absolute!important;left:auto!important;right:max(12px,env(safe-area-inset-right))!important;transform:none!important;min-width:112px;min-height:44px;border:2px solid #637e7c;border-radius:8px;box-shadow:0 3px #344f4d;font:700 12px system-ui;color:#2f4c4a;padding:9px 12px;z-index:4!important}
+.cafe-context .interact-button{bottom:max(14px,env(safe-area-inset-bottom))!important;background:#e6d3a0}
+.cafe-context .context-button{bottom:68px;background:#eef1db}
+.cafe-context .context-button:active,.cafe-context .interact-button:active{box-shadow:none}
+.cafe-context .context-button[hidden]{display:none!important}
+.cafe-context:not(.landscape-panel-closed) .context-button{display:none!important}
+.cafe-context .play-mode .context-button,.cafe-context .brawl-mode .context-button{display:none!important}
+.cafe-context .cafe-shell:not(.play-mode):not(.brawl-mode) .dpad{position:absolute!important;left:max(12px,env(safe-area-inset-left))!important;right:auto!important;bottom:max(12px,env(safe-area-inset-bottom))!important;z-index:3!important}
+.cafe-context .controls-hint{top:48px;bottom:auto;max-width:calc(100% - 24px)}
+.cafe-context #farm-link{display:inline-flex;align-items:center;text-decoration:none;color:#435e58;background:#e9ddbc;border:1px solid #9f9676;border-radius:5px;padding:6px 9px;font:700 12px system-ui;white-space:nowrap}
+.cafe-context .table-view.active{display:flex!important;flex-direction:column;overflow:hidden!important}
+.cafe-context #table-room{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0}
+.cafe-context #table-room[hidden]{display:none}
+.cafe-context .table-header{flex:none;margin:0;padding:0 0 6px;border:0}
+.cafe-context .table-header h2{font-size:17px;margin:3px 0}
+.cafe-context .table-header small{font-size:9px}
+.cafe-context .brawl-details{flex:none;max-height:45%;overflow:auto;border-top:1px solid #d1c5a4;border-bottom:1px solid #d1c5a4}
+.cafe-context .brawl-details summary{cursor:pointer;font-size:11px;font-weight:700;padding:6px 0;color:#637b70}
+.cafe-context .brawl-box{margin:0 0 5px;padding:6px;box-shadow:none;grid-template-columns:minmax(0,1fr) auto}
+.cafe-context .chat-list{flex:1;height:auto!important;min-height:28px;padding:5px 0;overflow:auto;overflow-wrap:anywhere}
+.cafe-context .emoji-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;margin:5px 0;flex:none}
+.cafe-context .emoji-row button{min-width:0;min-height:30px;padding:3px}
+.cafe-context .chat-form{flex:none;min-width:0;gap:5px;padding-bottom:3px}
+.cafe-context .chat-form input{width:0;font-size:12px;min-height:36px;padding:6px}
+.cafe-context .chat-form button{padding:6px;min-height:36px}
+.cafe-context .panel-view{overflow-x:hidden!important}
+@media(max-width:900px){.cafe-context{--cafe-bar:58px;--cafe-panel:min(330px,44vw)}}
+@media(max-width:900px) and (orientation:landscape){.cafe-context{--cafe-bar:48px}.cafe-context .cafe-shell:not(.play-mode) .panel-view{padding:10px!important}.cafe-context .cafe-shell:not(.play-mode) .panel-heading h1{font-size:19px}.cafe-context .cafe-shell:not(.play-mode) .panel-tabs button span{font-size:14px!important}.cafe-context .cafe-shell:not(.play-mode) .menu-grid{grid-template-columns:1fr}.cafe-context .controls-hint{display:none}}

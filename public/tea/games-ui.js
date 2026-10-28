@@ -9,7 +9,7 @@ window.TeaGamesUI=function({api,t,toast,id,myId,myTable,isVisible}){
   function timer(){if(!game||game.status!=='active')return;const el=$('#mini-clock');if(el)el.textContent=t('secondsLeft',{seconds:Math.max(0,Math.ceil((game.deadline-(Date.now()+offset))/1000))});}
   function render(force=false){
     document.querySelector('.games-view').classList.toggle('has-mini-game',Boolean(key));
-    document.body.classList.toggle('mini-game-fullscreen',Boolean(key));
+    document.body.classList.toggle('mini-game-fullscreen',Boolean(key)&&isVisible());
     if(!key){box.dataset.gameActive='false';box.innerHTML='<div class="mini-welcome"><span>✦</span><h3>'+t('pickOne')+'</h3><p>'+t('miniIntro')+'</p></div>';return;}
     document.querySelectorAll('[data-mini-game]').forEach(button=>button.classList.toggle('active',button.dataset.miniGame===key));
     const next=JSON.stringify({key,game:game?{...game,serverNow:undefined}:null,table:myTable()?.id,seats:myTable()?.seats.map(seat=>seat.walletId),locale:document.documentElement.lang});if(!force&&next===fingerprint){timer();return;}fingerprint=next;

@@ -19,12 +19,12 @@ async(page)=>{
       if(!seat)throw Error('No free test chair');const bounds=await live.locator('#cafe-canvas').boundingBox();await live.locator('#cafe-canvas').click({position:{x:seat.x*bounds.width/960,y:seat.y*bounds.height/640}});
       await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await live.setViewportSize(viewport);
     })();await live.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
-    const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('[data-tab=table]').click();return entry;
+    const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('#context-button').click();await live.locator('[data-tab=table]').click();return entry;
   }
   const fight=entry=>entry.page.evaluate(()=>window.__testFight);
   try{
     const host=await join('Minh <b>',1280),guest=await join('Lan bánh bèo',568);
-    await host.page.locator('#fight-opponent').selectOption(guest.id);await host.page.locator('#challenge-fight').click();await guest.page.locator('#fight-accept').click();
+    await host.page.locator('.brawl-details summary').click();await host.page.locator('#fight-opponent').selectOption(guest.id);await host.page.locator('#challenge-fight').click();await guest.page.locator('#fight-accept').click();
     await Promise.all(entries.map(entry=>entry.page.waitForFunction(()=>!document.querySelector('#brawl-stage').hidden&&!document.querySelector('dialog[open]'))));
     stage='countdown';const initial=await fight(host);if(initial.maxHealth!==20||initial.startsAt<=initial.serverNow)throw Error('Missing countdown or health');
     await host.page.bringToFront();await host.page.waitForFunction(()=>!document.querySelector('#brawl-punch').disabled);

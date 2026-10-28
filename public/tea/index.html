@@ -27,8 +27,9 @@
   <link rel="stylesheet" href="/assets/tea/cards-fullscreen.css?v=fit2">
   <link rel="stylesheet" href="/assets/tea/cards-skin.css?v=slate1">
   <link rel="stylesheet" href="/assets/tea/all-games-fullscreen.css?v=games2">
+  <link rel="stylesheet" href="/assets/tea/cafe-context.css?v=1">
 </head>
-<body>
+<body class="cafe-context landscape-panel-closed">
   <header class="topbar">
     <a class="brand" href="/tra-da"><span class="brand-cup">▰</span><span>LOC<span>LY</span></span><small data-i18n="brandSub">PIXEL TEA CAFÉ</small></a>
     <div class="online-pill"><i></i><b id="online-count">0</b> <span data-i18n="online">online</span></div>
@@ -50,6 +51,7 @@
       <div id="speech-layer" aria-live="polite"></div>
       <div class="controls-hint"><span class="desktop-only">WASD / ↑↓←→</span><span data-i18n="tapWalk">Tap anywhere to walk</span></div>
       <button id="interact-button" class="interact-button" hidden><span>●</span> <b>Sit</b></button>
+      <button id="context-button" class="context-button" aria-controls="side-panel" aria-expanded="false" hidden>Open table</button>
       <div class="dpad" aria-label="Movement controls">
         <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
       </div>
@@ -97,7 +99,7 @@
         <div id="table-empty" class="big-empty"><span>▱</span><h2 data-i18n="pullChair">Pull up a chair</h2><p data-i18n="tableEmpty">Walk to any free chair. If people are there, ask first or sit down anyway.</p></div>
         <div id="table-room" hidden>
           <div class="table-header"><div><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div></div>
-          <section class="brawl-box"><div><b data-i18n="pixelBrawl">Pixel brawl</b><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section>
+          <details class="brawl-details"><summary data-i18n="pixelBrawl">Pixel brawl</summary><section class="brawl-box"><div><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section></details>
           <div class="chat-list" id="chat-list" aria-live="polite"></div>
           <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
           <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>

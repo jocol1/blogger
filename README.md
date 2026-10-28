@@ -14,6 +14,10 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 
 ## Pixel Tea Café — `/tra-da`
 
+Menu quán mặc định đóng trên máy tính và điện thoại, kể cả khi tải lại. Đi tới ghế và bấm **Ngồi**, sau đó bấm **Mở bàn / E** để gọi món, chat hoặc chọn trò chơi. Nút Ngồi/Đứng dùng chung vị trí ở góc phải vùng quán. Đến gần mặt trước quầy có **Xem thực đơn / E**; chỉ xem giá, muốn đặt món vẫn cần ngồi. Đóng bảng bằng × hoặc Escape; rời quầy/đứng dậy cũng đóng bảng. Menu mở cạnh vùng quán, không phủ lên nhân vật; ô chat và nút gửi giữ trong khung, thách đấu nằm trong mục gấp mở. **Về quán** từ trò chơi đóng bảng và trả lại bản đồ; có thể mở bàn để xem lại ván đang chạy, đồng hồ server vẫn tiếp tục.
+
+PWA cache v34 thêm `cafe-context.css`; người đang mở bản cũ dùng nút cập nhật khi chơi xong, không cần cài APK mới. Chạy `tests/browser/tea-cafe-context.js` trên một phiên `node tests/preview.js` mới để kiểm tra menu, gần quầy, ghế, chat, QR giả, trò chơi và sao lưu. `tea-cards-mobile.js`, `tea-brawl-controls.js` và `tea-pwa-landscape.js` kiểm tra hồi quy bố cục/điều khiển. Các kích thước điện thoại là mô phỏng trình duyệt, chưa xác nhận trên thiết bị thật.
+
 ### Map 2 — nông trại riêng `/tra-da/farm`
 
 Nút **Map 2 · My farm / Nông trại** ở quán mở nông trại của chính mã ví hiện tại. Map 1 vẫn là quán chung để gặp nhau, chat và chơi cùng bàn. Sang nông trại sẽ trả ghế và rời ván đang tham gia; món đã mua và ví xu vẫn giữ nguyên. Nút **Về quán** luôn ở đầu màn hình nông trại. Cần tạo nhân vật ở quán trước lần đầu vào map 2.

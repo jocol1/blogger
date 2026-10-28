@@ -25,7 +25,7 @@ async(page)=>{
       const chair=await live.locator('#interact-button').getAttribute('data-seat');
       const seated=await context.request.post(base+'/api/tea/seats/'+chair,{headers,data:{}});if(!seated.ok())throw Error(mode.key+' could not sit');
       await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);
-      stage='start';await live.locator('[data-tab=cards]').click();await live.locator('[data-card-mode='+mode.key+']').click();
+      stage='start';await live.locator('#context-button').click();await live.locator('[data-tab=cards]').click();await live.locator('[data-card-mode='+mode.key+']').click();
       await live.locator(mode.bots).selectOption(mode.count);await live.locator(mode.start).click();
       await live.waitForFunction(selector=>document.querySelector(selector)?.children.length>0,mode.hand);
       for(const [width,height] of [[480,270],[568,320],[740,360],[844,390],[1024,600]]){
