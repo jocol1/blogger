@@ -35,13 +35,21 @@ async(page)=>{
     const firstMeter=await farm.locator('#fishing-meter').evaluate(el=>el.toDataURL());
     await farm.waitForTimeout(120);
     check(firstMeter!==await farm.locator('#fishing-meter').evaluate(el=>el.toDataURL()),'reduced motion keeps timing marker moving');
-    await farm.evaluate(async()=>{
-      const response=await fetch('/api/tea/farm',{headers:{'X-Wallet-Token':localStorage.getItem('locly-game-wallet')}}),state=await response.json(),offset=state.serverNow-Date.now(),start=state.farm.fishing.reelAt;
-      await new Promise(resolve=>{function tick(){const p=1-Math.abs(((Math.max(0,Date.now()+offset-start)/1000)%2)-1),button=document.querySelector('#fishing-action');if(p>.44&&p<.54&&!button.disabled){button.click();resolve();}else requestAnimationFrame(tick);}tick();});
-    });
+    for(let pull=0;pull<6;pull++){
+      const snapshot=await(await context.request.get(base+'/api/tea/farm',{headers})).json();if(snapshot.farm.fishing.status==='finished')break;
+      const step=snapshot.farm.fishing.reelStep;
+      await farm.evaluate(async({round,offset})=>{
+        await new Promise((resolve,reject)=>{const until=performance.now()+5000;function tick(){if(performance.now()>until)return reject(Error('Reel button did not become ready'));const pos=TeaFishingRules.position(Date.now()+offset,round.reelAt,round.period),button=document.querySelector('#fishing-action');if(pos>.45&&pos<.51&&!button.disabled){button.click();resolve();}else requestAnimationFrame(tick);}tick();});
+      },{round:snapshot.farm.fishing,offset:snapshot.serverNow-Date.now()});
+      await farm.waitForFunction(step=>Number(document.querySelector('#fishing-action').dataset.step)>step||document.querySelector('#fishing-action').dataset.phase==='finished',step);
+      if(pull===0){await farm.reload();await farm.waitForFunction(()=>document.querySelector('#gold').textContent==='120');await farm.locator('#map-toggle').click();await farm.locator('#map-destination').selectOption('lake');await farm.locator('#map-go').click();await farm.locator('#interact').click();check(await farm.locator('#fishing-action').getAttribute('data-step')==='1','reload resumes progress after a successful pull');}
+
+    }
     await farm.waitForFunction(()=>document.querySelector('#fishing-status')?.textContent.startsWith('Đã vào giỏ:'));
     const caught=await(await context.request.get(base+'/api/tea/farm',{headers})).json();
     check(caught.farm.products[caught.farm.fishing.caught]===1&&caught.farm.gold===120,'successful timing adds fish, not gold or paid coins');
+    check(caught.farm.fishing.hits>=2&&caught.farm.fishBook[caught.farm.fishing.caught]===1,'multiple pulls record collection exactly once');
+    await farm.locator('#fishing-switch').click();check(await farm.locator('.fish-species').count()===12,'fish book shows all twelve species');check(await farm.locator('.fish-species[data-discovered=true]').count()===1,'only caught species is marked discovered');await farm.screenshot({path:'E:/blogger/output/fishing-book.png'});await farm.locator('#fish-book button').click();
     await farm.screenshot({path:'E:/blogger/output/fishing-caught.png'});
     for(const viewport of [{width:568,height:320},{width:740,height:360},{width:844,height:390},{width:1024,height:768}]){
       await farm.setViewportSize(viewport);

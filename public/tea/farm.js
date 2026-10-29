@@ -23,6 +23,8 @@
   Object.assign(words.en,{tools:'Farm tools',tool_seed:'Seeds',tool_water:'Watering can',tool_feed:'Feed',tool_collect:'Basket',tool_inspect:'Hand',selectSeed:'Choose seeds',selectWater:'Equip watering can',selectFeed:'Equip feed',selectBasket:'Equip basket',pet:'Pet',adopt:'Choose an animal',inspect:'Inspect',findPatch:'Walk to a patch',details:'Details · Shift E',hint:'1–5 tools · E to use · tap to walk',growingStatus:'Growing peacefully'});
   Object.assign(words.vi,{tools:'Dụng cụ làm vườn',tool_seed:'Hạt giống',tool_water:'Bình tưới',tool_feed:'Thức ăn',tool_collect:'Giỏ thu hoạch',tool_inspect:'Bàn tay',selectSeed:'Chọn hạt giống',selectWater:'Cầm bình tưới',selectFeed:'Cầm thức ăn',selectBasket:'Cầm giỏ',pet:'Vuốt ve',adopt:'Chọn vật nuôi',inspect:'Xem',findPatch:'Đi tới luống đất',details:'Chi tiết · Shift E',hint:'1–5 chọn đồ · E sử dụng · chạm để đi',growingStatus:'Đang lớn yên bình'});
   const t = key => words[locale][key] || key, now = () => Date.now() + offset;
+  Object.assign(words.en,{fishBook:'Fish book',fishBookHint:'Species caught with your rod; selling keeps your collection.',caughtCount:'Caught',notCaught:'Not caught yet',common:'Common',uncommon:'Uncommon',rare:'Rare',legendary:'Legendary',fishingHint:'Watch the float, hook, then land 2–4 pulls in green. Three misses break the line. Free rod and bait.',fishingProgress:'Pulls',fishingTension:'Misses',fishingGood:'Good pull! Keep going.',fishingSlip:'Fish is fighting! Try the next green.',fishingReel:'Pull in GREEN · 3 misses break the line'});
+  Object.assign(words.vi,{fishBook:'Sổ cá',fishBookHint:'Loài đã câu được; bán cá vẫn giữ bộ sưu tập.',caughtCount:'Đã câu',notCaught:'Chưa câu được',common:'Phổ biến',uncommon:'Ít gặp',rare:'Hiếm',legendary:'Cực hiếm',fishingHint:'Chờ phao, giật cần, kéo trúng xanh 2–4 nhịp. Hụt 3 lần mới đứt dây. Cần và mồi miễn phí.',fishingProgress:'Kéo trúng',fishingTension:'Kéo hụt',fishingGood:'Kéo tốt! Thêm nhịp nữa nhé.',fishingSlip:'Cá vùng vẫy! Canh nhịp xanh tiếp nhé.',fishingReel:'Kéo lúc XANH · hụt 3 lần đứt dây'});
   const name = key => state?.catalog[key]?.[locale] || key;
   const portrait = () => matchMedia('(orientation:portrait) and (max-width:700px)').matches;
   function notice(key, error = false) { $('#notice-text').textContent = t(key); $('#notice').classList.toggle('error', error);$('#notice').classList.toggle('quiet',!error&&['welcome','saved'].includes(key)); $('#retry').hidden = !error; }
@@ -111,7 +113,7 @@
   function renderPanel() {
     hands?.refresh(Boolean(panel)||!entered||portrait());
     $('#panel').hidden = !panel;$('#map-toggle').setAttribute('aria-pressed',String(panel==='worldMap')); document.querySelectorAll('[data-panel]').forEach(b => b.setAttribute('aria-pressed', b.dataset.panel === panel));
-    $('#fishing-switch').hidden=true;
+    $('#fishing-switch').hidden=panel!=='fishing';$('#fishing-switch').textContent=t('fishBook');
     if (!panel) return; $('#panel-title').textContent = panelTarget?targetLabel(panelTarget):t(panel); const root = $('#panel-content');
     if(panel==='fishing'&&root.dataset.mode==='fishing'&&root.dataset.locale===locale&&fishingUi){syncFishingUi();return;}
     root.dataset.mode = panel;root.dataset.locale=locale;root.replaceChildren();fishingUi=null;
@@ -153,10 +155,11 @@
       const stepNodes=['castLine','hookFish','reelFish'].map((key,i)=>el('span',`${i+1} · ${t(key).replace('!','')}`,'',steps));
       const status=el('p','','fishing-status',box);status.id='fishing-status';status.setAttribute('role','status');
       const meter=el('canvas',undefined,'fishing-meter',box);meter.id='fishing-meter';meter.width=260;meter.height=28;meter.setAttribute('aria-label',t('fishingReel'));
+      const fight=el('div',undefined,'fishing-fight',box),progress=el('span','','',fight),tension=el('span','','line-tension',fight);
       const controls=el('div',undefined,'fishing-controls',box);
-      const primary=button(controls,'',()=>{const round=state?.farm.fishing;act(round&&round.status!=='finished'?{type:round.status==='waiting'?'hookFish':'reelFish',roundId:round.id}:{type:'castLine'});});primary.id='fishing-action';
+      const primary=button(controls,'',()=>{const round=state?.farm.fishing;act(round&&round.status!=='finished'?{type:round.status==='waiting'?'hookFish':'reelFish',roundId:round.id,...(round.version===2&&round.status==='reeling'?{reelStep:round.reelStep}:{})}:{type:'castLine',fishingVersion:2});});primary.id='fishing-action';
       const stop=button(controls,t('stopFishing'),()=>{const round=state?.farm.fishing;if(round&&round.status!=='finished')act({type:'stopFishing',roundId:round.id});});stop.classList.add('fishing-stop');
-      fishingUi={box,status,meter,primary,stop,stepNodes,controls};
+      fishingUi={box,status,meter,primary,stop,stepNodes,controls,fight,progress,tension};
       syncFishingUi();
     } else if (panel === 'shop') {
       const filter=el('select',undefined,'shop-filter',root);filter.setAttribute('aria-label',t('shop'));for(const type of ['crop','fish','animal','decor']){const option=el('option',t(type),'',filter);option.value=type;}filter.value=shopType;filter.onchange=()=>{shopType=filter.value;renderPanel();};
@@ -183,7 +186,7 @@
     const def = state?.catalog[item];
     if(def?.type==='animal'||def?.type==='produce'){TeaFarmRanch.item(c,p,item,time);}
     else if (def?.type === 'fish' || def?.type === 'caught') {
-      c.translate(0, Math.sin(time / 700 + x) * 2); p(c,'#244f55',-16,1,31,9); p(c,def.color,-12,-5,24,13); p(c,def.color,12,-9,6,20); p(c,'#e27c53',-4,-6,7,4); p(c,'#283e36',-10,-2,3,3); p(c,'#fff4cf',-8,-4,9,2);
+      c.translate(0, time?Math.sin(time / 700 + x) * 2:0);TeaFishArt(c,p,def,time);
     } else if (item === 'flowers') {
       p(c,'#966a49',-20,5,40,12); p(c,'#5c763f',-17,-2,34,8); for(let i=-12;i<=12;i+=12){p(c,i===0?'#e8c45c':'#e89a91',i-4,-12,8,9);p(c,'#fae8a1',i-1,-9,3,3);}
     } else if (item === 'lantern') { p(c,'#6a5542',-3,-12,6,33);p(c,'#715d44',-10,-24,20,5);p(c,'#e5bb69',-7,-19,14,14);p(c,'#ffe4a3',-3,-17,6,10); }
@@ -237,7 +240,7 @@
   function fishingPosition(at,start){return 1-Math.abs(((Math.max(0,at-start)/1000)%2)-1);}
   function syncFishingUi(){
     if(!fishingUi||panel!=='fishing')return;
-    const {primary:button,status,meter,box,stop,stepNodes,controls}=fishingUi;
+    const {primary:button,status,meter,box,stop,stepNodes,controls,fight,progress,tension}=fishingUi;
     const round=state?.farm.fishing,at=now(),active=round&&round.status!=='finished';
     let message=t('fishingHint'),label=t('castLine'),disabled=false;
     let phase=round?.status||'idle',step=0;
@@ -248,17 +251,22 @@
       label=t(bitten?'hookFish':'fishingWait');disabled=!bitten||at>round.expiresAt;
       if(bitten){phase='bite';step=1;}
     }else if(round?.status==='reeling'){
-      message=t(at>round.expiresAt?'fishingEscaped':'fishingReel');label=t('reelFish');disabled=at<round.reelAt||at>round.expiresAt;
-      step=2;const pos=fishingPosition(at,round.reelAt);
-      p(c,'#d2b98c',0,5,260,18);p(c,'#72a966',86,5,88,18);p(c,'#def1bc',88,7,84,3);p(c,'#345044',Math.round(pos*252),0,8,28);p(c,'#fff6d6',Math.round(pos*252)+2,2,4,7);
+      message=t(at>round.expiresAt?'fishingEscaped':'fishingReel');label=`${t('reelFish')} · ${Math.max(0,Math.ceil((round.expiresAt-at)/1000))}s`;disabled=at<round.reelAt||at>round.expiresAt;
+      step=2;const pos=TeaFishingRules.position(at,round.reelAt,round.period);
+      if(round.version===2&&round.lastPull&&at<round.reelAt)message=t(round.lastPull==='hit'?'fishingGood':'fishingSlip');
+      const zone=(round.width||.34)*260,left=(260-zone)/2;p(c,'#d2b98c',0,5,260,18);p(c,'#72a966',left,5,zone,18);p(c,'#def1bc',left+2,7,zone-4,3);p(c,'#345044',Math.round(pos*252),0,8,28);p(c,'#fff6d6',Math.round(pos*252)+2,2,4,7);
     }else if(round?.status==='finished'){
-      message=round.reason==='caught'?`${t('fishingCaught')} ${name(round.caught)} · ${t('fishingValue')} ${state.catalog[round.caught].sell} ${t('gold')}`:t({early:'fishingEarly',missed:'fishingMissed',stopped:'fishingStopped',escaped:'fishingEscaped'}[round.reason]||'fishingEscaped');
+      message=round.reason==='caught'?`${t('fishingCaught')} ${name(round.caught)} · ${t(state.catalog[round.caught].rarity)} · ${t('fishingValue')} ${state.catalog[round.caught].sell} ${t('gold')}`:t({early:'fishingEarly',missed:'fishingMissed',stopped:'fishingStopped',escaped:'fishingEscaped'}[round.reason]||'fishingEscaped');
       const remaining=Math.ceil((round.finishedAt+3000-at)/1000);if(remaining>0){label=`${t('fishingCooldown')} ${remaining}s`;disabled=true;}
     }
     if(round?.status!=='reeling'){
       if(round?.caught){drawItem(c,round.caught,130,14,.85,1);}
       else{p(c,'#d8e5d7',0,12,260,3);for(let i=0;i<5;i++){const x=reducedMotion.matches?i*55:(performance.now()/35+i*55)%260;p(c,'#8cb3a7',x,12,15,3);}p(c,phase==='bite'?'#d48d45':'#6c9991',126,4,8,10);p(c,'#fff8df',126,4,8,4);}
     }
+    const v2=round?.version===2&&round.status==='reeling';
+    const progressText=v2?`${t('fishingProgress')} ${round.hits}/${round.required}`:t('fishingFree'),tensionText=v2?`${t('fishingTension')} ${round.misses}/3`:'';
+    if(progress.textContent!==progressText)progress.textContent=progressText;if(tension.textContent!==tensionText)tension.textContent=tensionText;fight.dataset.last=round?.lastPull||'';
+    $('#fishing-switch').disabled=Boolean(active)||busy;
     if(busy)label=locale==='vi'?'Đang xử lý…':'One moment…';
     if(box.dataset.phase!==phase)box.dataset.phase=phase;
     if(box.getAttribute('aria-busy')!==String(busy))box.setAttribute('aria-busy',String(busy));
@@ -266,6 +274,7 @@
     stepNodes.forEach((node,i)=>{node.classList.toggle('current',i===step);node.classList.toggle('done',i<step||round?.reason==='caught');});
     if(status.textContent!==message)status.textContent=message;if(button.textContent!==label)button.textContent=label;
     button.disabled=disabled||busy||Boolean(pending);button.dataset.phase=round?.status||'idle';
+    button.dataset.step=String(round?.reelStep||0);
   }
   function drawPondWater(time){
     ctx.save();ctx.beginPath();ctx.rect(680,262,188,223);ctx.clip();
@@ -284,12 +293,14 @@
     const bite=active&&round.status==='waiting'&&now()>=round.biteAt&&now()<=round.expiresAt;
     const cast=active&&!reducedMotion.matches?Math.min(1,Math.max(0,(now()-round.castAt)/500)):1;
     const reeling=active&&round.status==='reeling',tug=reducedMotion.matches?0:reeling?Math.sin(time/180)*3:0;
-    const floatX=763+32*cast,floatY=480-40*cast-Math.sin(cast*Math.PI)*32+(reducedMotion.matches?0:Math.sin(time/(bite?65:400))*(bite?6:2));
+    const landed=reeling&&round.version===2?round.hits/round.required:0;
+    const floatX=763+32*cast,floatY=480-40*cast+landed*24-Math.sin(cast*Math.PI)*32+(reducedMotion.matches?0:Math.sin(time/(bite?65:400))*(bite?6:2));
     const tipX=763-tug,tipY=480-(reeling?12:0);
     ctx.strokeStyle='#755238';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(789,526);ctx.lineTo(tipX,tipY);ctx.stroke();
     ctx.strokeStyle='#c4a36d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(789,523);ctx.lineTo(tipX,tipY);ctx.stroke();
     if(active){
-      ctx.strokeStyle='#ecdfb3';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(tipX,tipY);ctx.quadraticCurveTo(768,reeling?430:450,floatX,floatY);ctx.stroke();
+      ctx.strokeStyle=round.misses>=2?'#e4a06a':'#ecdfb3';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(tipX,tipY);ctx.quadraticCurveTo(768,reeling?430:450,floatX,floatY);ctx.stroke();
+      if(reeling){const sway=reducedMotion.matches?0:Math.sin(time/230)*10;p(ctx,'#507f73',floatX-16+sway,floatY+6,22,6);p(ctx,'#507f73',floatX+6+sway,floatY+3,6,11);if(round.lastPull&&now()<round.reelAt){for(let i=0;i<4;i++)p(ctx,'#d6eada',floatX-16+i*10,floatY-8+(i%2)*5,3,5);}}
       if(cast===1)for(let i=0;i<2;i++){const ripple=reducedMotion.matches?.5:(time/1100+i*.5)%1;ctx.globalAlpha=(1-ripple)*.55;ctx.strokeStyle='#e2f0d8';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(floatX,449,9+ripple*22,3+ripple*7,0,0,Math.PI*2);ctx.stroke();}ctx.globalAlpha=1;
       p(ctx,'#fff5cd',floatX-3,floatY-5,7,6);p(ctx,bite?'#f09144':'#c65745',floatX-3,floatY+1,7,6);
       if(bite)badge('!',floatX,floatY-21,'#ffe28e');
@@ -410,6 +421,7 @@
   window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel){if(e.shiftKey)inspectNearby();else interact();}return;}if(key==='escape'){openPanel('');return;}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(panel===b.dataset.panel?'':b.dataset.panel));$('#close-panel').onclick=()=>openPanel('');
+  $('#fishing-switch').onclick=()=>{if(!busy&&(!state?.farm.fishing||state.farm.fishing.status==='finished')){controls.reset();TeaFishBook({state,locale,t,draw:drawItem});}};
   $('#interact').onclick=interact;$('#farm-details').onclick=inspectNearby;
   $('#map-toggle').onclick=()=>openPanel(panel==='worldMap'?'':'worldMap');
   $('#lang').onclick=()=>{locale=locale==='en'?'vi':'en';applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));};

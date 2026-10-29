@@ -10,9 +10,7 @@ const CATALOG = {
   guppy: { en: 'Guppy', vi: 'Cá bảy màu', type: 'fish', price: 10, sell: 18, seconds: 120, color: '#f2a66b' },
   carp: { en: 'Carp', vi: 'Cá chép', type: 'fish', price: 24, sell: 46, seconds: 600, color: '#e0c1a2' },
   koi: { en: 'Koi', vi: 'Cá koi', type: 'fish', price: 45, sell: 90, seconds: 1800, color: '#fff0d5' },
-  perch: { en:'Perch', vi:'Cá rô', type:'caught', sell:5, color:'#a4b789' },
-  tilapia: { en:'Tilapia', vi:'Cá rô phi', type:'caught', sell:8, color:'#9ab6c4' },
-  snakehead: { en:'Snakehead', vi:'Cá lóc', type:'caught', sell:12, color:'#8b9982' },
+  ...require('./fish-catalog'),
   chicken: { en:'Chick',vi:'Gà con',type:'animal',price:20,seconds:180,color:'#eed9a1' },
   pig: { en:'Piglet',vi:'Heo con',type:'animal',price:35,seconds:600,color:'#e5a5a0' },
   egg: { en:'Egg',vi:'Trứng gà',type:'produce',sell:8,color:'#f5e8c6' },
@@ -61,7 +59,7 @@ function createFarm({ db, now = () => Date.now() }) {
     const allowed = ['raiseAnimal','feedAnimal','collectAnimal','waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase, fishingVersion:input.fishingVersion, reelStep:input.reelStep })).digest('hex');
     const attempt = db.collection('tea_farm_actions').doc(crypto.createHash('sha256').update(id + ':' + input.requestId).digest('hex'));
     // Judge the reel when its request reaches the service, not after database latency/retries.
     const actionAt = now();
