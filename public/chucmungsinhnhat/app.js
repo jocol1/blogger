@@ -2,6 +2,10 @@
   'use strict';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  // start the intro once fonts are in, so the title does not jump
+  const go = () => requestAnimationFrame(() => document.documentElement.classList.add('loaded'));
+  if (document.fonts && document.fonts.ready) Promise.race([document.fonts.ready, new Promise(r => setTimeout(r, 1200))]).then(go); else go();
+
   // birthday: 3 Nov 2026, Vietnam time
   const DAY_START = new Date('2026-11-03T00:00:00+07:00').getTime();
   const DAY_END = DAY_START + 24 * 3600 * 1000;
@@ -9,6 +13,17 @@
   // countdown
   const main = document.getElementById('cd-main');
   const sub = document.getElementById('cd-sub');
+  let first = true;
+  function countUp(n, unit) {
+    const t0 = performance.now() + 900, dur = 900;
+    const step = now => {
+      const k = Math.min(1, Math.max(0, (now - t0) / dur));
+      main.textContent = 'Còn ' + Math.round(n * (1 - Math.pow(1 - k, 3))) + unit;
+      if (k < 1) requestAnimationFrame(step); else document.getElementById('countdown').classList.add('is-pop');
+    };
+    main.textContent = 'Còn 0' + unit;
+    requestAnimationFrame(step);
+  }
   function tick() {
     const now = Date.now();
     if (now >= DAY_END) { main.textContent = 'Chúc mừng sinh nhật Đan'; sub.textContent = 'hẹn năm sau nhé'; return; }
@@ -16,7 +31,9 @@
     const left = DAY_START - now;
     const d = Math.floor(left / 86400000);
     const h = Math.floor(left % 86400000 / 3600000);
-    main.textContent = d > 0 ? 'Còn ' + d + ' ngày' : 'Còn ' + h + ' giờ';
+    const unit = d > 0 ? ' ngày' : ' giờ', n = d > 0 ? d : h;
+    if (first && !reduce && n > 1) countUp(n, unit); else main.textContent = 'Còn ' + n + unit;
+    first = false;
     sub.textContent = 'đến sinh nhật Đan';
   }
   tick();
@@ -24,7 +41,7 @@
 
   // entrances, staggered per section
   const groups = [
-    '.invite-title, .invite-note, .invite-date, .invite-foot',
+    '.invite-note, .invite-date, .countdown, .invite-foot .link',
         '.about h2, .about-big, .about-text, .about-actions, .pic-tall, .pic-square',
     '.reply-lead, .reply-card',
     '.back-msg p, .back-addr'
@@ -33,7 +50,7 @@
   groups.forEach(sel => {
     document.querySelectorAll(sel).forEach((el, i) => {
       el.classList.add('rise');
-      el.style.setProperty('--d', `${Math.min(i, 6) * 70}ms`);
+      el.style.setProperty('--d', `${(sel === groups[0] ? 750 : 0) + Math.min(i, 6) * 90}ms`);
       targets.push(el);
     });
   });
@@ -52,6 +69,12 @@
   const bloom = document.querySelector('.story-photos video');
   if (bloom && reduce) bloom.pause();
   const steps = [...document.querySelectorAll('.step')];
+  steps.forEach(s => {
+    const t = s.querySelector('.step-title');
+    const words = t.textContent.trim().split(' ');
+    t.setAttribute('aria-label', t.textContent.trim());
+    t.innerHTML = words.map((w, i) => '<span class="w" aria-hidden="true" style="--i:' + i + '">' + w + '</span>').join(' ');
+  });
   let current = 0;
   function show(i) {
     if (i === current) return;
@@ -109,6 +132,8 @@
     out.hidden = false;
     if (!nameInput.value.trim()) { nameInput.focus(); text.textContent = 'Bạn cho Đan biết tên bạn nhé.'; hint.textContent = ''; return; }
     const message = compose();
+    const b = document.getElementById('wish-send').getBoundingClientRect();
+    window.fx && window.fx.confetti(b.left + b.width / 2, b.top + b.height / 2, 110);
     text.textContent = message;
     if (navigator.share) {
       try { await navigator.share({ text: message }); hint.textContent = 'Đã mở danh sách ứng dụng để bạn gửi cho Đan.'; return; } catch (err) { if (err && err.name === 'AbortError') { hint.textContent = ''; return; } }
@@ -118,4 +143,6 @@
   copyBtn.addEventListener('click', async () => {
     hint.textContent = (await copy(text.textContent)) ? copied : manual;
   });
+
+  if (Date.now() >= DAY_START && Date.now() < DAY_END) setTimeout(() => window.fx && window.fx.confetti(innerWidth / 2, innerHeight * 0.4, 140), 1800);
 })();

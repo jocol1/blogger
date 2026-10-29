@@ -14,13 +14,16 @@
   <link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
   <script>document.documentElement.classList.add("js")</script>
   <link rel="stylesheet" href="/assets/chucmungsinhnhat/style.css">
+  <script src="/assets/chucmungsinhnhat/fx.js" defer></script>
   <script src="/assets/chucmungsinhnhat/app.js" defer></script>
 </head>
 <body>
   <header class="hero" id="thiep">
     <img class="hero-photo" src="/assets/chucmungsinhnhat/img/quynh-giot-suong.jpg" width="1920" height="2560" alt="Một đóa quỳnh trắng đẫm sương nở trong bóng tối">
+    <canvas class="hero-petals" aria-hidden="true"></canvas>
     <div class="invite">
-      <h1 class="invite-title">Sinh nhật<br>Thảo Đan</h1>
+      <div class="invite-arch"><img src="/assets/chucmungsinhnhat/img/quynh-can-canh.jpg" width="1920" height="1280" alt="Cận cảnh một đóa quỳnh trắng đang nở"></div>
+      <h1 class="invite-title"><span class="line" style="--i:0"><span>Sinh nhật</span></span> <span class="line" style="--i:1"><span>Thảo Đan</span></span></h1>
       <div class="invite-body">
         <p class="invite-note">Nguyễn Quỳnh Thảo Đan mời bạn nhớ một ngày: 3 tháng 11 là sinh nhật của Đan.</p>
         <p class="invite-date">Ngày 3 tháng 11</p>
@@ -67,8 +70,8 @@
         <div class="about-actions"><a class="btn" href="#loi-chuc">Gửi lời chúc</a> <a class="link" href="#thiep">Về đầu thiệp</a></div>
       </div>
       <div class="about-pics">
-        <img class="pic-tall" src="/assets/chucmungsinhnhat/img/quynh-ca-cay.jpg" width="1500" height="2000" alt="Cây quỳnh nở chín bông trong một đêm" loading="lazy">
-        <img class="pic-square" src="/assets/chucmungsinhnhat/img/quynh-hoa.jpg" width="1920" height="1822" alt="Một đóa hoa nở về đêm, nhụy trắng trên nền tối" loading="lazy">
+        <img class="pic-tall" data-par="36" src="/assets/chucmungsinhnhat/img/quynh-ca-cay.jpg" width="1500" height="2000" alt="Cây quỳnh nở chín bông trong một đêm" loading="lazy">
+        <img class="pic-square" data-par="-70" src="/assets/chucmungsinhnhat/img/quynh-hoa.jpg" width="1920" height="1822" alt="Một đóa hoa nở về đêm, nhụy trắng trên nền tối" loading="lazy">
       </div>
     </section>
 
