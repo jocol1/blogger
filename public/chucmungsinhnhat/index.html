@@ -3,15 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#0e1f1c">
-  <meta name="description" content="Thiệp mời sinh nhật Nguyễn Quỳnh Thảo Đan: ngày 3 tháng 11 là sinh nhật của Đan.">
-  <meta property="og:title" content="Sinh nhật Thảo Đan · 3 tháng 11">
-  <meta property="og:description" content="Quỳnh chỉ nở một đêm. Ngày 3 tháng 11 là sinh nhật Đan, bạn nhớ nhé.">
-  <meta property="og:image" content="/assets/chucmungsinhnhat/img/quynh-giot-suong.jpg">
-  <title>Sinh nhật Thảo Đan · 3 tháng 11</title>
+  <meta name="theme-color" content="#ffe3ec">
+  <meta name="description" content="Thiệp sinh nhật Nguyễn Quỳnh Thảo Đan, ngày 3 tháng 11.">
+  <meta property="og:title" content="Happy Birthday Thảo Đan · 3 tháng 11">
+  <meta property="og:description" content="Ngày 3 tháng 11 là sinh nhật Thảo Đan. Gửi Đan một lời chúc nhé!">
+  <title>Happy Birthday Thảo Đan · 3 tháng 11</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;1,400;1,600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Pacifico&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
   <script>document.documentElement.classList.add("js")</script>
   <link rel="stylesheet" href="/assets/chucmungsinhnhat/style.css">
   <script src="/assets/chucmungsinhnhat/fx.js" defer></script>
@@ -19,96 +18,88 @@
 </head>
 <body>
   <header class="hero" id="thiep">
-    <img class="hero-photo" src="/assets/chucmungsinhnhat/img/quynh-giot-suong.jpg" width="1920" height="2560" alt="Một đóa quỳnh trắng đẫm sương nở trong bóng tối">
-    <canvas class="hero-petals" aria-hidden="true"></canvas>
-    <div class="invite">
-      <div class="invite-arch"><img src="/assets/chucmungsinhnhat/img/quynh-can-canh.jpg" width="1920" height="1280" alt="Cận cảnh một đóa quỳnh trắng đang nở"></div>
-      <h1 class="invite-title"><span class="line" style="--i:0"><span>Sinh nhật</span></span> <span class="line" style="--i:1"><span>Thảo Đan</span></span></h1>
-      <div class="invite-body">
-        <p class="invite-note">Nguyễn Quỳnh Thảo Đan mời bạn nhớ một ngày: 3 tháng 11 là sinh nhật của Đan.</p>
-        <p class="invite-date">Ngày 3 tháng 11</p>
-      </div>
-      <div class="invite-foot">
-        <p class="countdown" id="countdown" aria-live="off"><strong id="cd-main">Còn 5 ngày</strong><span id="cd-sub">đến sinh nhật Đan</span></p>
-        <a class="btn" href="#loi-chuc">Gửi lời chúc cho Đan</a>
-        <a class="link" href="#dem-quynh">Vì sao là hoa quỳnh</a>
-      </div>
+    <div class="deco" aria-hidden="true">
+      <span style="--x:6%;--y:12%;--s:26px;--d:0s;--c:#ff8fb1">♥</span>
+      <span style="--x:88%;--y:9%;--s:22px;--d:-2s;--c:#ffc94d">★</span>
+      <span style="--x:14%;--y:72%;--s:20px;--d:-4s;--c:#8fd9c0">✦</span>
+      <span style="--x:80%;--y:64%;--s:30px;--d:-1s;--c:#ff8fb1">♥</span>
+      <span style="--x:46%;--y:4%;--s:18px;--d:-3s;--c:#b9a6ff">✦</span>
+      <span style="--x:94%;--y:38%;--s:18px;--d:-5s;--c:#8fd9c0">♥</span>
+      <span style="--x:3%;--y:42%;--s:20px;--d:-6s;--c:#ffc94d">★</span>
+      <span style="--x:70%;--y:90%;--s:22px;--d:-2.5s;--c:#b9a6ff">♥</span>
+      <span style="--x:24%;--y:93%;--s:18px;--d:-4.5s;--c:#ff8fb1">★</span>
     </div>
+
+    <article class="card">
+      <h1 class="title">
+        <span class="script">Happy Birthday</span>
+        <span class="name" id="name">Thảo Đan</span>
+      </h1>
+      <svg class="bow" viewBox="0 0 64 36" aria-hidden="true">
+        <path d="M32 18C24 6 6 2 6 14s18 10 26 4z" fill="#ff8fb1"/>
+        <path d="M32 18c8-12 26-16 26-4s-18 10-26 4z" fill="#ff8fb1"/>
+        <path d="M29 19l-9 15 7-2 3 3 2-16zM35 19l9 15-7-2-3 3-2-16z" fill="#ff6f9c"/>
+        <circle cx="32" cy="18" r="5" fill="#ff6f9c"/>
+      </svg>
+      <p class="invite">Mời bạn cùng mừng sinh nhật<br><b>Nguyễn Quỳnh Thảo Đan</b></p>
+      <p class="date">Ngày 3 tháng 11</p>
+      <p class="countdown" id="countdown">Còn 4 ngày nữa thôi!</p>
+
+      <button class="cake" id="cake" type="button" aria-label="Thổi nến trên bánh kem">
+        <svg viewBox="0 0 240 230" aria-hidden="true">
+          <ellipse cx="120" cy="208" rx="104" ry="13" fill="#ffd6e2"/>
+          <rect x="30" y="124" width="180" height="80" rx="16" fill="#ffb3c7"/>
+          <path d="M30 140Q30 124 46 124H194Q210 124 210 140V146q-10 14-20 0q-11 18-22 0q-11 12-22 0q-11 16-22 0q-11 12-22 0q-11 18-22 0q-11 12-22 0q-14 16-28 0Z" fill="#fff6ef"/>
+          <g class="sprinkles">
+            <rect x="52" y="168" width="12" height="4" rx="2" fill="#8fd9c0" transform="rotate(-25 58 170)"/>
+            <rect x="84" y="182" width="12" height="4" rx="2" fill="#ffc94d" transform="rotate(20 90 184)"/>
+            <rect x="112" y="166" width="12" height="4" rx="2" fill="#b9a6ff" transform="rotate(-10 118 168)"/>
+            <rect x="142" y="184" width="12" height="4" rx="2" fill="#fff6ef" transform="rotate(30 148 186)"/>
+            <rect x="170" y="170" width="12" height="4" rx="2" fill="#8fd9c0" transform="rotate(-35 176 172)"/>
+            <rect x="64" y="190" width="12" height="4" rx="2" fill="#b9a6ff" transform="rotate(12 70 192)"/>
+            <rect x="184" y="190" width="10" height="4" rx="2" fill="#ffc94d" transform="rotate(-18 189 192)"/>
+          </g>
+          <rect x="62" y="74" width="116" height="56" rx="14" fill="#bdebd9"/>
+          <path d="M62 88Q62 74 76 74H164Q178 74 178 88V92q-10 12-19 0q-10 16-20 0q-10 12-19 0q-10 16-20 0q-10 12-19 0q-10 16-19 0Z" fill="#fff6ef"/>
+          <circle cx="82" cy="114" r="4" fill="#fff6ef"/><circle cx="104" cy="118" r="4" fill="#ff8fb1"/>
+          <circle cx="126" cy="112" r="4" fill="#fff6ef"/><circle cx="148" cy="118" r="4" fill="#ff8fb1"/>
+          <circle cx="166" cy="110" r="4" fill="#fff6ef"/>
+          <g class="candles">
+            <g><rect x="91" y="42" width="10" height="34" rx="4" fill="#fff1b8"/><rect x="91" y="50" width="10" height="5" fill="#ff8fb1"/><rect x="91" y="62" width="10" height="5" fill="#ff8fb1"/></g>
+            <g><rect x="115" y="36" width="10" height="40" rx="4" fill="#d9ccff"/><rect x="115" y="46" width="10" height="5" fill="#fff6ef"/><rect x="115" y="60" width="10" height="5" fill="#fff6ef"/></g>
+            <g><rect x="139" y="42" width="10" height="34" rx="4" fill="#c8f0e0"/><rect x="139" y="50" width="10" height="5" fill="#ffc94d"/><rect x="139" y="62" width="10" height="5" fill="#ffc94d"/></g>
+          </g>
+          <g class="flame" style="--fd:0s"><ellipse cx="96" cy="30" rx="7" ry="11" fill="#ffc94d"/><ellipse cx="96" cy="33" rx="3.5" ry="6" fill="#fff5c2"/></g>
+          <g class="flame" style="--fd:-.3s"><ellipse cx="120" cy="24" rx="7" ry="11" fill="#ffc94d"/><ellipse cx="120" cy="27" rx="3.5" ry="6" fill="#fff5c2"/></g>
+          <g class="flame" style="--fd:-.6s"><ellipse cx="144" cy="30" rx="7" ry="11" fill="#ffc94d"/><ellipse cx="144" cy="33" rx="3.5" ry="6" fill="#fff5c2"/></g>
+          <g class="smoke"><circle cx="96" cy="30" r="5"/><circle cx="120" cy="24" r="5"/><circle cx="144" cy="30" r="5"/></g>
+        </svg>
+      </button>
+      <p class="hint" id="hint" role="status">Chạm vào bánh để thổi nến nhé</p>
+
+      <a class="btn" href="#loi-chuc">Gửi lời chúc cho Đan</a>
+    </article>
   </header>
 
   <main>
-    <section class="story" id="dem-quynh" aria-labelledby="story-title">
-      <h2 class="sr-only" id="story-title">Vì sao là hoa quỳnh</h2>
-      <div class="story-stage">
-        <div class="story-photos" aria-hidden="true">
-          <video class="is-on" src="/assets/chucmungsinhnhat/img/quynh-no-dem.webm" poster="/assets/chucmungsinhnhat/img/quynh-no-dem-poster.jpg" width="854" height="480" muted loop playsinline autoplay preload="metadata"></video>
-          <img src="/assets/chucmungsinhnhat/img/quynh-can-canh.jpg" width="1920" height="1280" alt="" loading="lazy">
-          <img src="/assets/chucmungsinhnhat/img/quynh-hoa.jpg" width="1920" height="1822" alt="" loading="lazy">
-        </div>
-        <div class="story-words">
-          <article class="step is-on" data-step="0">
-            <h3 class="step-title">Hoa quỳnh chỉ nở một đêm.</h3>
-            <p class="step-text">Cả năm lặng lẽ, rồi một tối nở trắng cả góc nhà. Ai thấy được thì nhớ mãi.</p>
-          </article>
-          <article class="step" data-step="1">
-            <h3 class="step-title">Tên Đan có chữ Quỳnh.</h3>
-            <p class="step-text">Quỳnh là tên một loài hoa nở về đêm, Thảo là cỏ cây. Nghe tên thôi đã thấy dịu dàng.</p>
-          </article>
-          <article class="step" data-step="2">
-            <h3 class="step-title">Ngày 3 tháng 11 là sinh nhật Đan.</h3>
-            <p class="step-text">Một ngày mỗi năm để mọi người nhớ đến Đan.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="about" id="loi-moi" aria-labelledby="about-title">
-      <div class="about-col">
-        <h2 id="about-title">Bạn nhớ ngày này nhé</h2>
-        <p class="about-big">3 tháng 11</p>
-        <p class="about-text">Không cần quà, không cần chuẩn bị gì. Chỉ cần bạn nhớ hôm đó là sinh nhật Đan, và gửi cho Đan một lời chúc là Đan vui rồi.</p>
-        <div class="about-actions"><a class="btn" href="#loi-chuc">Gửi lời chúc</a> <a class="link" href="#thiep">Về đầu thiệp</a></div>
-      </div>
-      <div class="about-pics">
-        <img class="pic-tall" data-par="36" src="/assets/chucmungsinhnhat/img/quynh-ca-cay.jpg" width="1500" height="2000" alt="Cây quỳnh nở chín bông trong một đêm" loading="lazy">
-        <img class="pic-square" data-par="-70" src="/assets/chucmungsinhnhat/img/quynh-hoa.jpg" width="1920" height="1822" alt="Một đóa hoa nở về đêm, nhụy trắng trên nền tối" loading="lazy">
-      </div>
-    </section>
-
-    <section class="reply" id="loi-chuc" aria-labelledby="reply-title">
-      <p class="reply-lead">Viết vài chữ cho Đan nhé. Ngắn thôi cũng được.</p>
-      <form class="reply-card" id="wish" novalidate>
-        <h2 id="reply-title">Chúc mừng sinh nhật Đan</h2>
+    <section class="wishes" id="loi-chuc" aria-labelledby="wish-title">
+      <form class="wish-card" id="wish" novalidate>
+        <h2 id="wish-title">Gửi lời chúc cho Đan</h2>
+        <p class="wish-sub">Viết vài dòng thật dễ thương, Đan sẽ vui lắm đó!</p>
         <label class="field"><span>Tên của bạn</span><input id="wish-name" name="name" autocomplete="name" maxlength="40" placeholder="Ví dụ: Minh Anh"></label>
-        <label class="field"><span>Lời chúc</span><textarea id="wish-text" name="wish" rows="3" maxlength="240" placeholder="Chúc Đan luôn vui, luôn xinh, thật nhiều niềm vui…"></textarea></label>
-        <button class="bar" type="submit" id="wish-send">Gửi lời chúc cho Đan</button>
-        <div class="reply-out" id="reply-out" hidden>
-          <p id="reply-text"></p>
-          <button class="bar bar-soft" type="button" id="reply-copy">Sao chép lời chúc</button>
-          <p class="reply-hint" id="reply-hint" role="status"></p>
+        <label class="field"><span>Lời chúc</span><textarea id="wish-text" name="wish" rows="3" maxlength="240" placeholder="Chúc Đan tuổi mới thật vui, thật xinh…"></textarea></label>
+        <button class="btn btn-wide" type="submit" id="wish-send">Gửi lời chúc</button>
+        <div class="wish-out" id="wish-out" hidden>
+          <p id="wish-result"></p>
+          <button class="btn btn-soft btn-wide" type="button" id="wish-copy">Sao chép lời chúc</button>
+          <p class="wish-hint" id="wish-hint" role="status"></p>
         </div>
       </form>
     </section>
   </main>
 
-  <footer class="back">
-    <div class="back-card">
-      <span class="scallop scallop-top" aria-hidden="true"></span>
-      <div class="back-inner">
-        <div class="back-msg">
-          <p class="back-sign">Cảm ơn bạn.</p>
-          <p>Cảm ơn bạn đã nhớ đến ngày sinh nhật của Đan.</p>
-          <p class="back-from">Thảo Đan</p>
-        </div>
-        <div class="back-addr">
-          <img class="stamp" src="/assets/chucmungsinhnhat/img/quynh-can-canh.jpg" width="88" height="117" alt="" loading="lazy">
-          <a href="#thiep">Sinh nhật 3 tháng 11</a>
-          <a href="#dem-quynh">Vì sao là hoa quỳnh</a>
-          <a href="#loi-chuc">Gửi lời chúc</a>
-        </div>
-      </div>
-      <p class="imprint">Ảnh hoa quỳnh: Gon ksg, Pinakpani, Bellosayshello, Fischer.H (CC BY-SA) và video "Epiphyllum Time-lapse" của Grant Nielsen (CC BY 3.0), qua Wikimedia Commons.</p>
-    </div>
+  <footer class="foot">
+    <p>Làm bằng cả trái tim cho Thảo Đan <span aria-hidden="true">♥</span> 3.11</p>
   </footer>
 </body>
 </html>
