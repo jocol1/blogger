@@ -138,7 +138,7 @@ function attachTeaSockets(io, service) {
   io.on('connection', socket => {
     socket.emit('tea:ready', socket.data.tea);
     socket.broadcast.emit('tea:state-request');
-    socket.on('tea:move', input => service.move(socket.data.walletId, input));
+    socket.on('tea:move', input => service.move(socket.data.walletId, input, socket.id));
     socket.on('tea:fight-input', (input, acknowledge) => {
       try {
         const fight = service.fightInput(socket.data.walletId, socket.id, input);

@@ -4,11 +4,12 @@
   let token = localStorage.getItem(WALLET), locale = localStorage.getItem(LANGUAGE) === 'vi' ? 'vi' : 'en';
   const outbox = TeaFarmOutbox.create(localStorage, token);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let careEffect = null, fishingUi = null, cameraReady = false, bulkEffects=[], running=false, fishingSite=0;
+  let careEffect = null, fishingUi = null, cameraReady = false, bulkEffects=[], fishingSite=0;
   let state, profile, offset = 0, pending = null, busy = false, panel = '', selected = 0, entered = false, waitingWorker, updateRequested = false;
   const keys = new Set(), player = { x: 500, y: 550 }, camera = { x: 0, y: 0, scale: 1 };
   let path = [], effectUntil = 0, frameAt = performance.now(), walk = false, cameraFocus = null, facing='down', stride=0, destination=null;
   const canvas = $('#farm-canvas'), ctx = canvas.getContext('2d');
+  const controls=TeaWalkControls({canvas,keys,locale:()=>locale,allowed:()=>entered&&!portrait()&&!document.hidden&&!document.querySelector('dialog[open]')&&panel!=='worldMap',cancel:()=>{path=[];destination=null;cameraFocus=null;}});
   const words = {
     en: { cafe:'← Café',map:'MAP 02 · JUST YOURS',title:'My little farm',gold:'gold',backup:'Backup',loading:'Opening your garden…',retry:'Try again',hint:'Tap a patch or pond · WASD to walk',garden:'Garden',pond:'Pond',shop:'Shop',bag:'Basket',quests:'Tasks',decorate:'Decorate',free:'Free to play · Farm gold is separate from café coins',rotate:'Turn your phone sideways',rotateHint:'Your garden will be right here. Nothing stops growing.',walletHint:'This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.',copy:'Copy code',restoreLabel:'Restore a saved wallet',restore:'Restore',close:'Close',update:'Update farm',welcome:'Your own little corner. Plants and fish grow while you are away.',intro:'Start with 120 gold, 6 radish seeds and 2 guppies. Plant → water → harvest → sell. Stock → feed → catch. Nothing withers!',empty:'Empty',patch:'Patch',pool:'Fish spot',plant:'Plant',stock:'Add fish',water:'Water',feed:'Feed',harvest:'Harvest',catch:'Catch',ready:'Ready!',thirsty:'Water once to start growing. Water is free.',hungry:'Feed once to start growing. Feed is free.',growing:'Growing even while you are away. No more care needed.',seeds:'seeds / young fish',product:'harvested',buy:'Buy',sell:'Sell',sellAll:'Sell all',each:'each',upgradePlots:'Add 2 patches',upgradePond:'Add 2 fish spots',max:'Fully upgraded',shopHint:'Farm gold only. No café coins or bank transfer needed.',bagHint:'Harvested goods stay here until you sell them. Seeds and young fish are for planting and stocking.',noProducts:'Your basket is empty. Grow something first!',reward:'Claim',claimed:'Claimed',taskHint:'One-time rewards for getting to know your farm.',decorHint:'Buy ornaments in the shop, then choose a garden corner. One of each, yours forever.',corner:'Corner',place:'Place',remove:'Remove',noDecor:'Your garden has room for flowers, a lantern and a bench. Find them in the shop.',saved:'Saved',offline:'Connection lost. Your farm and wallet are safe. Reconnect and try again.',uncertain:'Not confirmed yet. Retry the same action safely.',needWallet:'Open the café to create a character, or restore your wallet.',invalidWallet:'This code is invalid. Restore your saved wallet; your current code has not been erased.',copied:'Code copied. Keep it somewhere private.',confirmRestore:'Switch to this wallet? Your current farm stays with its old backup code.',restoreFirst:'Back up your current code before switching wallets.',plotHint:'Choose a patch. Each plant needs one watering before its timer starts.',pondHint:'Choose a fish spot. Feed a young fish once; catch it when it has grown.',full:'Your farm is fully expanded.',newProfile:'Create your character in the café first.',pendingSwitch:'Retry the pending action before switching wallets.',farm_bad_request:'Please refresh and try again.',farm_request_conflict:'This request was already used. Refresh to see your farm.',farm_not_enough_gold:'Not enough farm gold. Sell produce or claim a task reward.',farm_no_seed:'You need more seeds or young fish. Visit the shop.',farm_slot_busy:'This spot is already in use. The farm has refreshed.',farm_stale_slot:'This spot changed in another tab. Choose it again.',farm_not_ready:'Still growing. Please wait for the timer.',farm_already_cared:'Already cared for. Just let it grow.',farm_no_product:'No products to sell. Your basket has refreshed.',farm_already_owned:'You already own this ornament.',farm_bad_item:'Choose a valid item.',farm_bad_slot:'Choose an unlocked spot.',farm_max_level:'Already fully upgraded.',farm_already_claimed:'Reward already collected.',farm_quest_not_ready:'Complete the task first.',farm_inventory_full:'Sell or use some items to make space.',private:'PRIVATE FARM',minutes:'min',view:'View',returnHint:'Your farm saves automatically. Meet everyone at the café.' },
     vi: { cafe:'← Về quán',map:'MAP 02 · CỦA RIÊNG BẠN',title:'Nông trại nhỏ',gold:'vàng',backup:'Mã ví',loading:'Đang mở khu vườn…',retry:'Thử lại',hint:'Chạm đất hoặc ao · WASD để đi',garden:'Vườn rau',pond:'Ao cá',shop:'Cửa hàng',bag:'Giỏ đồ',quests:'Nhiệm vụ',decorate:'Trang trí',free:'Chơi miễn phí · Vàng nông trại riêng với xu ở quán',rotate:'Xoay ngang điện thoại nhé',rotateHint:'Nông trại vẫn ở đây. Cây và cá vẫn lớn bình thường.',walletHint:'Đây cũng là mã ví ở quán. Giữ kín và sao lưu để khôi phục nhân vật, nông trại và món đã mua.',copy:'Sao chép mã',restoreLabel:'Khôi phục mã ví đã lưu',restore:'Khôi phục',close:'Đóng',update:'Cập nhật nông trại',welcome:'Góc nhỏ của riêng bạn. Cây và cá vẫn lớn khi bạn đi vắng.',intro:'Tặng 120 vàng, 6 hạt củ cải và 2 cá bảy màu. Gieo → tưới → thu hoạch → bán. Thả cá → cho ăn → bắt. Không lo cây héo!',empty:'Còn trống',patch:'Luống',pool:'Ô nuôi cá',plant:'Gieo',stock:'Thả cá',water:'Tưới nước',feed:'Cho ăn',harvest:'Thu hoạch',catch:'Bắt cá',ready:'Lớn rồi!',thirsty:'Tưới một lần để cây bắt đầu lớn. Nước miễn phí.',hungry:'Cho ăn một lần để cá bắt đầu lớn. Thức ăn miễn phí.',growing:'Vẫn lớn khi bạn đi vắng. Không cần chăm thêm.',seeds:'hạt / cá giống',product:'đã thu hoạch',buy:'Mua',sell:'Bán',sellAll:'Bán hết',each:'mỗi loại',upgradePlots:'Thêm 2 luống',upgradePond:'Thêm 2 ô cá',max:'Đã nâng tối đa',shopHint:'Chỉ dùng vàng nông trại. Không trừ xu ở quán, không cần nạp tiền.',bagHint:'Nông sản chờ bạn bán ở đây. Hạt giống dùng để gieo, cá giống dùng để thả ao.',noProducts:'Giỏ còn trống. Trồng rau và nuôi cá trước nhé!',reward:'Nhận thưởng',claimed:'Đã nhận',taskHint:'Phần thưởng một lần cho những cột mốc đầu tiên.',decorHint:'Mua đồ ở cửa hàng rồi chọn góc đặt. Mỗi món có một chiếc, có thể chuyển chỗ.',corner:'Góc',place:'Đặt',remove:'Cất đi',noDecor:'Vườn còn chỗ cho bồn hoa, đèn và ghế gỗ. Ghé cửa hàng nhé.',saved:'Đã lưu',offline:'Mất kết nối. Nông trại và mã ví vẫn an toàn. Có mạng rồi thử lại nhé.',uncertain:'Chưa xác nhận được. Bấm thử lại, không bị tính hai lần.',needWallet:'Vào quán tạo nhân vật hoặc khôi phục mã ví để mở nông trại.',invalidWallet:'Mã chưa hợp lệ. Khôi phục mã đã lưu nhé; mã hiện tại chưa bị xóa.',copied:'Đã sao chép. Hãy cất mã ở nơi riêng tư.',confirmRestore:'Chuyển sang ví này? Nông trại hiện tại vẫn nằm trong mã ví cũ.',restoreFirst:'Nhớ sao lưu mã hiện tại trước khi đổi ví.',plotHint:'Chọn một luống. Tưới một lần sau khi gieo để bắt đầu đếm giờ.',pondHint:'Chọn một ô cá. Cho cá giống ăn một lần rồi chờ lớn để bắt.',full:'Nông trại đã mở rộng tối đa.',newProfile:'Vào quán tạo nhân vật trước nhé.',pendingSwitch:'Thử lại thao tác đang chờ trước khi đổi ví.',farm_bad_request:'Tải lại trang rồi thử nhé.',farm_request_conflict:'Mã thao tác đã dùng. Tải lại để xem nông trại.',farm_not_enough_gold:'Chưa đủ vàng. Bán nông sản hoặc nhận thưởng nhiệm vụ nhé.',farm_no_seed:'Hết giống rồi, ghé cửa hàng mua thêm nhé.',farm_slot_busy:'Ô này đã có cây hoặc cá. Đã cập nhật lại.',farm_stale_slot:'Ô đã thay đổi ở tab khác. Chọn lại nhé.',farm_not_ready:'Chưa lớn đủ, chờ hết giờ nhé.',farm_already_cared:'Chăm rồi, cứ để lớn thôi.',farm_no_product:'Chưa có nông sản để bán. Đã cập nhật giỏ.',farm_already_owned:'Bạn đã có món trang trí này.',farm_bad_item:'Chọn lại món hợp lệ nhé.',farm_bad_slot:'Chọn ô đã mở khóa nhé.',farm_max_level:'Đã nâng tối đa.',farm_already_claimed:'Đã nhận thưởng rồi.',farm_quest_not_ready:'Hoàn thành nhiệm vụ trước nhé.',farm_inventory_full:'Bán hoặc dùng bớt đồ để có chỗ nhé.',private:'NÔNG TRẠI RIÊNG',minutes:'phút',view:'Xem',returnHint:'Nông trại tự lưu. Về quán để gặp mọi người nhé.' }
@@ -81,7 +82,7 @@
       const target=nearby();if(!target||target.panel!==key||(slot!==undefined&&slot!==target.slot))return;
       panelTarget=target;selected=target.slot||0;if(target.site!==undefined)fishingSite=target.site;cameraFocus=target.look||target;
     }else{panelTarget=null;cameraFocus=null;}
-    panel=key;path=[];keys.clear();renderPanel();
+    panel=key;controls.reset();path=[];keys.clear();renderPanel();
   }
   function interact(){if(busy||portrait()||pending)return;const target=nearby();if(target){preferredTarget=target.id;openPanel(target.panel,target.slot);}}
   function updateInteraction(){
@@ -157,7 +158,7 @@
       f.placed.forEach((item, slot) => { const box = card(root, `${t('corner')} ${slot + 1} · ${item ? name(item) : t('empty')}`, '', item); f.decorations.forEach(key => button(box, `${t('place')} ${name(key)}`, () => act({ type:'decorate', item:key, slot }), item === key)); if (item) button(box, t('remove'), () => act({ type:'decorate', item:null, slot })); });
     }
   }
-  function applyLocale() { document.documentElement.lang = locale; localStorage.setItem(LANGUAGE, locale); document.querySelectorAll('[data-text]').forEach(n => { n.textContent = t(n.dataset.text); }); $('#run-toggle').textContent=t(running?'walking':'run');$('#lang').textContent = locale === 'vi' ? 'EN' : 'VI'; $('#owner').textContent = profile ? `${profile.nickname} · ${t('private')}` : t('private');makeMap();renderPanel(); }
+  function applyLocale() { document.documentElement.lang = locale; localStorage.setItem(LANGUAGE, locale); document.querySelectorAll('[data-text]').forEach(n => { n.textContent = t(n.dataset.text); }); $('#lang').textContent = locale === 'vi' ? 'EN' : 'VI'; $('#owner').textContent = profile ? `${profile.nickname} · ${t('private')}` : t('private');makeMap();renderPanel(); }
   const p = (c, color, x, y, w, h) => { c.fillStyle = color; c.fillRect(Math.round(x), Math.round(y), w, h); };
   function tree(c, x, y, size = 1) { c.save(); c.translate(x,y); c.scale(size,size); p(c,'#68834b',-28,18,60,12); p(c,'#715139',-7,-12,16,42); p(c,'#98704b',0,-10,5,35); p(c,'#365e42',-29,-48,60,50); p(c,'#365e42',-40,-32,80,30); p(c,'#52794b',-30,-48,52,38); p(c,'#71945b',-19,-56,36,24); p(c,'#86a462',-14,-50,22,7); p(c,'#648951',-34,-22,26,13); c.restore(); }
   function drawItem(c, item, x, y, scale = 1, progress = 1, time = 0) {
@@ -213,7 +214,7 @@
   const blocked=TeaFarmWorld.blocked;
   function routeTo(x,y){
     const next=TeaFarmMotion.findPath(player,{x,y},blocked);
-    if(next.length){path=next;destination={x,y,started:performance.now()};}
+    path=next;if(next.length){destination={x,y,started:performance.now()};}else{destination=null;controls.reject((x-camera.x)*camera.scale,(y-camera.y)*camera.scale);}
   }
   function badge(text,x,y,color='#fff3cc'){ctx.font='bold 11px system-ui';ctx.textAlign='center';const width=ctx.measureText(text).width+14;p(ctx,'#4c6746',x-width/2,y-12,width,20);p(ctx,color,x-width/2+1,y-11,width-2,17);ctx.fillStyle='#34543b';ctx.fillText(text,x,y+1);}
   function fishingPosition(at,start){return 1-Math.abs(((Math.max(0,at-start)/1000)%2)-1);}
@@ -318,27 +319,18 @@
   }
   function frame(time){
     const dt=Math.min(.04,(time-frameAt)/1000);frameAt=time;walk=false;
-    if(!portrait()&&!document.querySelector('dialog[open]')){
-      let dx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0),dy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0);
-      let travelled=0;
-      const speed=running||keys.has('shift')?225:145;
-      if(dx||dy){path=[];destination=null;cameraFocus=null;const len=Math.hypot(dx,dy),oldX=player.x,oldY=player.y,nx=player.x+dx/len*speed*dt,ny=player.y+dy/len*speed*dt;
-        if(TeaFarmMotion.clear(player,{x:nx,y:player.y},blocked))player.x=nx;
-        if(TeaFarmMotion.clear(player,{x:player.x,y:ny},blocked))player.y=ny;
-        travelled=Math.hypot(player.x-oldX,player.y-oldY);
-      }else if(path.length){const moved=TeaFarmMotion.follow(player,path,speed*dt,blocked);travelled=moved.travelled;dx=moved.dx;dy=moved.dy;}
-      walk=travelled>.001;stride+=travelled;if(walk)facing=Math.abs(dx)>Math.abs(dy)?dx>0?'right':'left':dy>0?'down':'up';
+    const v=controls.vector();
+    if(entered&&!portrait()&&panel!=='worldMap'&&!document.querySelector('dialog[open]')){
+      let input={dx:v.x,dy:v.y,mode:controls.mode};
+      if(v.x||v.y){path=[];destination=null;}
+      const moved=path.length?TeaMotion.follow(player,path,controls.mode,dt,blocked):TeaMotion.step(player,input,dt,blocked);walk=moved.distance>.001;stride+=moved.distance;if(walk||input.dx||input.dy)facing=moved.facing;
     }
+    canvas.dataset.playerX=player.x.toFixed(2);canvas.dataset.playerY=player.y.toFixed(2);
     const rect=canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2),width=Math.round(rect.width*dpr),height=Math.round(rect.height*dpr);
     const resized=canvas.width!==width||canvas.height!==height;
     if(resized){canvas.width=width;canvas.height=height;}
-    const scale=Math.max(.72,Math.min(rect.width/1000,rect.height/700));camera.scale=scale;
-    const visibleWidth=rect.width/scale,visibleHeight=rect.height/scale;
-    const focus = cameraFocus || player;
-    const targetX=visibleWidth>=TeaFarmWorld.width?(TeaFarmWorld.width-visibleWidth)/2:Math.max(0,Math.min(TeaFarmWorld.width-visibleWidth,focus.x-visibleWidth/2));
-    const targetY=visibleHeight>=TeaFarmWorld.height?(TeaFarmWorld.height-visibleHeight)/2:Math.max(0,Math.min(TeaFarmWorld.height-visibleHeight,focus.y-visibleHeight/2));
-    const ease=!cameraReady||resized||reducedMotion.matches?1:1-Math.exp(-10*dt);
-    camera.x+=(targetX-camera.x)*ease;camera.y+=(targetY-camera.y)*ease;cameraReady=true;
+    const scale=controls.zoom;TeaMotion.camera(camera,player,rect,TeaFarmWorld,scale,dt,!cameraReady||resized||reducedMotion.matches);cameraReady=true;
+    canvas.dataset.view=JSON.stringify({scale,tx:-camera.x*scale,ty:-camera.y*scale});
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);ctx.scale(scale,scale);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;ctx.drawImage(staticMap,0,0);
     const f=state?.farm;
     drawPondWater(time);
@@ -383,12 +375,11 @@
     openPanel('');preferredTarget=null;routeTo(x,y);
   });
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
-  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel)interact();return;}if(key==='escape'){openPanel('');return;}if(['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright','shift'].includes(key)){e.preventDefault();keys.add(key);}});
+  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel)interact();return;}if(key==='escape'){openPanel('');return;}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(panel===b.dataset.panel?'':b.dataset.panel));$('#close-panel').onclick=()=>openPanel('');
   $('#interact').onclick=interact;
   $('#map-toggle').onclick=()=>openPanel(panel==='worldMap'?'':'worldMap');
-  $('#run-toggle').onclick=()=>{running=!running;$('#run-toggle').setAttribute('aria-pressed',String(running));$('#run-toggle').textContent=t(running?'walking':'run');};
   $('#lang').onclick=()=>{locale=locale==='en'?'vi':'en';applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));};
   function showWallet(){keys.clear();$('#wallet-code').value=token||'';$('#wallet-dialog').showModal();}
   $('#wallet').onclick=showWallet;$('#portrait-wallet').onclick=showWallet;$('#close-wallet').onclick=()=>$('#wallet-dialog').close();

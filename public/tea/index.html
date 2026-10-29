@@ -28,6 +28,7 @@
   <link rel="stylesheet" href="/assets/tea/cards-skin.css?v=slate1">
   <link rel="stylesheet" href="/assets/tea/all-games-fullscreen.css?v=games2">
   <link rel="stylesheet" href="/assets/tea/cafe-context.css?v=1">
+  <link rel="stylesheet" href="/assets/tea/walk-controls.css?v=movement1">
 </head>
 <body class="cafe-context landscape-panel-closed">
   <header class="topbar">
@@ -52,9 +53,6 @@
       <div class="controls-hint"><span class="desktop-only">WASD / ↑↓←→</span><span data-i18n="tapWalk">Tap anywhere to walk</span></div>
       <button id="interact-button" class="interact-button" hidden><span>●</span> <b>Sit</b></button>
       <button id="context-button" class="context-button" aria-controls="side-panel" aria-expanded="false" hidden>Open table</button>
-      <div class="dpad" aria-label="Movement controls">
-        <button data-dir="up">▲</button><button data-dir="left">◀</button><button data-dir="down">▼</button><button data-dir="right">▶</button>
-      </div>
       <section id="brawl-stage" class="brawl-stage" hidden>
         <canvas id="brawl-canvas" width="800" height="520" tabindex="0" aria-label="Pixel combat arena"></canvas>
         <p id="brawl-help" data-i18n="brawlControlsHint"></p>
@@ -257,7 +255,7 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/app.js?v=farm1"></script>
+  <script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/prediction.js"></script><script src="/assets/tea/cafe-walker.js"></script><script src="/assets/tea/app.js?v=movement1"></script>
   <script src="/assets/tea/pwa.js?v=pwa1"></script>
 </body>
 </html>

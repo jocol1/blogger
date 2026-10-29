@@ -6,6 +6,7 @@
   <title>My little farm · Locly</title>
   <link rel="manifest" href="/tra-da.webmanifest"><link rel="icon" href="/assets/tea/icons/icon-192.png">
   <link rel="stylesheet" href="/assets/tea/farm.css">
+  <link rel="stylesheet" href="/assets/tea/walk-controls.css?v=movement1">
 </head>
 <body>
   <header>
@@ -20,13 +21,13 @@
       <canvas id="farm-canvas" tabindex="0" aria-label="Farm. Tap to walk, then use Interact or press E near a plot, pond or pen."></canvas>
       <div class="world-label"><span id="owner"></span><small data-text="hint">Tap a patch or pond · WASD to walk</small></div>
       <div id="harvest-fx" aria-live="polite"></div>
-      <div class="world-tools"><button id="map-toggle" data-text="worldMap">Map</button><button id="run-toggle" aria-pressed="false" data-text="run">Run</button></div>
+      <div class="world-tools"><button id="map-toggle" data-text="worldMap">Map</button></div>
       <button id="interact" hidden></button>
     </section>
     <aside id="panel" hidden><div class="panel-heading"><h2 id="panel-title"></h2><button id="fishing-switch" hidden>Fishing</button><button id="close-panel" aria-label="Close">×</button></div><div id="panel-content"></div></aside>
   </main>
   <section id="portrait"><div><span class="turn-phone">↻</span><h2 data-text="rotate">Turn your phone sideways</h2><p data-text="rotateHint">Your garden will be right here. Nothing stops growing.</p><button id="portrait-wallet" data-text="backup">Backup</button><a href="/tra-da" data-text="cafe">← Café</a></div></section>
   <dialog id="wallet-dialog"><h2 data-text="backup">Backup</h2><p data-text="walletHint">This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.</p><textarea id="wallet-code" readonly aria-label="Wallet backup code"></textarea><button id="copy" data-text="copy">Copy code</button><hr><label for="restore-code" data-text="restoreLabel">Restore a saved wallet</label><textarea id="restore-code" autocomplete="off" spellcheck="false"></textarea><button id="restore" data-text="restore">Restore</button><button id="close-wallet" data-text="close">Close</button><p id="wallet-message" role="status"></p></dialog>
-  <script src="/assets/tea/farm-outbox.js"></script><script src="/assets/tea/farm-world.js"></script><script src="/assets/tea/farm-expansion.js"></script><script src="/assets/tea/farm-ranch.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/farm.js?v=context1"></script>
+  <script src="/assets/tea/farm-outbox.js"></script><script src="/assets/tea/farm-world.js"></script><script src="/assets/tea/farm-expansion.js"></script><script src="/assets/tea/farm-ranch.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm.js?v=movement1"></script>
 </body>
 </html>

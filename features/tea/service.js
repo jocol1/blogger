@@ -5,6 +5,7 @@ const { createTienLen } = require('./tienlen');
 const { createClassicCards } = require('./classic-cards');
 const { readCardGames, activeCardGame } = require('./card-coordination');
 const brawl = require('./brawl');
+const {applyMovement}=require('./movement');
 
 const ROOM_ID = 'main';
 const MAX_GUESTS = 32;
@@ -267,7 +268,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     },
     async publicState() {
       requireDb(); const roomSnapshot = await rooms().doc(ROOM_ID).get(); const stored = roomSnapshot.exists ? roomSnapshot.data() : null; const room = stored?.layoutVersion === 2 ? stored : emptyRoom();
-      return { room: publicRoom(room), guests: [...presence.values()].map(({ walletId, nickname, hair, clothes, shoes, x, y, connected, tableId, seatId }) => ({ walletId, nickname, hair, clothes, shoes, x, y, connected, tableId, seatId })), maxGuests: MAX_GUESTS, serverNow: now() };
+      return { room: publicRoom(room), guests: [...presence.values()].map(({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId }) => ({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId })), maxGuests: MAX_GUESTS, serverNow: now() };
     },
     async connect(token, socket) {
       const walletId = await walletIdFor(token); const profile = await profileFor(walletId);
@@ -275,15 +276,18 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       if (!presence.has(walletId) && presence.size >= MAX_GUESTS) throw new TeaError(409, 'The café is full. Please try again soon.', 'cafe_full');
       const old = sockets.get(walletId); if (old && old.id !== socket.id) old.emit('tea:replaced'); old?.disconnect(true); if (old) fightInputRates.delete(old.id);
       const current = presence.get(walletId) || { walletId, x: 90 + Math.random() * 100, y: 560, tableId: null, seatId: null };
-      Object.assign(current, profile, { connected: true, socketId: socket.id, disconnectedAt: null }); presence.set(walletId, current); sockets.set(walletId, socket);
+      Object.assign(current, profile, {walletId, connected: true, socketId: socket.id, disconnectedAt: null,moveProtocol:0,moveSeq:0,moveBudget:0,moveAt:now(),moveReceivedAt:undefined }); presence.set(walletId, current); sockets.set(walletId, socket);
       socket.join(`wallet:${walletId}`); socket.data.walletId = walletId;
       const roomSnapshot = await rooms().doc(ROOM_ID).get(); const room = roomSnapshot.exists && roomSnapshot.data()?.layoutVersion === 2 ? roomSnapshot.data() : emptyRoom(); const seated = tableForWallet(room, walletId);
       if (seated) { Object.assign(current, { tableId: seated.table.id, seatId: seated.seat.id, x: seated.seat.x, y: seated.seat.y }); socket.join(`table:${seated.table.id}`); }
       const fight = recentFightFor(walletId); if (fight && brawl.clearInput(fight, walletId)) emitFight(fight);
       return { walletId, state: await service.publicState(), fight: fightView(fight) };
     },
-    move(walletId, input) {
+    move(walletId, input, socketId) {
       const player = presence.get(walletId); if (!player || player.seatId) return;
+      if(socketId&&socketId!==player.socketId)return;
+      if(input?.v===2){const result=applyMovement(player,input,socketId,now(),blocked);if(result)io?.emit('tea:move',result);return result;}
+      if(player.moveProtocol===2)return;
       const dx = Number(input?.dx) || 0; const dy = Number(input?.dy) || 0; if(!Number.isFinite(dx)||!Number.isFinite(dy))return; const length = Math.hypot(dx, dy) || 1;
       const elapsed = Math.min(140, now() - (player.movedAt ?? now() - 50)); if(elapsed<16)return; const maximum=145*elapsed/1000; const distance=Number(input?.distance); const step=Number.isFinite(distance)&&distance>=0?Math.min(maximum,distance):maximum;
       const vectors = [[dx / length, dy / length], [dx ? Math.sign(dx) : 0, 0], [0, dy ? Math.sign(dy) : 0], [-dy / length, dx / length], [dy / length, -dx / length]];

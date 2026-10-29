@@ -1,4 +1,4 @@
-// Original four-direction farm character. Café artwork is kept independent.
+// Original shared four-direction walking character; seated and combat poses remain separate.
 window.TeaFarmAvatar=(c,x,y,profile,direction,stride,walking,reduced,working=false)=>{
   const p=(color,x,y,w,h)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
   const hair=profile.hairColor||['#302622','#674533','#aa693e','#d6a453','#edcc7a','#a14948','#554671','#202829'][profile.hair||0];
