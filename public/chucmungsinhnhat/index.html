@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/assets/chucmungsinhnhat/style.css">
   <script src="/assets/chucmungsinhnhat/fx.js" defer></script>
   <script src="/assets/chucmungsinhnhat/app.js" defer></script>
+  <script src="/assets/chucmungsinhnhat/extras.js" defer></script>
 </head>
 <body>
   <header class="hero" id="thiep">
@@ -82,11 +83,52 @@
   </header>
 
   <main>
+    <section class="sec sec-lav" id="dem-nguoc" aria-labelledby="cd-title">
+      <h2 class="sec-title" id="cd-title">Đếm ngược đến sinh nhật Đan</h2>
+      <div class="tiles" id="tiles">
+        <div class="tile"><b data-u="d">4</b><span>ngày</span></div>
+        <div class="tile"><b data-u="h">00</b><span>giờ</span></div>
+        <div class="tile"><b data-u="m">00</b><span>phút</span></div>
+        <div class="tile"><b data-u="s">00</b><span>giây</span></div>
+      </div>
+      <p class="sec-sub" id="tiles-note">Tính đến 0 giờ ngày 3 tháng 11</p>
+    </section>
+
+    <section class="sec sec-butter" id="lich" aria-labelledby="cal-title">
+      <div class="cal-wrap">
+        <div class="cal" role="img" aria-label="Lịch tháng 11 năm 2026, ngày 3 được khoanh tròn">
+          <div class="cal-head"><i></i><i></i><span>Tháng 11 · 2026</span></div>
+          <div class="cal-grid" id="cal-grid">
+            <b>T2</b><b>T3</b><b>T4</b><b>T5</b><b>T6</b><b>T7</b><b>CN</b>
+          </div>
+        </div>
+        <div class="cal-text">
+          <h2 class="sec-title" id="cal-title">Khoanh tròn ngày 3 nhé</h2>
+          <p>Thứ Ba, ngày 3 tháng 11 là sinh nhật Thảo Đan. Thêm vào lịch điện thoại để năm nào cũng được nhắc.</p>
+          <button class="btn" id="add-cal" type="button">Thêm vào lịch</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec sec-sky sec-game" id="bong-bay" aria-labelledby="bb-title">
+      <h2 class="sec-title" id="bb-title">Bóp bóng bay, ghép lời chúc</h2>
+      <p class="sec-sub">Chạm vào từng quả bóng để xem nó giấu chữ gì.</p>
+      <div class="balloons" id="balloons"></div>
+      <p class="words" id="words" aria-live="polite"></p>
+      <button class="btn btn-soft" id="bb-reset" type="button" hidden>Chơi lại</button>
+    </section>
+
     <section class="wishes" id="loi-chuc" aria-labelledby="wish-title">
       <form class="wish-card" id="wish" novalidate>
         <h2 id="wish-title">Gửi lời chúc cho Đan</h2>
         <p class="wish-sub">Viết vài dòng thật dễ thương, Đan sẽ vui lắm đó!</p>
         <label class="field"><span>Tên của bạn</span><input id="wish-name" name="name" autocomplete="name" maxlength="40" placeholder="Ví dụ: Minh Anh"></label>
+        <div class="chips" id="chips" aria-label="Lời chúc gợi ý">
+          <button type="button">Chúc Đan tuổi mới thật xinh, thật vui!</button>
+          <button type="button">Chúc Đan luôn khỏe mạnh và gặp nhiều may mắn!</button>
+          <button type="button">Chúc mọi điều ước của Đan đều thành sự thật!</button>
+          <button type="button">Chúc Đan luôn được yêu thương thật nhiều!</button>
+        </div>
         <label class="field"><span>Lời chúc</span><textarea id="wish-text" name="wish" rows="3" maxlength="240" placeholder="Chúc Đan tuổi mới thật vui, thật xinh…"></textarea></label>
         <button class="btn btn-wide" type="submit" id="wish-send">Gửi lời chúc</button>
         <div class="wish-out" id="wish-out" hidden>
@@ -97,6 +139,8 @@
       </form>
     </section>
   </main>
+
+  <button class="music" id="music" type="button" aria-pressed="false"><span class="music-note" aria-hidden="true">♪</span><span class="music-label">Bật nhạc</span></button>
 
   <footer class="foot">
     <p>Làm bằng cả trái tim cho Thảo Đan <span aria-hidden="true">♥</span> 3.11</p>
