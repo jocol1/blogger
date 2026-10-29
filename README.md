@@ -16,7 +16,7 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 
 Menu quán mặc định đóng trên máy tính và điện thoại, kể cả khi tải lại. Đi tới ghế và bấm **Ngồi**, sau đó bấm **Mở bàn / E** để gọi món, chat hoặc chọn trò chơi. Nút Ngồi/Đứng dùng chung vị trí ở góc phải vùng quán. Đến gần mặt trước quầy có **Xem thực đơn / E**; chỉ xem giá, muốn đặt món vẫn cần ngồi. Đóng bảng bằng × hoặc Escape; rời quầy/đứng dậy cũng đóng bảng. Menu mở cạnh vùng quán, không phủ lên nhân vật; ô chat và nút gửi giữ trong khung, thách đấu nằm trong mục gấp mở. **Về quán** từ trò chơi đóng bảng và trả lại bản đồ; có thể mở bàn để xem lại ván đang chạy, đồng hồ server vẫn tiếp tục.
 
-PWA cache v36 cập nhật thao tác làm vườn trực tiếp; người đang mở bản cũ dùng nút cập nhật khi chơi xong, không cần cài APK mới. Chạy `tests/browser/tea-cafe-context.js` trên một phiên `node tests/preview.js` mới để kiểm tra menu, gần quầy, ghế, chat, QR giả, trò chơi và sao lưu. `tea-cards-mobile.js`, `tea-brawl-controls.js` và `tea-pwa-landscape.js` kiểm tra hồi quy bố cục/điều khiển. Các kích thước điện thoại là mô phỏng trình duyệt, chưa xác nhận trên thiết bị thật.
+PWA cache v37 cập nhật thao tác làm vườn trực tiếp; người đang mở bản cũ dùng nút cập nhật khi chơi xong, không cần cài APK mới. Chạy `tests/browser/tea-cafe-context.js` trên một phiên `node tests/preview.js` mới để kiểm tra menu, gần quầy, ghế, chat, QR giả, trò chơi và sao lưu. `tea-cards-mobile.js`, `tea-brawl-controls.js` và `tea-pwa-landscape.js` kiểm tra hồi quy bố cục/điều khiển. Các kích thước điện thoại là mô phỏng trình duyệt, chưa xác nhận trên thiết bị thật.
 
 ### Di chuyển chung cho quán và nông trại
 
@@ -28,6 +28,8 @@ PWA cache v36 cập nhật thao tác làm vườn trực tiếp; người đang 
 - Kiểm tra: `npm test`, `tests/browser/tea-shared-movement.js`, `tea-movement-network.js`, `tea-cafe-context.js`, `tea-farm-context.js` trên preview cục bộ. Đã mô phỏng 30/60/120 FPS, hai trình duyệt với RTT 100–300 ms, đa chạm, ngắt/kết nối lại, tab thay thế và kích thước 568×320 / 844×390 / tablet / desktop. Đây là mô phỏng Chromium, chưa thử Android/iPhone thật. APK dùng nội dung web nên không cần đóng gói lại; cập nhật PWA khi chơi xong.
 
 ### Map 2 — nông trại riêng `/tra-da/farm`
+
+Thanh dụng cụ nhớ lựa chọn dụng cụ và giống trên thiết bị; tới gần cây/con vật sẽ hiện trạng thái và thời gian lớn ngay trên thanh, không tự mở menu. Thu hoạch hiện tên và số lượng vừa thêm vào giỏ theo phản hồi server. Khi mở bảng chăm sóc, nhân vật dừng và không nhận phím/joystick cho tới khi đóng.
 
 **Làm vườn trực tiếp:** thanh năm dụng cụ ở dưới gồm hạt giống (1), bình tưới (2), thức ăn (3), giỏ (4) và bàn tay (5). Chạm mục tiêu để đi tới, rồi bấm nút hành động hoặc **E** để dùng dụng cụ ngay trên map. Gieo thành công tự cầm bình tưới; chọn lại túi hạt để đổi giống. Bình tưới, thức ăn và giỏ dùng cho đúng trạng thái của cây/con vật; nút gợi ý dụng cụ cần dùng khi chọn sai. **Chi tiết / Shift E** mới mở bảng cũ để xem, mua giống hoặc nâng cấp. Mua vật nuôi vẫn cần bấm xác nhận lựa chọn, không tự trừ vàng khi đi tới chuồng.
 

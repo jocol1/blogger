@@ -27,5 +27,20 @@
  }
  // Smooth deterministic wander with a resting interval, confined to each animal's half-pen.
  function animalPose(kind,slot,time,reduced){const phase=(time/1000+slot*3.7+(kind==='pig'?2:0))%12,t=phase<8?phase/8:1,s=t*t*(3-2*t),angle=s*Math.PI*2;return{x:reduced?0:Math.sin(angle)*24,y:reduced?0:(Math.cos(angle)-1)*13,flip:phase<4,peck:!reduced&&phase>=8};}
- return{resolve,stage,icon,animalPose};
+ function status(farm,catalog,target,now){
+  if(!target||!['garden','pond','chicken','pig'].includes(target.panel))return null;
+  const {panel,slot}=target,animal=panel==='chicken'||panel==='pig';
+  const row=(animal?farm.animals?.[panel]:farm[panel==='garden'?'plots':'ponds'])?.[slot];
+  if(!row)return{key:'empty',progress:0,seconds:0};
+  const item=animal?panel:row.item;
+  if(row.readyAt===null)return{item,key:'careStatus',progress:0,seconds:0};
+  const seconds=Math.max(0,Math.ceil((row.readyAt-now)/1000));
+  return{item,key:seconds?'growingStatus':'readyStatus',seconds,progress:Math.max(0,Math.min(1,1-(row.readyAt-now)/((catalog[item]?.seconds||1)*1000)))};
+ }
+ function preferences(value,catalog){
+  value=value&&typeof value==='object'?value:{};
+  return{tool:['seed','water','feed','collect','inspect'].includes(value.tool)?value.tool:'seed',crop:catalog[value.crop]?.type==='crop'?value.crop:'radish',fish:catalog[value.fish]?.type==='fish'?value.fish:'guppy'};
+ }
+ function receipt(before={},after={}){return Object.entries(after).filter(([item,quantity])=>quantity>(before[item]||0)).map(([item,quantity])=>({item,quantity:quantity-(before[item]||0)}));}
+ return{resolve,stage,icon,animalPose,status,preferences,receipt};
 });

@@ -18,3 +18,19 @@ test('empty inventory, wrong seed category and invalid targets cannot produce a 
 test('crops have distinct seed, sprout, leaf, flowering and ripe stages',()=>{
  assert.equal(tools.stage({readyAt:null},60,0),0);assert.equal(tools.stage({readyAt:60000},60,0),1);assert.equal(tools.stage({readyAt:60000},60,30000),2);assert.equal(tools.stage({readyAt:60000},60,50000),3);assert.equal(tools.stage({readyAt:60000},60,60000),4);
 });
+test('nearby status distinguishes empty, thirsty, growing and ripe without changing farm state',()=>{
+ const f=structuredClone(farm),target={panel:'garden',slot:0};
+ assert.equal(tools.status(f,catalog,target,0).key,'empty');
+ f.plots[0]={item:'radish',readyAt:null};assert.equal(tools.status(f,catalog,target,0).key,'careStatus');
+ f.plots[0].readyAt=60000;const before=JSON.stringify(f);
+ assert.deepEqual(tools.status(f,catalog,target,30000),{item:'radish',key:'growingStatus',seconds:30,progress:.5});
+ assert.equal(tools.status(f,catalog,target,60000).key,'readyStatus');assert.equal(JSON.stringify(f),before);
+ assert.equal(tools.status(f,catalog,{panel:'shop'},0),null);
+});
+test('saved tools tolerate corrupt or removed choices and receipt ignores losses',()=>{
+ assert.deepEqual(tools.preferences({tool:'invalid',crop:'guppy',fish:'radish'},catalog),{tool:'seed',crop:'radish',fish:'guppy'});
+ assert.equal(tools.preferences({tool:'collect',crop:'radish',fish:'guppy'},catalog).tool,'collect');
+ assert.deepEqual(tools.receipt({radish:3,egg:1},{radish:4,egg:1}),[{item:'radish',quantity:1}]);
+ assert.deepEqual(tools.receipt({radish:3},{radish:3}),[]);
+ assert.deepEqual(tools.receipt({radish:3},{radish:0}),[]);
+});
