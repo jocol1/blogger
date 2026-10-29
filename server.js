@@ -15,6 +15,7 @@ const { createDonationRouter } = require('./features/donations/routes');
 const { readConfig } = require('./features/donations/service');
 const { createChatRouter } = require('./features/chat/routes');
 const { createPartyRouter } = require('./features/party/routes');
+const { createBirthdayRouter } = require('./features/birthday/routes');
 const { createTeaService } = require('./features/tea/service');
 const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
 const { Server: SocketServer } = require('socket.io');
@@ -95,6 +96,7 @@ app.use(createTeaRouter({ service: teaService, isAdmin: req => req.session.user 
 app.use(createDonationRouter({ db: firestore, config: donationConfig, teaService, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+app.use(createBirthdayRouter());
 // Keep the former blog in place while exposing the current public product routes mounted above.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {
