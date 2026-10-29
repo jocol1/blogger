@@ -4,12 +4,12 @@
   let token = localStorage.getItem(WALLET), locale = localStorage.getItem(LANGUAGE) === 'vi' ? 'vi' : 'en';
   const outbox = TeaFarmOutbox.create(localStorage, token);
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
-  let careEffect = null, fishingUi = null, cameraReady = false, bulkEffects=[], fishingSite=0;
+  let careEffect = null, fishingUi = null, cameraReady = false, bulkEffects=[], fishingSite=0, hands, toolSwing=null, petEffect=null;
   let state, profile, offset = 0, pending = null, busy = false, panel = '', selected = 0, entered = false, waitingWorker, updateRequested = false;
   const keys = new Set(), player = { x: 500, y: 550 }, camera = { x: 0, y: 0, scale: 1 };
   let path = [], effectUntil = 0, frameAt = performance.now(), walk = false, cameraFocus = null, facing='down', stride=0, destination=null;
   const canvas = $('#farm-canvas'), ctx = canvas.getContext('2d');
-  const controls=TeaWalkControls({canvas,keys,locale:()=>locale,allowed:()=>entered&&!portrait()&&!document.hidden&&!document.querySelector('dialog[open]')&&panel!=='worldMap',cancel:()=>{path=[];destination=null;cameraFocus=null;}});
+  const controls=TeaWalkControls({canvas,keys,locale:()=>locale,allowed:()=>entered&&!busy&&!hands?.choosing&&!portrait()&&!document.hidden&&!document.querySelector('dialog[open]')&&panel!=='worldMap',cancel:()=>{path=[];destination=null;cameraFocus=null;}});
   const words = {
     en: { cafe:'← Café',map:'MAP 02 · JUST YOURS',title:'My little farm',gold:'gold',backup:'Backup',loading:'Opening your garden…',retry:'Try again',hint:'Tap a patch or pond · WASD to walk',garden:'Garden',pond:'Pond',shop:'Shop',bag:'Basket',quests:'Tasks',decorate:'Decorate',free:'Free to play · Farm gold is separate from café coins',rotate:'Turn your phone sideways',rotateHint:'Your garden will be right here. Nothing stops growing.',walletHint:'This is the same code as your café wallet. Keep it private: it restores your character, farm and purchases.',copy:'Copy code',restoreLabel:'Restore a saved wallet',restore:'Restore',close:'Close',update:'Update farm',welcome:'Your own little corner. Plants and fish grow while you are away.',intro:'Start with 120 gold, 6 radish seeds and 2 guppies. Plant → water → harvest → sell. Stock → feed → catch. Nothing withers!',empty:'Empty',patch:'Patch',pool:'Fish spot',plant:'Plant',stock:'Add fish',water:'Water',feed:'Feed',harvest:'Harvest',catch:'Catch',ready:'Ready!',thirsty:'Water once to start growing. Water is free.',hungry:'Feed once to start growing. Feed is free.',growing:'Growing even while you are away. No more care needed.',seeds:'seeds / young fish',product:'harvested',buy:'Buy',sell:'Sell',sellAll:'Sell all',each:'each',upgradePlots:'Add 2 patches',upgradePond:'Add 2 fish spots',max:'Fully upgraded',shopHint:'Farm gold only. No café coins or bank transfer needed.',bagHint:'Harvested goods stay here until you sell them. Seeds and young fish are for planting and stocking.',noProducts:'Your basket is empty. Grow something first!',reward:'Claim',claimed:'Claimed',taskHint:'One-time rewards for getting to know your farm.',decorHint:'Buy ornaments in the shop, then choose a garden corner. One of each, yours forever.',corner:'Corner',place:'Place',remove:'Remove',noDecor:'Your garden has room for flowers, a lantern and a bench. Find them in the shop.',saved:'Saved',offline:'Connection lost. Your farm and wallet are safe. Reconnect and try again.',uncertain:'Not confirmed yet. Retry the same action safely.',needWallet:'Open the café to create a character, or restore your wallet.',invalidWallet:'This code is invalid. Restore your saved wallet; your current code has not been erased.',copied:'Code copied. Keep it somewhere private.',confirmRestore:'Switch to this wallet? Your current farm stays with its old backup code.',restoreFirst:'Back up your current code before switching wallets.',plotHint:'Choose a patch. Each plant needs one watering before its timer starts.',pondHint:'Choose a fish spot. Feed a young fish once; catch it when it has grown.',full:'Your farm is fully expanded.',newProfile:'Create your character in the café first.',pendingSwitch:'Retry the pending action before switching wallets.',farm_bad_request:'Please refresh and try again.',farm_request_conflict:'This request was already used. Refresh to see your farm.',farm_not_enough_gold:'Not enough farm gold. Sell produce or claim a task reward.',farm_no_seed:'You need more seeds or young fish. Visit the shop.',farm_slot_busy:'This spot is already in use. The farm has refreshed.',farm_stale_slot:'This spot changed in another tab. Choose it again.',farm_not_ready:'Still growing. Please wait for the timer.',farm_already_cared:'Already cared for. Just let it grow.',farm_no_product:'No products to sell. Your basket has refreshed.',farm_already_owned:'You already own this ornament.',farm_bad_item:'Choose a valid item.',farm_bad_slot:'Choose an unlocked spot.',farm_max_level:'Already fully upgraded.',farm_already_claimed:'Reward already collected.',farm_quest_not_ready:'Complete the task first.',farm_inventory_full:'Sell or use some items to make space.',private:'PRIVATE FARM',minutes:'min',view:'View',returnHint:'Your farm saves automatically. Meet everyone at the café.' },
     vi: { cafe:'← Về quán',map:'MAP 02 · CỦA RIÊNG BẠN',title:'Nông trại nhỏ',gold:'vàng',backup:'Mã ví',loading:'Đang mở khu vườn…',retry:'Thử lại',hint:'Chạm đất hoặc ao · WASD để đi',garden:'Vườn rau',pond:'Ao cá',shop:'Cửa hàng',bag:'Giỏ đồ',quests:'Nhiệm vụ',decorate:'Trang trí',free:'Chơi miễn phí · Vàng nông trại riêng với xu ở quán',rotate:'Xoay ngang điện thoại nhé',rotateHint:'Nông trại vẫn ở đây. Cây và cá vẫn lớn bình thường.',walletHint:'Đây cũng là mã ví ở quán. Giữ kín và sao lưu để khôi phục nhân vật, nông trại và món đã mua.',copy:'Sao chép mã',restoreLabel:'Khôi phục mã ví đã lưu',restore:'Khôi phục',close:'Đóng',update:'Cập nhật nông trại',welcome:'Góc nhỏ của riêng bạn. Cây và cá vẫn lớn khi bạn đi vắng.',intro:'Tặng 120 vàng, 6 hạt củ cải và 2 cá bảy màu. Gieo → tưới → thu hoạch → bán. Thả cá → cho ăn → bắt. Không lo cây héo!',empty:'Còn trống',patch:'Luống',pool:'Ô nuôi cá',plant:'Gieo',stock:'Thả cá',water:'Tưới nước',feed:'Cho ăn',harvest:'Thu hoạch',catch:'Bắt cá',ready:'Lớn rồi!',thirsty:'Tưới một lần để cây bắt đầu lớn. Nước miễn phí.',hungry:'Cho ăn một lần để cá bắt đầu lớn. Thức ăn miễn phí.',growing:'Vẫn lớn khi bạn đi vắng. Không cần chăm thêm.',seeds:'hạt / cá giống',product:'đã thu hoạch',buy:'Mua',sell:'Bán',sellAll:'Bán hết',each:'mỗi loại',upgradePlots:'Thêm 2 luống',upgradePond:'Thêm 2 ô cá',max:'Đã nâng tối đa',shopHint:'Chỉ dùng vàng nông trại. Không trừ xu ở quán, không cần nạp tiền.',bagHint:'Nông sản chờ bạn bán ở đây. Hạt giống dùng để gieo, cá giống dùng để thả ao.',noProducts:'Giỏ còn trống. Trồng rau và nuôi cá trước nhé!',reward:'Nhận thưởng',claimed:'Đã nhận',taskHint:'Phần thưởng một lần cho những cột mốc đầu tiên.',decorHint:'Mua đồ ở cửa hàng rồi chọn góc đặt. Mỗi món có một chiếc, có thể chuyển chỗ.',corner:'Góc',place:'Đặt',remove:'Cất đi',noDecor:'Vườn còn chỗ cho bồn hoa, đèn và ghế gỗ. Ghé cửa hàng nhé.',saved:'Đã lưu',offline:'Mất kết nối. Nông trại và mã ví vẫn an toàn. Có mạng rồi thử lại nhé.',uncertain:'Chưa xác nhận được. Bấm thử lại, không bị tính hai lần.',needWallet:'Vào quán tạo nhân vật hoặc khôi phục mã ví để mở nông trại.',invalidWallet:'Mã chưa hợp lệ. Khôi phục mã đã lưu nhé; mã hiện tại chưa bị xóa.',copied:'Đã sao chép. Hãy cất mã ở nơi riêng tư.',confirmRestore:'Chuyển sang ví này? Nông trại hiện tại vẫn nằm trong mã ví cũ.',restoreFirst:'Nhớ sao lưu mã hiện tại trước khi đổi ví.',plotHint:'Chọn một luống. Tưới một lần sau khi gieo để bắt đầu đếm giờ.',pondHint:'Chọn một ô cá. Cho cá giống ăn một lần rồi chờ lớn để bắt.',full:'Nông trại đã mở rộng tối đa.',newProfile:'Vào quán tạo nhân vật trước nhé.',pendingSwitch:'Thử lại thao tác đang chờ trước khi đổi ví.',farm_bad_request:'Tải lại trang rồi thử nhé.',farm_request_conflict:'Mã thao tác đã dùng. Tải lại để xem nông trại.',farm_not_enough_gold:'Chưa đủ vàng. Bán nông sản hoặc nhận thưởng nhiệm vụ nhé.',farm_no_seed:'Hết giống rồi, ghé cửa hàng mua thêm nhé.',farm_slot_busy:'Ô này đã có cây hoặc cá. Đã cập nhật lại.',farm_stale_slot:'Ô đã thay đổi ở tab khác. Chọn lại nhé.',farm_not_ready:'Chưa lớn đủ, chờ hết giờ nhé.',farm_already_cared:'Chăm rồi, cứ để lớn thôi.',farm_no_product:'Chưa có nông sản để bán. Đã cập nhật giỏ.',farm_already_owned:'Bạn đã có món trang trí này.',farm_bad_item:'Chọn lại món hợp lệ nhé.',farm_bad_slot:'Chọn ô đã mở khóa nhé.',farm_max_level:'Đã nâng tối đa.',farm_already_claimed:'Đã nhận thưởng rồi.',farm_quest_not_ready:'Hoàn thành nhiệm vụ trước nhé.',farm_inventory_full:'Bán hoặc dùng bớt đồ để có chỗ nhé.',private:'NÔNG TRẠI RIÊNG',minutes:'phút',view:'Xem',returnHint:'Nông trại tự lưu. Về quán để gặp mọi người nhé.' }
@@ -20,6 +20,8 @@
   Object.assign(words.vi,{worldMap:'Bản đồ',run:'Chạy',walking:'Đi bộ',mapHint:'Đi nhanh miễn phí · Cây vẫn lớn.',go:'Tới đây',waterAll:'Tưới tất cả',feedAll:'Cho ăn tất cả',harvestAll:'Thu hoạch chín',catchAll:'Bắt cá lớn',sellBasket:'Bán cả giỏ',sellConfirm:'Bán số nông sản này để nhận',farm_bad_action:'Cập nhật nông trại để dùng tiện ích này nhé.'});
   Object.assign(words.en,{interact:'Interact',hint:'Tap to walk · E to interact',chicken:'Chicken pen',pig:'Pig pen',chooseSeed:'Choose a seed',chooseFish:'Choose young fish',raise:'Add animal',buyRaise:'Buy & raise',collectEgg:'Collect egg',collectPig:'Move to basket',animalHint:'Feed once, then wait. Nothing gets sick or runs away.',chickenHint:'Feed → collect an egg → feed again. Your chicken stays.',pigHint:'Feed → let it grow → move to basket and sell.',moreTools:'More tools',readyStatus:'Ready',careStatus:'Needs care',growingStatus:'Growing',buyAtMarket:'Get more seeds and young fish at the market.',crop:'Seeds',fish:'Young fish',animal:'Animals',decor:'Decorations'});
   Object.assign(words.vi,{interact:'Tương tác',hint:'Chạm để đi · E để tương tác',chicken:'Chuồng gà',pig:'Chuồng heo',chooseSeed:'Chọn hạt giống',chooseFish:'Chọn cá giống',raise:'Thả vào chuồng',buyRaise:'Mua & nuôi',collectEgg:'Nhặt trứng',collectPig:'Đưa vào giỏ',animalHint:'Cho ăn một lần rồi chờ lớn. Không bệnh, không bỏ chạy.',chickenHint:'Cho ăn → nhặt trứng → cho ăn tiếp. Gà vẫn ở trong chuồng.',pigHint:'Cho ăn → chờ lớn → đưa vào giỏ để bán.',moreTools:'Tiện ích khác',readyStatus:'Sẵn sàng',careStatus:'Cần chăm sóc',growingStatus:'Đang lớn',buyAtMarket:'Ghé quầy hàng để mua thêm hạt và cá giống.',crop:'Hạt giống',fish:'Cá giống',animal:'Vật nuôi',decor:'Trang trí'});
+  Object.assign(words.en,{tools:'Farm tools',tool_seed:'Seeds',tool_water:'Watering can',tool_feed:'Feed',tool_collect:'Basket',tool_inspect:'Hand',selectSeed:'Choose seeds',selectWater:'Equip watering can',selectFeed:'Equip feed',selectBasket:'Equip basket',pet:'Pet',adopt:'Choose an animal',inspect:'Inspect',findPatch:'Walk to a patch',details:'Details · Shift E',hint:'1–5 tools · E to use · tap to walk',growingStatus:'Growing peacefully'});
+  Object.assign(words.vi,{tools:'Dụng cụ làm vườn',tool_seed:'Hạt giống',tool_water:'Bình tưới',tool_feed:'Thức ăn',tool_collect:'Giỏ thu hoạch',tool_inspect:'Bàn tay',selectSeed:'Chọn hạt giống',selectWater:'Cầm bình tưới',selectFeed:'Cầm thức ăn',selectBasket:'Cầm giỏ',pet:'Vuốt ve',adopt:'Chọn vật nuôi',inspect:'Xem',findPatch:'Đi tới luống đất',details:'Chi tiết · Shift E',hint:'1–5 chọn đồ · E sử dụng · chạm để đi',growingStatus:'Đang lớn yên bình'});
   const t = key => words[locale][key] || key, now = () => Date.now() + offset;
   const name = key => state?.catalog[key]?.[locale] || key;
   const portrait = () => matchMedia('(orientation:portrait) and (max-width:700px)').matches;
@@ -35,9 +37,9 @@
     try { const version = state?.farm.version; accept(await api('/api/tea/farm')); if (version !== state.farm.version) renderPanel(); if (!pending) notice('welcome'); }
     catch (error) { notice(error.status === 401 ? 'invalidWallet' : 'offline', true); }
   }
-  async function act(input) {
+  async function act(input,interactionTarget=panelTarget) {
     if (busy || !entered || portrait()) return;
-    if(input&&(!panelTarget||Math.hypot(player.x-panelTarget.x,player.y-panelTarget.y)>70))return;
+    if(input&&(!interactionTarget||Math.hypot(player.x-interactionTarget.x,player.y-interactionTarget.y)>70))return;
     if (pending && input) { notice('uncertain', true); return; }
     if (!pending) {
       pending = { ...input, requestId: crypto.randomUUID() };
@@ -63,6 +65,7 @@
       if(bulkRows){bulkEffects=bulkRows.map(row=>({type:type.replace('All',''),item:row.item,...(bulkFish?fishPos(row.slot):plotPos(row.slot)),started:performance.now()}));}
       if(['raiseAnimal','feedAnimal','collectAnimal'].includes(type)){careEffect={type:type==='collectAnimal'?'harvest':type==='feedAnimal'?'feed':'stock',item:type==='collectAnimal'?(attempt.kind==='chicken'?'egg':'grownPig'):attempt.kind,...TeaFarmWorld.animalPos(attempt.kind,attempt.slot),started:performance.now()};canvas.dataset.careEffect=type;}
       if (['harvest','catch','sell','claim'].includes(type)) { $('#harvest-fx').textContent = t(type === 'claim' ? 'reward' : type === 'sell' ? 'sell' : type); effectUntil = performance.now() + 1800; }
+      return true;
     } catch (error) {
       if (error.status && error.status < 500) { outbox.remove(attempt.requestId); loadPending(); if (error.status !== 401) { try { accept(await api('/api/tea/farm')); } catch {} } notice(pending ? 'uncertain' : words[locale][error.code] ? error.code : error.status === 401 ? 'invalidWallet' : 'offline', true); }
       else notice('uncertain', true);
@@ -82,13 +85,23 @@
       const target=nearby();if(!target||target.panel!==key||(slot!==undefined&&slot!==target.slot))return;
       panelTarget=target;selected=target.slot||0;if(target.site!==undefined)fishingSite=target.site;cameraFocus=target.look||target;
     }else{panelTarget=null;cameraFocus=null;}
-    panel=key;controls.reset();path=[];keys.clear();renderPanel();
+    panel=key;hands?.close();controls.reset();path=[];keys.clear();renderPanel();
   }
-  function interact(){if(busy||portrait()||pending)return;const target=nearby();if(target){preferredTarget=target.id;openPanel(target.panel,target.slot);}}
+  function inspectNearby(){if(busy||portrait()||pending)return;const target=nearby();if(target){preferredTarget=target.id;openPanel(target.panel,target.slot);}}
+  async function interact(){
+    if(busy||portrait()||pending||panel||performance.now()<(toolSwing?.until||0))return;const target=nearby();if(!target)return;
+    const plan=TeaFarmTools.resolve(state.farm,state.catalog,target,hands.tool,hands.seed,now());
+    if(plan.open)return inspectNearby();if(plan.choose)return hands.choose(plan.choose);if(plan.suggest)return hands.select(plan.suggest);if(plan.waiting)return;
+    controls.reset();const point=target.look||target;facing=Math.abs(point.x-player.x)>Math.abs(point.y-player.y)?point.x>player.x?'right':'left':point.y>player.y?'down':'up';
+    toolSwing={tool:hands.tool,started:performance.now(),until:performance.now()+500,x:point.x,y:point.y};
+    if(plan.pet){if(!petEffect||performance.now()-petEffect.started>1200)petEffect={...point,started:performance.now()};return;}
+    if(plan.action){const ok=await act(plan.action,target);if(ok&&plan.action.type==='plant')hands.select('water');}
+  }
   function updateInteraction(){
     if(panelTarget&&Math.hypot(player.x-panelTarget.x,player.y-panelTarget.y)>70)openPanel('');
-    const target=nearby(),button=$('#interact');button.hidden=!target||Boolean(panel)||!entered||portrait();
-    if(target){const label=`${t('interact')} · ${targetLabel(target)}`;if(button.textContent!==label)button.textContent=label;button.dataset.target=target.id;button.disabled=busy||Boolean(pending);}
+    const target=nearby(),button=$('#interact'),details=$('#farm-details'),hidden=!target||Boolean(panel)||!entered||portrait()||hands?.choosing;
+    button.hidden=details.hidden=hidden;hands?.refresh(Boolean(panel)||!entered||portrait());
+    if(target){const plan=TeaFarmTools.resolve(state.farm,state.catalog,target,hands.tool,hands.seed,now()),label=t(plan.label);if(button.textContent!==label)button.textContent=label;button.dataset.target=target.id;button.disabled=busy||Boolean(pending)||Boolean(plan.waiting)||performance.now()<(toolSwing?.until||0);details.textContent=t('details');details.disabled=busy||Boolean(pending);}
   }
   function bulkAction(type){const fish=type==='feedAll'||type==='catchAll',care=type==='feedAll'||type==='waterAll',targets=[];state.farm[fish?'ponds':'plots'].forEach((row,slot)=>{if(row&&(care?row.readyAt===null:row.readyAt!==null&&row.readyAt<=now()))targets.push({slot,cycleId:row.cycleId});});if(targets.length)act({type,targets});}
   function sellBasket(){const sale=Object.entries(state.farm.products).filter(([,quantity])=>quantity>0).map(([item,quantity])=>({item,quantity})),total=sale.reduce((sum,row)=>sum+row.quantity*state.catalog[row.item].sell,0);if(total&&confirm(`${t('sellConfirm')} ${total} ${t('gold')}?`))act({type:'sellAll',sale});}
@@ -285,8 +298,7 @@
     const { type, item, x, y } = effect, progress = reducedMotion.matches ? .5 : elapsed / 1600;
     ctx.save(); ctx.translate(x,y); ctx.globalAlpha = reducedMotion.matches ? 1 : Math.min(1,(1600-elapsed)/300);
     if (type === 'water') {
-      // Small watering can and individual droplets, above the selected patch.
-      p(ctx,'#527d83',-38,-49,23,17);p(ctx,'#8ac2bf',-36,-48,19,12);p(ctx,'#486d74',-43,-45,7,10);p(ctx,'#7ca9a7',-17,-43,15,5);p(ctx,'#8ac2bf',-5,-40,7,8);
+      // Water lands on the selected soil; the can stays in the character's hand.
       for(let i=0;i<9;i++){const fall=(progress*2.4+i*.13)%1;p(ctx,i%2?'#b9e4e2':'#74bed2',-3+i*4,-28+fall*48,3,5);}
       p(ctx,'#54775c',-24,22,50,3);
     } else if (type === 'feed' || type === 'stock') {
@@ -307,6 +319,17 @@
     }
     ctx.restore();
   }
+  function drawHands(time){
+    const target=nearby();if(target&&!panel&&['garden','pond','chicken','pig'].includes(target.panel)){
+      const spot=target.look||target,w=target.panel==='garden'?88:66,h=target.panel==='garden'?60:48;
+      ctx.strokeStyle='#fff2b5';ctx.lineWidth=2;for(const sx of [-1,1])for(const sy of [-1,1]){const x=spot.x+sx*w/2,y=spot.y+sy*h/2;ctx.beginPath();ctx.moveTo(x-sx*9,y);ctx.lineTo(x,y);ctx.lineTo(x,y-sy*7);ctx.stroke();}
+    }
+    if(hands&&hands.tool!=='inspect'&&!panel){const active=toolSwing&&time<toolSwing.until,phase=active?(time-toolSwing.started)/500:0,side=facing==='left'?-1:1;
+      ctx.save();ctx.translate(player.x+side*15,player.y-9);if(active&&!reducedMotion.matches)ctx.rotate(side*Math.sin(phase*Math.PI)*.55);TeaFarmTools.icon(ctx,active?toolSwing.tool:hands.tool,0,0,.55);ctx.restore();
+      if(careEffect?.type==='water'&&time-careEffect.started<750){for(let i=0;i<8;i++){const u=reducedMotion.matches?i/8:((time-careEffect.started)/750+i/8)%1,x=player.x+side*20+(careEffect.x-player.x-side*20)*u,y=player.y-12+(careEffect.y-player.y+12)*u-Math.sin(u*Math.PI)*18;p(ctx,'#b5e2e1',x,y,3,4);}}
+    }
+    if(petEffect){const age=(time-petEffect.started)/1400;if(age>=1){petEffect=null;return;}for(let i=0;i<3;i++){const x=petEffect.x-18+i*17,y=petEffect.y-24-(reducedMotion.matches?12:age*30)+(i%2)*6;p(ctx,'#e68d8b',x,y,5,5);p(ctx,'#e68d8b',x+7,y,5,5);p(ctx,'#e68d8b',x-1,y+3,14,5);p(ctx,'#e68d8b',x+2,y+8,8,3);p(ctx,'#e68d8b',x+5,y+11,2,2);}}
+  }
   let miniAt=0;
   function drawMinimap(time){
     if(panel!=='worldMap'||time-miniAt<100)return;miniAt=time;
@@ -320,7 +343,7 @@
   function frame(time){
     const dt=Math.min(.04,(time-frameAt)/1000);frameAt=time;walk=false;
     const v=controls.vector();
-    if(entered&&!portrait()&&panel!=='worldMap'&&!document.querySelector('dialog[open]')){
+    if(entered&&!busy&&!hands?.choosing&&!portrait()&&panel!=='worldMap'&&!document.querySelector('dialog[open]')){
       let input={dx:v.x,dy:v.y,mode:controls.mode};
       if(v.x||v.y){path=[];destination=null;}
       const moved=path.length?TeaMotion.follow(player,path,controls.mode,dt,blocked):TeaMotion.step(player,input,dt,blocked);walk=moved.distance>.001;stride+=moved.distance;if(walk||input.dx||input.dy)facing=moved.facing;
@@ -332,13 +355,13 @@
     const scale=controls.zoom;TeaMotion.camera(camera,player,rect,TeaFarmWorld,scale,dt,!cameraReady||resized||reducedMotion.matches);cameraReady=true;
     canvas.dataset.view=JSON.stringify({scale,tx:-camera.x*scale,ty:-camera.y*scale});
     ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);ctx.scale(scale,scale);ctx.translate(-camera.x,-camera.y);ctx.imageSmoothingEnabled=false;ctx.drawImage(staticMap,0,0);
-    const f=state?.farm;
+    const f=state?.farm,focusTarget=nearby();
     drawPondWater(time);
     ctx.save();ctx.translate(685,600);drawPondWater(time);ctx.restore();
     if(destination&&path.length){const pulse=reducedMotion.matches?0:Math.sin(time/220)*2;ctx.strokeStyle='#f1e3aa';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(destination.x,destination.y+8,10+pulse,4+pulse*.3,0,0,Math.PI*2);ctx.stroke();}
     for(let i=0;i<TeaFarmWorld.maxPlots;i++){const pos=plotPos(i),unlocked=i<(f?.plots.length||6),row=f?.plots[i],wet=row?.readyAt!=null;p(ctx,unlocked?'#9e784e':'#89975c',pos.x-45,pos.y-32,90,62);p(ctx,unlocked?wet?'#876746':'#b28b58':'#829454',pos.x-41,pos.y-28,82,54);for(let j=0;j<4;j++)p(ctx,unlocked?wet?'#70573c':'#9f794f':'#788d51',pos.x-35,pos.y-19+j*12,70,3);
       if(panel==='garden'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=3;ctx.strokeRect(pos.x-46,pos.y-33,92,64);}
-      if(row){const progress=row.readyAt===null?.1:Math.min(1,1-(row.readyAt-now())/(state.catalog[row.item].seconds*1000));for(const dx of [-22,20])drawItem(ctx,row.item,pos.x+dx,pos.y+3,1.1,progress,time);if((panel==='garden'&&selected===i)||row.readyAt===null||row.readyAt<=now())badge(row.readyAt===null?t('water'):remaining(row),pos.x,pos.y-36,row.readyAt!==null&&row.readyAt<=now()?'#ffe5a0':'#ecf0ce');}
+      if(row){const stage=TeaFarmTools.stage(row,state.catalog[row.item].seconds,now()),progress=[0,.1,.4,.64,1][stage];for(const dx of [-23,0,23])for(const dy of [-7,15]){if(stage===0){p(ctx,'#ead1a1',pos.x+dx-2,pos.y+dy,4,3);p(ctx,'#775333',pos.x+dx-3,pos.y+dy+3,6,2);}else{drawItem(ctx,row.item,pos.x+dx,pos.y+dy,.72,progress,time);if(stage===3){p(ctx,'#edd2a0',pos.x+dx-3,pos.y+dy-16,5,4);p(ctx,'#f7e7be',pos.x+dx+3,pos.y+dy-12,4,4);}}}if(focusTarget?.id==='garden:'+i)badge(row.readyAt===null?t('water'):remaining(row),pos.x,pos.y-36,row.readyAt!==null&&row.readyAt<=now()?'#ffe5a0':'#ecf0ce');}
       else if(panel==='garden'||!unlocked)badge(unlocked?String(i+1):'+',pos.x,pos.y,unlocked?'#d5be8b':'#a9b57c');
     }
     for(let i=0;i<(f?.ponds.length||2);i++){const pos=fishPos(i),row=f?.ponds[i];if(row){const phase=reducedMotion.matches?i:time/1800+i,swim=Math.sin(phase)*19;
@@ -347,15 +370,20 @@
     }else if(panel==='pond')badge(`${i+1} +`,pos.x,pos.y,'#b9d8bd');if(panel==='pond'&&selected===i){ctx.strokeStyle='#fff0af';ctx.lineWidth=2;ctx.strokeRect(pos.x-42,pos.y-40,84,72);}}
     f?.placed.forEach((item,i)=>{if(item)drawItem(ctx,item,decorations[i].x,decorations[i].y,1.6);});
     for(const kind of ['chicken','pig'])for(let slot=0;slot<2;slot++){
-      const row=f?.animals?.[kind]?.[slot],pos=TeaFarmWorld.animalPos(kind,slot);if(row){const moving=!reducedMotion.matches,drift=moving?Math.sin(time/1700+slot)*12:0;ctx.save();ctx.translate(pos.x+drift,pos.y);if(moving&&Math.cos(time/1700+slot)<0)ctx.scale(-1,1);drawItem(ctx,kind,0,0,kind==='chicken'?1.3:1.1,1,moving?time:0);ctx.restore();
-        if(row.readyAt!==null&&row.readyAt<=now())badge(t(kind==='chicken'?'collectEgg':'readyStatus'),pos.x,pos.y-40,'#ffe5a0');else if(panel===kind&&selected===slot)badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-40);
-      }else{badge('+',pos.x,pos.y,'#e4d7b0');}
+      const row=f?.animals?.[kind]?.[slot],pos=TeaFarmWorld.animalPos(kind,slot);
+      if(row){const pose=TeaFarmTools.animalPose(kind,slot,time,reducedMotion.matches),age=TeaFarmTools.stage(row,state.catalog[kind].seconds,now()),size=(kind==='chicken'?1.2:1.1)*(age<2?.8:1);
+        ctx.save();ctx.translate(pos.x+pose.x,pos.y+pose.y+(pose.peck?2:0));if(pose.flip)ctx.scale(-1,1);drawItem(ctx,kind,0,0,size,1,pose.peck?0:time);ctx.restore();
+        if(row.readyAt!==null){p(ctx,'#b99860',pos.x-17,pos.y+26,34,9);for(let j=0;j<6;j++)p(ctx,'#edca77',pos.x-14+j*5,pos.y+26+(j%2)*3,3,3);}
+        if(kind==='chicken'&&row.readyAt!==null&&row.readyAt<=now())drawItem(ctx,'egg',pos.x+25,pos.y+15,.65,1);
+        if(focusTarget?.id===kind+':'+slot)badge(row.readyAt===null?t('feed'):remaining(row),pos.x,pos.y-47);
+      }else if(focusTarget?.id===kind+':'+slot)badge(t('adopt'),pos.x,pos.y,'#e4d7b0');
     }
     drawFishing(time);
     ctx.save();ctx.translate(685,600);drawFishing(time,1);ctx.restore();
     const fishingPose=!walk&&f?.fishing&&f.fishing.status!=='finished';
     TeaFarmAvatar(ctx,player.x,player.y,profile||{hair:1,clothes:2,shoes:0},fishingPose?'up':facing,stride,walk,reducedMotion.matches,Boolean(careEffect));
     if(walk&&!reducedMotion.matches&&stride%25<10){p(ctx,'#d3c797',player.x-6,player.y+15,3,2);p(ctx,'#d3c797',player.x+7,player.y+17,3,2);}
+    drawHands(time);
     drawCareEffect(time);
     bulkEffects=bulkEffects.filter(effect=>time-effect.started<1600);bulkEffects.forEach(effect=>drawCareEffect(time,effect));
     drawMinimap(time);
@@ -368,17 +396,17 @@
     requestAnimationFrame(frame);
   }
   canvas.addEventListener('pointerdown',event=>{
-    if(!state||portrait())return;event.preventDefault();canvas.focus();const r=canvas.getBoundingClientRect(),x=(event.clientX-r.left)/camera.scale+camera.x,y=(event.clientY-r.top)/camera.scale+camera.y;
+    if(!state||portrait()||busy)return;hands.close();event.preventDefault();canvas.focus();const r=canvas.getBoundingClientRect(),x=(event.clientX-r.left)/camera.scale+camera.x,y=(event.clientY-r.top)/camera.scale+camera.y;
     const target=TeaFarmWorld.hitAt(x,y,state.farm);
     if(target){openPanel('');preferredTarget=target.id;routeTo(target.x,target.y);return;}
     if(x>370&&x<460&&y>570&&y<630){location.assign('/tra-da');return;}
     openPanel('');preferredTarget=null;routeTo(x,y);
   });
   canvas.addEventListener('contextmenu',event=>event.preventDefault());
-  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel)interact();return;}if(key==='escape'){openPanel('');return;}});
+  window.addEventListener('keydown',e=>{if(e.target.closest('input,textarea,select,dialog')||portrait())return;const key=e.key.toLowerCase();if(key==='e'&&!e.repeat){e.preventDefault();if(!panel){if(e.shiftKey)inspectNearby();else interact();}return;}if(key==='escape'){openPanel('');return;}});
   window.addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));window.addEventListener('blur',()=>{keys.clear();path=[];});window.addEventListener('resize',()=>{keys.clear();path=[];});document.addEventListener('visibilitychange',()=>{keys.clear();if(!document.hidden)refresh();});
   document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(panel===b.dataset.panel?'':b.dataset.panel));$('#close-panel').onclick=()=>openPanel('');
-  $('#interact').onclick=interact;
+  $('#interact').onclick=interact;$('#farm-details').onclick=inspectNearby;
   $('#map-toggle').onclick=()=>openPanel(panel==='worldMap'?'':'worldMap');
   $('#lang').onclick=()=>{locale=locale==='en'?'vi':'en';applyLocale();notice(pending?'uncertain':'welcome',Boolean(pending));};
   function showWallet(){keys.clear();$('#wallet-code').value=token||'';$('#wallet-dialog').showModal();}
@@ -406,5 +434,6 @@
   if('serviceWorker'in navigator){navigator.serviceWorker.register('/tra-da-sw.js',{scope:'/tra-da'}).then(reg=>{const watch=()=>{if(reg.waiting&&navigator.serviceWorker.controller){waitingWorker=reg.waiting;$('#update').hidden=false;}};watch();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',watch));}).catch(()=>{});navigator.serviceWorker.addEventListener('controllerchange',()=>{if(updateRequested&&!busy&&!pending)location.reload();});}
   $('#update').onclick=()=>{if(!busy&&!pending&&waitingWorker){updateRequested=true;waitingWorker.postMessage({type:'SKIP_WAITING'});}};
   let lastPoll=0;
+  hands=TeaFarmHands({world:canvas.parentElement,state:()=>state,nearby,locale:()=>locale,t,name,stop:()=>controls.reset(),available:()=>entered&&!busy&&!pending&&!panel&&!portrait()&&!document.querySelector('dialog[open]')});
   applyLocale();requestAnimationFrame(frame);boot();setInterval(()=>{const active=state?.farm.fishing&&state.farm.fishing.status!=='finished';if(active||Date.now()-lastPoll>=10000){lastPoll=Date.now();refresh();}},2000);
 })();
