@@ -1,6 +1,6 @@
 window.TeaFarmRanch={
   scenery(c,p,locale){
-    for(const [left,kind] of [[810,'chicken'],[1080,'pig']]){
+    for(const [left,kind] of [[1080,'pig']]){
       p(c,'#8c7750',left,735,235,130);p(c,kind==='chicken'?'#c8b67a':'#b99979',left+7,742,221,116);
       p(c,'#9d7950',left+15,709,75,61);p(c,'#d9bb82',left+20,715,65,49);p(c,kind==='chicken'?'#8b6245':'#7e8980',left+6,700,95,17);
       p(c,'#5b513c',left+40,741,23,25);p(c,'#dbc99a',left+112,763,54,9);
