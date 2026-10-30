@@ -1,6 +1,6 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.TeaFarmWorld=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   const width=2000,height=1400,maxPlots=24,maxPonds=12;
-  const plotPos=i=>({x:130+(i%4)*110+(i>=12?1000:0),y:290+Math.floor(i%12/4)*90});
+  const plotPos=i=>({x:150+(i%4)*40+(i>=12?1000:0),y:310+Math.floor(i%12/4)*40});
   const fishPos=i=>({x:720+(i%2)*110+(i>=6?685:0),y:290+Math.floor(i%6/2)*90+(i>=6?600:0)});
   const ponds=[{x:648,y:225,w:258,h:297},{x:1333,y:825,w:258,h:297}];
   const orchard=Array.from({length:8},(_,i)=>({x:220+(i%4)*160,y:920+Math.floor(i/4)*190}));
@@ -25,7 +25,7 @@
   const animalPos=(kind,slot,time=clock())=>{if(kind==='chicken'){const m=roam(slot,time);return{x:m.x,y:m.y};}return{x:1145+slot*110,y:810};};
   function targets(farm){
     const result=[],now=clock();
-    (farm?.plots||[]).forEach((_,slot)=>{const p=plotPos(slot);result.push({id:`garden:${slot}`,panel:'garden',slot,x:p.x,y:p.y+43,look:p,hit:{x:p.x-48,y:p.y-36,w:96,h:72}});});
+    (farm?.plots||[]).forEach((_,slot)=>{const p=plotPos(slot);result.push({id:`garden:${slot}`,panel:'garden',slot,x:p.x,y:p.y,look:p,hit:{x:p.x-20,y:p.y-20,w:40,h:40}});});
     (farm?.ponds||[]).forEach((_,slot)=>{const p=fishPos(slot);result.push({id:`pond:${slot}`,panel:'pond',slot,x:620+(slot>=6?685:0),y:p.y,look:p,hit:{x:p.x-52,y:p.y-42,w:104,h:84}});});
     for(const kind of ['chicken','pig'])for(let slot=0;slot<2;slot++){const p=animalPos(kind,slot,now),free=kind==='chicken';result.push({id:`${kind}:${slot}`,panel:kind,slot,x:p.x,y:free?p.y+34:890,look:p,hit:free?{x:p.x-40,y:p.y-40,w:80,h:85}:{x:p.x-50,y:730,w:100,h:135}});}
     for(let site=0;site<2;site++)result.push({id:`fishing:${site}`,panel:'fishing',site,x:780+685*site,y:540+600*site,look:{x:780+685*site,y:420+600*site},hit:{x:738+685*site,y:468+600*site,w:102,h:90}});
@@ -36,7 +36,12 @@
       {id:'decorate',panel:'decorate',x:520,y:235,hit:{x:390,y:90,w:250,h:120}}
     );return result;
   }
-  function nearest(player,farm,preferred){const near=targets(farm).filter(t=>Math.hypot(t.x-player.x,t.y-player.y)<=56);return near.find(t=>t.id===preferred)||near.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0]||null;}
+  function nearest(player,farm,preferred,facing){
+    const list=targets(farm),direction={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]}[facing];
+    if(direction){const aim={x:player.x+direction[0]*28,y:player.y+direction[1]*28};const tile=list.find(t=>t.panel==='garden'&&Math.abs(t.x-aim.x)<20&&Math.abs(t.y-aim.y)<20);if(tile)return tile;}
+    const near=list.filter(t=>(!direction||t.panel!=='garden')&&Math.hypot(t.x-player.x,t.y-player.y)<=56);
+    return near.find(t=>t.id===preferred)||near.sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0]||null;
+  }
   function hitAt(x,y,farm){return targets(farm).find(t=>x>=t.hit.x&&x<=t.hit.x+t.hit.w&&y>=t.hit.y&&y<=t.hit.y+t.hit.h)||null;}
   return {width,height,maxPlots,maxPonds,plotPos,fishPos,blocked,ponds,places,orchard,animalPos,chickenMood,targets,nearest,hitAt};
 });

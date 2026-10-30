@@ -3,7 +3,7 @@ const {MemoryFirestore}=require('./helpers/memory-firestore');
 const {createFarm}=require('../features/tea/farm');
 const world=require('../public/tea/farm-world'),motion=require('../public/tea/farm-motion');
 function fixture(){let time=1800000000000;const db=new MemoryFirestore(),farm=createFarm({db,now:()=>time});return{db,farm,tick:ms=>time+=ms,send:input=>farm.action('farmer',{requestId:crypto.randomUUID(),...input})};}
-async function planted(f,fish=false){const rows=[];for(let slot=0;slot<2;slot++){const r=await f.send({type:fish?'stock':'plant',item:fish?'guppy':'radish',slot});rows.push({slot,cycleId:r.farm[fish?'ponds':'plots'][slot].cycleId});}return rows;}
+async function planted(f,fish=false){const rows=[];for(let slot=0;slot<2;slot++){if(!fish)await f.send({type:'hoe',slot});const r=await f.send({type:fish?'stock':'plant',item:fish?'guppy':'radish',slot});rows.push({slot,cycleId:r.farm[fish?'ponds':'plots'][slot].cycleId});}return rows;}
 test('expanded world has four times the area and connected routes to all zones and working slots',()=>{
   assert.equal(world.width*world.height,1000*700*4);
   const places=[...world.places,...Array.from({length:24},(_,i)=>{const p=world.plotPos(i);return{x:p.x,y:p.y+43};}),...Array.from({length:12},(_,i)=>({x:620+(i>=6?685:0),y:world.fishPos(i).y}))];

@@ -34,6 +34,7 @@ test('all crop and fish types require care, mature offline and can be harvested 
   for (const [item, def] of Object.entries(CATALOG).filter(([,d]) => ['crop','fish'].includes(d.type))) {
     const f = await fixture(), fish = def.type === 'fish';
     await f.send({ type: 'buy', item });
+    if(!fish)await f.send({type:'hoe',slot:0});
     const planted = await f.send({ type: fish ? 'stock' : 'plant', item, slot: 0 });
     const cycleId = planted.farm[fish ? 'ponds' : 'plots'][0].cycleId;
     const harvest = { type: fish ? 'catch' : 'harvest', slot: 0, cycleId };
@@ -61,7 +62,7 @@ test('concurrent purchases cannot overspend; duplicate request cannot double cha
 });
 
 test('repeated or concurrent harvest cannot duplicate products, even with new request ids', async () => {
-  const f = await fixture(), p = await f.send({ type:'plant', item:'radish', slot:0 }), cycleId = p.farm.plots[0].cycleId;
+  const f = await fixture();await f.send({type:'hoe',slot:0});const p = await f.send({ type:'plant', item:'radish', slot:0 }), cycleId = p.farm.plots[0].cycleId;
   await f.send({ type:'water',slot:0,cycleId }); f.tick(60_000);
   const input = { type:'harvest',slot:0,cycleId,requestId:crypto.randomUUID() };
   await Promise.all([f.send(input),f.send(input)]);
@@ -72,7 +73,7 @@ test('repeated or concurrent harvest cannot duplicate products, even with new re
 });
 
 test('quest rewards, upgrades and decoration placement are persistent and idempotent', async () => {
-  const f = await fixture(); let result = await f.send({ type:'plant',item:'radish',slot:0 }); const cycleId = result.farm.plots[0].cycleId;
+  const f = await fixture();await f.send({type:'hoe',slot:0}); let result = await f.send({ type:'plant',item:'radish',slot:0 }); const cycleId = result.farm.plots[0].cycleId;
   await f.send({ type:'water',slot:0,cycleId });f.tick(60_000);await f.send({ type:'harvest',slot:0,cycleId });
   const claim = { type:'claim',quest:'firstCrop',requestId:crypto.randomUUID() };
   await Promise.all([f.send(claim),f.send(claim)]);

@@ -7,6 +7,8 @@
   if(tool==='inspect')return animal&&row?{pet:true,label:'pet'}:{open:true,label:'inspect'};
   if(!row){
    if(animal)return{open:true,label:'adopt'};
+   if(garden&&!farm.tilled?.[slot])return tool==='hoe'?{action:{type:'hoe',slot},label:'hoe'}:{suggest:'hoe',label:'selectHoe'};
+   if(garden&&tool==='hoe')return{suggest:'seed',label:'selectSeed'};
    if(tool!=='seed')return{suggest:'seed',label:'selectSeed'};
    const category=fish?'fish':'crop';if(catalog[seed]?.type!==category||!(farm.seeds[seed]>0))return{choose:category,label:fish?'chooseFish':'chooseSeed'};
    return{action:{type:fish?'stock':'plant',item:seed,slot},label:fish?'stock':'plant'};
@@ -18,7 +20,8 @@
   return{action:{type,slot,cycleId:row.cycleId,...(animal?{kind:panel}:{})},label:needed==='collect'?(animal?panel==='chicken'?'collectEgg':'collectPig':type):needed};
  }
  function icon(c,key,x=24,y=26,size=1){c.save();c.translate(x,y);c.scale(size,size);const p=(color,x,y,w,h)=>{c.fillStyle=color;c.fillRect(x,y,w,h);};
-  if(key==='water'){p('#3e676b',-13,-7,22,18);p('#8dbeb7',-11,-5,18,13);p('#527e80',8,-5,14,5);p('#9ed7d5',19,-3,5,7);p('#456c70',-18,-4,5,11);p('#e4eee0',-7,-9,9,3);}
+  if(key==='hoe'){p('#7c5434',-3,-14,6,31);p('#c79b61',-1,-12,2,27);p('#42575c',-15,-17,24,8);p('#9dafac',-14,-17,22,4);p('#667d7e',-15,-12,8,7);}
+  else if(key==='water'){p('#3e676b',-13,-7,22,18);p('#8dbeb7',-11,-5,18,13);p('#527e80',8,-5,14,5);p('#9ed7d5',19,-3,5,7);p('#456c70',-18,-4,5,11);p('#e4eee0',-7,-9,9,3);}
   else if(key==='seed'){p('#8c6846',-12,-14,24,29);p('#d3bc83',-10,-12,20,25);p('#f2dfb1',-10,-11,20,5);p('#628343',-2,-4,3,13);p('#83a153',-8,-5,7,4);p('#4d763e',1,-8,8,5);}
   else if(key==='feed'){p('#92734e',-14,-7,28,22);p('#dac18b',-11,-10,22,22);p('#e1ac4f',-13,-14,26,8);for(let i=0;i<5;i++)p('#f4db8d',-9+i*4,-15+(i%2)*3,3,3);p('#94774d',-6,-1,12,3);}
   else if(key==='collect'){p('#745836',-13,-8,4,13);p('#745836',9,-8,4,13);p('#745836',-9,-12,18,4);p('#b88b54',-16,1,32,16);p('#e1ba76',-18,-2,36,5);for(let i=0;i<5;i++)p('#d3aa66',-12+i*6,4,3,10);}
@@ -31,7 +34,7 @@
   if(!target||!['garden','pond','chicken','pig'].includes(target.panel))return null;
   const {panel,slot}=target,animal=panel==='chicken'||panel==='pig';
   const row=(animal?farm.animals?.[panel]:farm[panel==='garden'?'plots':'ponds'])?.[slot];
-  if(!row)return{key:'empty',progress:0,seconds:0};
+  if(!row)return{key:panel==='garden'?(farm.tilled?.[slot]?'soilReady':'soilWild'):'empty',progress:0,seconds:0};
   const item=animal?panel:row.item;
   if(row.readyAt===null)return{item,key:'careStatus',progress:0,seconds:0};
   const seconds=Math.max(0,Math.ceil((row.readyAt-now)/1000));
@@ -39,7 +42,7 @@
  }
  function preferences(value,catalog){
   value=value&&typeof value==='object'?value:{};
-  return{tool:['seed','water','feed','collect','inspect'].includes(value.tool)?value.tool:'seed',crop:catalog[value.crop]?.type==='crop'?value.crop:'radish',fish:catalog[value.fish]?.type==='fish'?value.fish:'guppy'};
+  return{tool:['hoe','seed','water','feed','collect','inspect'].includes(value.tool)?value.tool:'hoe',crop:catalog[value.crop]?.type==='crop'?value.crop:'radish',fish:catalog[value.fish]?.type==='fish'?value.fish:'guppy'};
  }
  function receipt(before={},after={}){return Object.entries(after).filter(([item,quantity])=>quantity>(before[item]||0)).map(([item,quantity])=>({item,quantity:quantity-(before[item]||0)}));}
  return{resolve,stage,icon,animalPose,status,preferences,receipt};

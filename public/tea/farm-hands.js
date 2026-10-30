@@ -1,5 +1,5 @@
 window.TeaFarmHands=({world,state,nearby,locale,t,name,stop,available,now})=>{
- let tool='seed',crop='radish',fish='guppy',stamp='',restored=false;const keys=['seed','water','feed','collect','inspect'],storageKey='locly-farm-tools';
+ let tool='hoe',crop='radish',fish='guppy',stamp='',restored=false;const keys=['hoe','seed','water','feed','collect','inspect'],storageKey='locly-farm-tools';
  const save=()=>{try{localStorage.setItem(storageKey,JSON.stringify({tool,crop,fish}));}catch{}};
  const belt=document.createElement('div');belt.className='farm-belt';belt.setAttribute('role','toolbar');
  const caption=document.createElement('div');caption.className='farm-tool-caption';

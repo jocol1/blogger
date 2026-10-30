@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const tools=require('../public/tea/farm-tools');
-const catalog={radish:{type:'crop',seconds:60},guppy:{type:'fish',seconds:120}},farm={plots:[null],ponds:[null],animals:{chicken:[null,null],pig:[null,null]},seeds:{radish:2,guppy:1}};
+const catalog={radish:{type:'crop',seconds:60},guppy:{type:'fish',seconds:120}},farm={tilled:[true],plots:[null],ponds:[null],animals:{chicken:[null,null],pig:[null,null]},seeds:{radish:2,guppy:1}};
 test('direct tools choose the exact plot, inventory item and current cycle',()=>{
  const f=structuredClone(farm),target={panel:'garden',slot:0};assert.deepEqual(tools.resolve(f,catalog,target,'seed','radish',100).action,{type:'plant',item:'radish',slot:0});
  f.plots[0]={item:'radish',cycleId:'a',readyAt:null};assert.equal(tools.resolve(f,catalog,target,'seed','radish',100).suggest,'water');assert.deepEqual(tools.resolve(f,catalog,target,'water','radish',100).action,{type:'water',slot:0,cycleId:'a'});
@@ -20,7 +20,7 @@ test('crops have distinct seed, sprout, leaf, flowering and ripe stages',()=>{
 });
 test('nearby status distinguishes empty, thirsty, growing and ripe without changing farm state',()=>{
  const f=structuredClone(farm),target={panel:'garden',slot:0};
- assert.equal(tools.status(f,catalog,target,0).key,'empty');
+ assert.equal(tools.status(f,catalog,target,0).key,'soilReady');
  f.plots[0]={item:'radish',readyAt:null};assert.equal(tools.status(f,catalog,target,0).key,'careStatus');
  f.plots[0].readyAt=60000;const before=JSON.stringify(f);
  assert.deepEqual(tools.status(f,catalog,target,30000),{item:'radish',key:'growingStatus',seconds:30,progress:.5});
@@ -28,7 +28,7 @@ test('nearby status distinguishes empty, thirsty, growing and ripe without chang
  assert.equal(tools.status(f,catalog,{panel:'shop'},0),null);
 });
 test('saved tools tolerate corrupt or removed choices and receipt ignores losses',()=>{
- assert.deepEqual(tools.preferences({tool:'invalid',crop:'guppy',fish:'radish'},catalog),{tool:'seed',crop:'radish',fish:'guppy'});
+ assert.deepEqual(tools.preferences({tool:'invalid',crop:'guppy',fish:'radish'},catalog),{tool:'hoe',crop:'radish',fish:'guppy'});
  assert.equal(tools.preferences({tool:'collect',crop:'radish',fish:'guppy'},catalog).tool,'collect');
  assert.deepEqual(tools.receipt({radish:3,egg:1},{radish:4,egg:1}),[{item:'radish',quantity:1}]);
  assert.deepEqual(tools.receipt({radish:3},{radish:3}),[]);
