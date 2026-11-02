@@ -4,6 +4,8 @@
 
 ## Chạy local
 
+**Đơn hàng dân làng (PWA v45):** trong nông trại, mở Bản đồ → Bảng đơn dân làng → Tới đây, rồi bấm Tương tác/E. Bảng chỉ mở khi chủ động tương tác. Mỗi ngày có ba đơn rau/cá/trứng, đổi lúc 00:00 giờ Việt Nam; mỗi đơn được giao một lần mỗi nông trại. Đồ bị trừ khỏi giỏ, nhận vàng nông trại bằng 150% giá bán thường (làm tròn lên), không đụng tới xu trả phí. Không cần nhận đơn trước, không có phạt khi bỏ qua. Tab Cột mốc giữ nhiệm vụ cũ. `orders` trong phản hồi farm do server tạo; `deliverOrder` nhận `orderId` và `requestId`, kiểm tra ngày trong transaction và ghi trừ đồ/cộng vàng/biên nhận nguyên tử. Retry thành công vẫn an toàn qua ngày mới; mã đơn đã hết hạn chưa giao bị từ chối. Chỉ lưu danh sách tối đa ba đơn hoàn thành của ngày gần nhất và tổng số lượt giao. Kiểm thử: `tests/tea-farm-orders.test.js`, `tests/browser/tea-farm-orders.js`.
+
 ```powershell
 npm install
 Copy-Item .env.example .env

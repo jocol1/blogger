@@ -22,7 +22,7 @@ window.TeaFarmExpansion=(c,p,tree,world,locale)=>{
   p(c,'#806143',616,779,6,57);p(c,'#b38c5d',600,754,100,65);p(c,'#e8d6a9',606,760,88,52);
   for(let i=0;i<3;i++){p(c,'#fff3d0',612+i*25,769,20,29);p(c,'#a39773',615+i*25,776,14,2);}
   const sign=(x,y,en,vi)=>{p(c,'#785c40',x-3,y,6,32);p(c,'#d6bb85',x-66,y-19,132,23);c.font='bold 11px system-ui';c.textAlign='center';c.fillStyle='#385440';c.fillText(locale==='vi'?vi:en,x,y-3);};
-  sign(1230,580,'EAST FIELDS','RUỘNG PHÍA ĐÔNG');sign(1180,1160,'SOUTH POND →','AO PHÍA NAM →');sign(330,1235,'ORCHARD','VƯỜN CÂY');sign(1750,470,'SHOP','CỬA HÀNG');sign(1815,559,'SELL BASKET','BÁN NÔNG SẢN');sign(650,850,'TASKS','NHIỆM VỤ');
+  sign(1230,580,'EAST FIELDS','RUỘNG PHÍA ĐÔNG');sign(1180,1160,'SOUTH POND →','AO PHÍA NAM →');sign(330,1235,'ORCHARD','VƯỜN CÂY');sign(1750,470,'SHOP','CỬA HÀNG');sign(1815,559,'SELL BASKET','BÁN NÔNG SẢN');sign(650,850,'VILLAGE BOARD','BẢNG DÂN LÀNG');
   for(let x=80;x<1950;x+=80){tree(c,x,1370,.7);if(x>1000)tree(c,x,60,.9);}
   for(let y=120;y<1300;y+=95)tree(c,1960,y,.8);
 };

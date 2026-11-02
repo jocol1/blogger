@@ -1,5 +1,6 @@
 const crypto = require('node:crypto');
 const fishing = require('./fishing');
+const orders = require('./farm-orders');
 
 // All prices are play-only farm gold. This module never writes to paid wallets.
 const CATALOG = {
@@ -42,7 +43,7 @@ function ensureSoil(farm){
 }
 function createFarm({ db, now = () => Date.now() }) {
   const refFor = id => db.collection('tea_farms').doc(id);
-  const view = farm => ({ farm:{...farm,animals:farm.animals||{chicken:[null,null],pig:[null,null]},fishing:fishing.publicRound(farm.fishing)}, catalog: CATALOG, quests: QUESTS, serverNow: now() });
+  const view = farm => { const at=now();return { farm:{...farm,animals:farm.animals||{chicken:[null,null],pig:[null,null]},fishing:fishing.publicRound(farm.fishing)}, catalog: CATALOG, quests: QUESTS, orders:orders.board(farm,at,CATALOG), serverNow:at }; };
   async function read(id) {
     const farm = await db.runTransaction(async tx => {
       const ref = refFor(id), snap = await tx.get(ref);
@@ -61,10 +62,10 @@ function createFarm({ db, now = () => Date.now() }) {
     const { type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase } = input;
     if (item !== undefined && item !== null && typeof item !== 'string') fail('farm_bad_item', 400);
     const fishingAction = ['castLine','hookFish','reelFish','stopFishing'].includes(type);
-    const allowed = ['hoe','raiseAnimal','feedAnimal','collectAnimal','waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
+    const allowed = ['deliverOrder','hoe','raiseAnimal','feedAnimal','collectAnimal','waterAll','feedAll','harvestAll','catchAll','sellAll','castLine','hookFish','reelFish','stopFishing','buy', 'plant', 'stock', 'water', 'feed', 'harvest', 'catch', 'sell', 'upgradePlots', 'upgradePond', 'decorate', 'claim'];
     if (!allowed.includes(type)) fail('farm_bad_action', 400);
     // Unknown fields (including client gold/timestamps/owner) cannot affect state.
-    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase, fishingVersion:input.fishingVersion, reelStep:input.reelStep })).digest('hex');
+    const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ type, item, slot, cycleId, quantity, quest, roundId, targets, sale, kind, purchase, fishingVersion:input.fishingVersion, reelStep:input.reelStep, orderId:input.orderId })).digest('hex');
     const attempt = db.collection('tea_farm_actions').doc(crypto.createHash('sha256').update(id + ':' + input.requestId).digest('hex'));
     // Judge the reel when its request reaches the service, not after database latency/retries.
     const actionAt = now();
@@ -82,7 +83,9 @@ function createFarm({ db, now = () => Date.now() }) {
       const def = Object.hasOwn(CATALOG, item || '') ? CATALOG[item] : null;
       const qty = quantity === undefined ? 1 : quantity;
       const spend = amount => { if (farm.gold < amount) fail('farm_not_enough_gold'); farm.gold -= amount; };
-      if(type==='hoe'){
+      if(type==='deliverOrder'){
+        orders.deliver(farm,input,now(),CATALOG,fail);
+      }else if(type==='hoe'){
         if(!Number.isInteger(slot)||slot<0||slot>=farm.plots.length)fail('farm_bad_slot',400);
         if(farm.plots[slot])fail('farm_slot_busy');
         if(farm.tilled[slot])fail('farm_already_tilled');farm.tilled[slot]=true;

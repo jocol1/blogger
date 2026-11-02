@@ -28,6 +28,8 @@
   Object.assign(words.en,{hoe:'Hoe soil',tool_hoe:'Hoe',selectHoe:'Equip hoe',soilWild:'Untilled ground',soilReady:'Ready to plant',farm_untilled:'Hoe this tile before planting.',farm_already_tilled:'Already tilled. Choose seeds.',patch:'Tile',plotHint:'One tile, one plant. Hoe → sow → water → harvest.',intro:'Free hoe and water. Hoe one tile, sow a seed, water and harvest. Nothing withers!'});
   Object.assign(words.vi,{hoe:'Cuốc đất',tool_hoe:'Cuốc',selectHoe:'Cầm cuốc',soilWild:'Đất chưa cuốc',soilReady:'Đất sẵn sàng gieo',farm_untilled:'Cuốc ô đất này trước khi gieo nhé.',farm_already_tilled:'Đã cuốc rồi, chọn hạt giống nhé.',patch:'Ô đất',plotHint:'Một ô, một cây. Cuốc → gieo → tưới → thu hoạch.',intro:'Cuốc và nước miễn phí. Cuốc từng ô, gieo một hạt, tưới rồi thu hoạch. Không lo cây héo!'});
   const name = key => state?.catalog[key]?.[locale] || key;
+  Object.assign(words.en,{quests:'Village board',dailyOrders:'Daily requests',milestones:'Milestones',orderHint:'Deliver from your basket for 50% more farm gold than selling. New requests at midnight, Vietnam time.',deliver:'Deliver',delivered:'Delivered',orderNeed:'In basket',orderRefresh:'New requests in',orderRefreshing:'Fetching new requests…',orderThanks:'Thank you! Delivery received',farm_order_expired:'This request has expired. The board has refreshed.',farm_order_delivered:'Already delivered. Your reward is safe.',farm_order_missing:'Not enough produce in your basket yet.'});
+  Object.assign(words.vi,{quests:'Bảng dân làng',dailyOrders:'Đơn hôm nay',milestones:'Cột mốc',orderHint:'Giao đồ trong giỏ, nhận thêm 50% vàng so với bán thường. Đổi đơn lúc 0 giờ Việt Nam.',deliver:'Giao hàng',delivered:'Đã giao',orderNeed:'Trong giỏ',orderRefresh:'Đơn mới sau',orderRefreshing:'Đang lấy đơn mới…',orderThanks:'Cảm ơn nhé! Đã nhận hàng',farm_order_expired:'Đơn này hết hạn rồi. Đã cập nhật bảng mới.',farm_order_delivered:'Đã giao rồi, phần thưởng vẫn còn nguyên nhé.',farm_order_missing:'Giỏ chưa đủ món cần giao nhé.'});
   const portrait = () => matchMedia('(orientation:portrait) and (max-width:700px)').matches;
   function notice(key, error = false) { $('#notice-text').textContent = t(key); $('#notice').classList.toggle('error', error);$('#notice').classList.toggle('quiet',!error&&['welcome','saved'].includes(key)); $('#retry').hidden = !error; }
   async function api(url, options = {}) {
@@ -38,7 +40,7 @@
   function loadPending() { pending = outbox.first(); }
   async function refresh() {
     if (!entered || busy) return;
-    try { const version = state?.farm.version; accept(await api('/api/tea/farm')); if (version !== state.farm.version) renderPanel(); if (!pending) notice('welcome'); }
+    try { const version = state?.farm.version,day=state?.orders?.day; accept(await api('/api/tea/farm')); if (version !== state.farm.version||day!==state.orders?.day) renderPanel(); if (!pending) notice('welcome'); }
     catch (error) { notice(error.status === 401 ? 'invalidWallet' : 'offline', true); }
   }
   async function act(input,interactionTarget=panelTarget) {
@@ -60,6 +62,7 @@
     try {
       const type = attempt.type; accept(await api('/api/tea/farm/actions', { method:'POST', body:JSON.stringify(attempt) }));
       outbox.remove(attempt.requestId); loadPending(); notice(pending ? 'uncertain' : 'saved', Boolean(pending));
+      if(type==='deliverOrder'){const order=state.orders?.rows.find(o=>o.id===attempt.orderId);$('#harvest-fx').textContent=`${t('orderThanks')}${order?' · +'+order.reward+' '+t('gold'):''}`;effectUntil=performance.now()+2600;}
       if (['hoe','plant','stock','water','feed','harvest','catch'].includes(type)) {
         careEffect = { type, item: effectItem, ... (fish ? fishPos(attempt.slot) : plotPos(attempt.slot)), started: performance.now() };
         canvas.dataset.careEffect = type;
@@ -84,7 +87,7 @@
   function duration(seconds) { return seconds < 60 ? `${seconds}s` : `${seconds / 60} ${t('minutes')}`; }
   function remaining(row) { const s = Math.max(0, Math.ceil((row.readyAt - now()) / 1000)); return s ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2,'0')}` : t('ready'); }
   function careTimer(box,row,item){const status=el('p',t(row.readyAt===null?'careStatus':row.readyAt<=now()?'readyStatus':'growingStatus'),'care-status',box);if(row.readyAt!==null){status.dataset.statusAt=row.readyAt;const timer=el('div',remaining(row),'timer',box);timer.dataset.readyAt=row.readyAt;const progress=el('progress',undefined,'care-progress',box);progress.max=state.catalog[item].seconds*1000;progress.value=Math.max(0,progress.max-(row.readyAt-now()));progress.dataset.progressAt=row.readyAt;progress.setAttribute('aria-label',t('growingStatus'));}}
-  let preferredTarget=null, panelTarget=null, shopType='crop';
+  let preferredTarget=null, panelTarget=null, shopType='crop', boardTab='daily';
   function targetLabel(target){if(target.panel==='garden'||target.panel==='pond')return `${t(target.panel==='garden'?'patch':'pool')} ${target.slot+1}`;if(target.panel==='chicken'||target.panel==='pig')return `${t(target.panel)} ${target.slot+1}`;return t(target.panel);}
   function nearby(){return state?TeaFarmWorld.nearest(player,state.farm,preferredTarget,facing):null;}
   function openPanel(key,slot){
@@ -174,8 +177,22 @@
       if (!count) el('p', t('noProducts'), 'intro', root);
       Object.entries(f.seeds).filter(([,qty]) => qty > 0).forEach(([key, qty]) => card(root, `${name(key)} × ${qty}`, t('seeds'), key));
     } else if (panel === 'quests') {
-      el('p', t('taskHint'), 'intro', root);
-      state.quests.forEach(q => { const box = card(root, q[locale], `${Math.min(f.stats[q.stat]||0,q.target)} / ${q.target} · +${q.reward} ${t('gold')}`); button(box, t(f.claimed.includes(q.id) ? 'claimed' : 'reward'), () => act({ type:'claim', quest:q.id }), f.claimed.includes(q.id) || (f.stats[q.stat]||0) < q.target); });
+      const tabs=el('div',undefined,'board-tabs',root);
+      for(const [key,label]of [['daily','dailyOrders'],['milestones','milestones']]){const tab=button(tabs,t(label),()=>{boardTab=key;renderPanel();});tab.setAttribute('aria-pressed',String(boardTab===key));}
+      if(boardTab==='daily'&&state.orders){
+        el('p',t('orderHint'),'intro',root);el('p','','order-countdown',root).dataset.orderCountdown=state.orders.expiresAt;
+        for(const order of state.orders.rows){
+          const owned=f.products[order.item]||0,box=card(root,order.customer[locale],order.customer.note[locale],order.item);box.classList.add('order-card');box.dataset.orderId=order.id;
+          if(order.completed)box.classList.add('delivered');
+          el('strong',`${name(order.item)} × ${order.quantity}`,'order-goods',box);
+          el('p',`${t('orderNeed')}: ${owned} / ${order.quantity}`,'order-stock',box);
+          const progress=el('progress',undefined,'order-progress',box);progress.max=order.quantity;progress.value=Math.min(owned,order.quantity);progress.setAttribute('aria-label',`${name(order.item)} ${owned} / ${order.quantity}`);progress.hidden=order.completed;
+          const send=button(box,order.completed?`✓ ${t('delivered')}`:`${t('deliver')} · +${order.reward} ${t('gold')}`,()=>act({type:'deliverOrder',orderId:order.id}),order.completed||owned<order.quantity||now()>=state.orders.expiresAt);send.dataset.orderDeadline=state.orders.expiresAt;
+        }
+      }else{
+        el('p', t('taskHint'), 'intro', root);
+        state.quests.forEach(q => { const box = card(root, q[locale], `${Math.min(f.stats[q.stat]||0,q.target)} / ${q.target} · +${q.reward} ${t('gold')}`); button(box, t(f.claimed.includes(q.id) ? 'claimed' : 'reward'), () => act({ type:'claim', quest:q.id }), f.claimed.includes(q.id) || (f.stats[q.stat]||0) < q.target); });
+      }
     } else if (panel === 'decorate') {
       el('p', t('decorHint'), 'intro', root); if (!f.decorations.length) el('p', t('noDecor'), 'intro', root);
       f.placed.forEach((item, slot) => { const box = card(root, `${t('corner')} ${slot + 1} · ${item ? name(item) : t('empty')}`, '', item); f.decorations.forEach(key => button(box, `${t('place')} ${name(key)}`, () => act({ type:'decorate', item:key, slot }), item === key)); if (item) button(box, t('remove'), () => act({ type:'decorate', item:null, slot })); });
@@ -410,6 +427,8 @@
     drawMinimap(time);
     syncFishingUi();
     updateInteraction();
+    document.querySelectorAll('[data-order-countdown]').forEach(node=>{const seconds=Math.max(0,Math.ceil((Number(node.dataset.orderCountdown)-now())/1000)),text=seconds?`${t('orderRefresh')} ${Math.floor(seconds/3600)}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`:t('orderRefreshing');if(node.textContent!==text)node.textContent=text;});
+    document.querySelectorAll('[data-order-deadline]').forEach(node=>{if(now()>=Number(node.dataset.orderDeadline))node.disabled=true;});
     $('#harvest-fx').classList.toggle('show',time<effectUntil);
     document.querySelectorAll('[data-ready-at]').forEach(node=>{const at=Number(node.dataset.readyAt);if(node.tagName==='BUTTON')node.disabled=at>now()||busy||Boolean(pending);else{const text=remaining({readyAt:at});if(node.textContent!==text)node.textContent=text;}});
     document.querySelectorAll('[data-status-at]').forEach(node=>{const text=t(Number(node.dataset.statusAt)<=now()?'readyStatus':'growingStatus');if(node.textContent!==text)node.textContent=text;});

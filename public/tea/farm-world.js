@@ -12,6 +12,7 @@
     {id:'orchard',en:'Orchard',vi:'Vườn cây',x:540,y:1220},
     {id:'market',en:'Farm market',vi:'Chợ nông trại',x:1730,y:540},
     {id:'barn',en:'Chicken & pig pens',vi:'Chuồng gà · heo',x:980,y:890},
+    {id:'board',en:'Village request board',vi:'Bảng đơn dân làng',x:650,y:900},
   ];
   function blocked(x,y){return x<75||x>width-70||y<220||y>height-75||
     ponds.some(p=>x>p.x&&x<p.x+p.w&&y>p.y&&y<p.y+p.h)||
