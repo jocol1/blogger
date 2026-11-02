@@ -44,7 +44,8 @@ function play(game,id,input,at,fail){
       if(game.strokes.length>=100)fail(409,'Canvas is full. Clear it to keep drawing.','drawing_full');
       const s=input.stroke;
       if(!s||!COLORS.includes(s.color)||![3,7,14].includes(s.width)||!Array.isArray(s.points)||s.points.length<1||s.points.length>100||s.points.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isInteger)||p[0]<0||p[0]>600||p[1]<0||p[1]>360))fail(400,'Invalid drawing stroke.','drawing_bad_stroke');
-      game.strokes.push({color:s.color,width:s.width,points:s.points});
+      // Firestore does not support an array directly nested inside another array.
+      game.strokes.push({color:s.color,width:s.width,points:s.points.map(([x,y])=>({x,y}))});
     }
     game.strokeTimes[id]=at;return;
   }

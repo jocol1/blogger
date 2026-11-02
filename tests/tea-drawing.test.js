@@ -14,6 +14,9 @@ test('drawing requires real seated players, protects secret and only host starts
 test('strokes persist for peers, validate bounds and only artist can draw; duplicate is harmless',async()=>{
  const f=await fixture(),g=await f.start(),input={type:'stroke',stroke,requestId:crypto.randomUUID()};
  await assert.rejects(f.send('p1',g,input),e=>e.code==='drawing_not_artist');await Promise.all([f.send('p0',g,input),f.send('p0',g,input)]);assert.equal((await f.service.state('p1','drawing')).game.strokes.length,1);
+ const persisted=(await f.db.collection('tea_social_games').doc(f.table.id+'-drawing').get()).data();assert.deepEqual(persisted.strokes[0].points,[{x:0,y:0},{x:300,y:180},{x:600,y:360}]);
+ function firestoreArrays(value){if(Array.isArray(value)){assert.ok(value.every(v=>!Array.isArray(v)),'Firestore cannot store nested arrays');value.forEach(firestoreArrays);}else if(value&&typeof value==='object')Object.values(value).forEach(firestoreArrays);}
+ for(const value of f.db.rows.values())firestoreArrays(value);
  f.tick(101);for(const bad of [{...stroke,color:'url(secret)'},{...stroke,points:[[601,0]]},{...stroke,points:[[NaN,0]]},{...stroke,width:99},{...stroke,points:Array(101).fill([1,1])}])await assert.rejects(f.send('p0',g,{type:'stroke',stroke:bad}),e=>e.code==='drawing_bad_stroke');
  f.db.failWrites=true;await assert.rejects(f.send('p0',g,{type:'clear'}));f.db.failWrites=false;assert.equal((await f.service.state('p1','drawing')).game.strokes.length,1);await f.send('p0',g,{type:'clear'});assert.equal((await f.service.state('p1','drawing')).game.strokes.length,0);
 });
