@@ -51,7 +51,7 @@ window.TeaHubUI=function({t,state,myId,myTable,open}){
   if(!tile)return;
   const seated=(myTable()?.seats||[]).some(s=>s.walletId===myId());
   el('span','▶',box,'hub-live-dot');el('b',`${t('hubPlayingNow')}: ${t(tile.name)}`,box);
-  if(act.players)el('span',t('hubPlayers',{count:act.players}),box);
+  if(act.names?.length)el('span',act.names.join(' · '),box);else if(act.players)el('span',t('hubPlayers',{count:act.players}),box);
   el('button',t(seated?'hubJoin':'hubWatch'),box,'hub-live-go').onclick=()=>launch(tile);
   const node=document.querySelector(`.hub-tile[data-tile="${tile.id}"]`);
   if(node){node.classList.add('live');el('em','●',node,'hub-live-tag');}

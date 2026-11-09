@@ -82,6 +82,22 @@ function createTeaService({ db, config, now = () => Date.now() }) {
   const socialRate = new Map();
   const seatRequests = new Map();
   const fights = new Map();
+  // What each table is playing right now, shown on the table in the café and in the table lobby.
+  // In memory like presence: the app runs as one process and a restart cancels every game anyway.
+  const tableActivity = new Map(), activitySeen = new Map(), ACTIVITY_TTL = 5 * 60_000;
+  function liveActivity(table) {
+    const row = tableActivity.get(table.id);
+    if (!row || now() - (activitySeen.get(table.id) || 0) > ACTIVITY_TTL || !table.seats.some(seat => seat.walletId)) return null;
+    return row;
+  }
+  async function noteActivity(key, result) {
+    const game = result && result.game !== undefined ? result.game : result, tableId = game?.tableId || result?.tableId;
+    if (!game || !tableId || !game.status) return;
+    const before = JSON.stringify(tableActivity.get(tableId) || null), humans = (game.players || []).filter(player => !player.bot);
+    if (game.status === 'active') { tableActivity.set(tableId, { key, players: humans.length, names: humans.map(player => player.name).filter(Boolean).slice(0, 3) }); activitySeen.set(tableId, now()); }
+    else if (tableActivity.get(tableId)?.key === key) { tableActivity.delete(tableId); activitySeen.delete(tableId); }
+    if (before !== JSON.stringify(tableActivity.get(tableId) || null)) io?.emit('tea:state', await service.publicState());
+  }
   const fightInputRates = new Map();
   let io = null;
   let fightTimer = null;
@@ -268,7 +284,8 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     },
     async publicState() {
       requireDb(); const roomSnapshot = await rooms().doc(ROOM_ID).get(); const stored = roomSnapshot.exists ? roomSnapshot.data() : null; const room = stored?.layoutVersion === 2 ? stored : emptyRoom();
-      return { room: publicRoom(room), guests: [...presence.values()].map(({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId }) => ({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId })), maxGuests: MAX_GUESTS, serverNow: now() };
+      const shown = publicRoom(room); shown.tables = shown.tables.map(table => ({ ...table, activity: liveActivity(table) }));
+      return { room: shown, guests: [...presence.values()].map(({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId }) => ({ walletId, nickname, hair, clothes, shoes, x, y, facing, connected, tableId, seatId })), maxGuests: MAX_GUESTS, serverNow: now() };
     },
     async connect(token, socket) {
       const walletId = await walletIdFor(token); const profile = await profileFor(walletId);
@@ -558,6 +575,17 @@ function createTeaService({ db, config, now = () => Date.now() }) {
       await classicCards.cancelAfterRestart();
     },
   };
+  // Every game entry point reports what it saw, so the café knows which tables are playing what.
+  const tracked = {
+    startTableGame: (args, result) => result.key, tableGameState: args => args[1], tableGameAction: (args, result) => result.key,
+    startCard: () => 'color', cardState: () => 'color', cardAction: () => 'color',
+    startTienLen: () => 'tienlen', tienLenState: () => 'tienlen', tienLenAction: () => 'tienlen',
+    startClassicCard: args => args[1]?.key, classicCardState: args => args[1], classicCardAction: args => args[1]?.key,
+  };
+  for (const [name, keyOf] of Object.entries(tracked)) {
+    const original = service[name];
+    service[name] = async function (...args) { const result = await original.apply(this, args); await noteActivity(keyOf(args, result), result).catch(() => {}); return result; };
+  }
   return service;
 }
 

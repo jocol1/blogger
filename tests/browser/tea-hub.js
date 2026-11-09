@@ -9,7 +9,10 @@ async(page)=>{
   await c.request.put(base+'/api/tea/profile',{headers,data:{nickname:'Khách Hub',language:'vi'}});
   await c.addInitScript(token=>{localStorage.setItem('locly-game-wallet',token);localStorage.setItem('locly-tea-language','vi');localStorage.removeItem('locly-hub-last');},w.token);
   const p=page;p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-  await p.goto(base+'/tra-da');await p.waitForFunction(()=>Boolean(document.querySelector('#cafe-canvas').dataset.playerX)&&document.querySelector('#connection-dot').classList.contains('live'));
+  await p.goto(base+'/tra-da');
+  // A freshly registered service worker claims the page and pwa.js reloads it once; let that happen before the test starts.
+  await p.waitForFunction(()=>navigator.serviceWorker.controller,null,{timeout:15000}).catch(()=>{});await p.waitForTimeout(2200);
+  await p.waitForFunction(()=>Boolean(document.querySelector('#cafe-canvas').dataset.playerX)&&document.querySelector('#connection-dot').classList.contains('live'));
   let seat;for(let n=0;n<40;n++){seat=await c.request.post(base+'/api/tea/seats/t5-3',{headers,data:{}});if(seat.ok())break;await p.keyboard.down(n%2?'w':'a');await p.waitForTimeout(110);await p.keyboard.up(n%2?'w':'a');await p.waitForTimeout(260);}
   if(!seat.ok())throw Error(await seat.text());await p.waitForFunction(()=>!document.querySelector('.menu-item').disabled);
   const until=async(test,label,ms=9000)=>{const t=Date.now();while(Date.now()-t<ms){if(await test())return;await p.waitForTimeout(150);}throw Error('Timed out waiting for '+label);};
@@ -29,6 +32,7 @@ async(page)=>{
   await p.screenshot({path:out('lobby-844')});
 
   // --- chat drawer
+  await p.evaluate(()=>{window.__log=[];const d=document.querySelector('#hub-chat');new MutationObserver(()=>window.__log.push(['hidden',performance.now()|0,d.hidden])).observe(d,{attributes:true,attributeFilter:['hidden']});document.addEventListener('click',e=>window.__log.push(['click',performance.now()|0,e.target.id||e.target.className]),true);});
   await p.locator('#hub-chat-open').click();await p.locator('#hub-chat').waitFor();
   await p.locator('#chat-input').fill('Xin chào cả bàn');await p.locator('#chat-form button').click();await p.locator('#chat-list .message',{hasText:'Xin chào cả bàn'}).waitFor();
   await p.screenshot({path:out('chat-844')});await p.locator('#hub-chat-close').click();if(await p.locator('#hub-chat').isVisible())throw Error('Chat drawer did not close');
@@ -60,13 +64,22 @@ async(page)=>{
   await p.locator('#hub-menu').click();await p.locator('.menu-grid').waitFor();await p.locator('.panel-tabs [data-tab=table]').click();await p.locator('.hub-shell').waitFor();
   checks.push('Gọi món and back to the lobby');
 
+  // --- a running game shows on the lobby and drops you straight into it
+  const started=await c.request.post(base+'/api/tea/games',{headers,data:{key:'xiangqi',botCount:0,opponent:'bot',level:'easy',requestId:'hub-test-'+Date.now()+'-abcdef'}});if(!started.ok())throw Error(await started.text());
+  await p.locator('#hub-live').waitFor();const liveText=await p.locator('#hub-live').innerText();if(!/Cờ tướng/.test(liveText)||!/Khách Hub/.test(liveText))throw Error('Live banner wrong: '+liveText);
+  if(!(await p.locator('.hub-tile[data-tile=xiangqi].live').count()))throw Error('Xiangqi tile should be marked live');
+  await p.screenshot({path:out('lobby-live')});
+  await p.locator('.hub-live-go').click();await p.locator('.xq-shell').waitFor();await p.locator('[data-xq=back]').click();await p.locator('.hub-shell').waitFor();
+  checks.push('running game: live banner with names, tile marked, one tap drops into the board');
+
   // --- sizes
   for(const size of [{width:568,height:320},{width:667,height:375},{width:844,height:390},{width:1280,height:800}]){
    await p.setViewportSize(size);await p.waitForTimeout(150);checks.push('lobby fits '+size.width+'x'+size.height+' '+JSON.stringify(await fits(size.width+'x'+size.height)));await p.screenshot({path:out('lobby-'+size.width)});
   }
   await p.setViewportSize({width:844,height:390});
-  await p.locator('.hub-actions .back-cafe').click();await until(async()=>!(await p.locator('.hub-shell').isVisible()),'leaving to the café');checks.push('Về quán closes the lobby');
+  await p.locator('.hub-actions .back-cafe').click();await until(async()=>!(await p.locator('.hub-shell').isVisible()),'leaving to the café');
+  await p.waitForTimeout(700);await p.screenshot({path:out('cafe-pill')});checks.push('Về quán closes the lobby');
   if(errors.length)throw Error(errors.join('\n'));return{checks,errors};
- }catch(error){await page.screenshot({path:out('failure')}).catch(()=>{});error.message+=' | passed: '+checks.length+' ('+checks.slice(-1)+') errors: '+errors.join(' / ');throw error;}
+ }catch(error){await page.screenshot({path:out('failure')}).catch(()=>{});error.message+=' | log: '+await page.evaluate(()=>JSON.stringify(window.__log||[])).catch(()=>'?')+' | passed: '+checks.length+' ('+checks.slice(-1)+') errors: '+errors.join(' / ');throw error;}
  finally{if(headers)await c.request.delete(base+'/api/tea/seat',{headers}).catch(()=>{});}
 }

@@ -82,6 +82,17 @@ window.TeaScene = (() => {
     // One tiny tea glass and a share plate make the tables read as tea-stall tables.
     glass(c,x-8,y+1,.38);p(c,'#756147',x+9,y+5,12,3);p(c,'#e8d8b4',x+8,y+2,14,4);p(c,'#ca8a4d',x+10,y,4,3);p(c,'#d79b55',x+15,y,4,3);
     c.fillStyle='#3f382f';c.font='bold 8px "Segoe UI",sans-serif';c.textAlign='center';c.fillText(`${occupied}/${table.capacity}`,x,y+h/2+16);c.textAlign='left';
+    activityPill(c,table);
+  }
+  // A small tag over a table that is in the middle of a game: icon, number of people, and a blinking dot.
+  const ACTIVITY={xiangqi:['帥','#3f8a5f'],quiz:['?','#3f8a5f'],math:['÷','#3f8a5f'],pattern:['◇','#3f8a5f'],tienlen:['♠','#4a78ad'],color:['▤','#4a78ad'],baicao:['♣','#4a78ad'],poker:['♦','#4a78ad'],barista:['☕','#c27a2f'],drawing:['✎','#c27a2f'],rps:['✌','#c27a2f'],memory:['▧','#c27a2f']};
+  function activityPill(c,table){
+    const activity=table.activity,def=activity&&ACTIVITY[activity.key];if(!def)return;
+    const label=`${def[0]} ${activity.players}`;c.font='bold 9px "Segoe UI","Noto Serif CJK SC",sans-serif';c.textAlign='center';
+    const w=Math.ceil(c.measureText(label).width)+14,x=Math.round(table.x-w/2),y=Math.round(table.y-table.height/2-22);
+    p(c,'#2f2a24',x-1,y-1,w+2,15);p(c,def[1],x,y,w,13);c.fillStyle='#fff6dc';c.fillText(label,table.x-2,y+10);
+    if(Math.floor(Date.now()/600)%2===0)p(c,'#ff5a4a',x+w-6,y+4,3,3);
+    c.textAlign='left';
   }
   function avatar(c,x,y,avatar,scale=1,seated=false,walking=false,time=0){
     c.save();c.translate(Math.round(x/2)*2,Math.round(y/2)*2);c.scale(scale,scale);
