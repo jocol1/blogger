@@ -532,6 +532,7 @@ function createTeaService({ db, config, now = () => Date.now() }) {
     async classicCardState(token, key) { return classicCards.state(await walletIdFor(token), key); },
     async classicCardAction(token, input) { return classicCards.action(await walletIdFor(token), input); },
     async tableGameState(token,key){return tableGames.state(await walletIdFor(token),key)},
+    async xiangqiLeaderboard(token){return tableGames.leaderboard(await walletIdFor(token))},
     async tableGameAction(token,input){const result=await tableGames.action(await walletIdFor(token),input);io?.to(`table:${result.tableId}`).emit('tea:table-game',{key:result.key});return result},
     async adminOrders() { requireDb(); const snapshot = await orders().where('createdMs', '>', 0).orderBy('createdMs').limit(200).get(); return snapshot.docs.map(doc => doc.data()).sort((a, b) => b.createdMs - a.createdMs); },
     async updatePrices(input) { const value=await menu(); for(const kind of Object.keys(MENU)){if(input[kind]===undefined)continue;const price=Number(input[kind]);if(!Number.isSafeInteger(price)||price<1000||price>1_000_000)throw new TeaError(400,'Prices must be whole VND amounts.','bad_price');value[kind]=price}value.updatedAt=iso(now());await settings().set(value);return value; },

@@ -104,6 +104,7 @@ function createTeaRouter({ service, isAdmin }) {
   router.get('/api/tea/card-games/:key/current', asyncRoute(async (req, res) => res.json(await service.classicCardState(token(req), req.params.key))));
   router.post('/api/tea/card-games/:key/action', json, asyncRoute(async (req, res) => res.json(await service.classicCardAction(token(req), { ...req.body, key: req.params.key }))));
   router.post('/api/tea/games', json, asyncRoute(async (req,res)=>res.status(201).json({game:await service.startTableGame(token(req),req.body)})));
+  router.get('/api/tea/xiangqi/leaderboard', asyncRoute(async (req,res)=>res.json(await service.xiangqiLeaderboard(token(req)))));
   router.get('/api/tea/games/:key', asyncRoute(async (req,res)=>res.json(await service.tableGameState(token(req),req.params.key))));
   router.post('/api/tea/games/:key/action', json, asyncRoute(async (req,res)=>res.json({game:await service.tableGameAction(token(req),{...req.body,key:req.params.key})})));
   router.get('/api/tea/fights/current', asyncRoute(async (req, res) => res.json(await service.fightState(token(req)))));

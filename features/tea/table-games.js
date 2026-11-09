@@ -1,7 +1,10 @@
 const crypto = require('node:crypto');
 const drawing = require('./drawing-game');
+const barista = require('./barista-game');
+const xq = require('./xiangqi-game');
+const xqRatings = require('./xiangqi-ratings');
 
-const KEYS = ['rps', 'memory', 'quiz', 'math', 'pattern', 'drawing'];
+const KEYS = ['rps', 'memory', 'quiz', 'math', 'pattern', 'drawing', 'barista', 'xiangqi'];
 const RETIRED_KEYS = ['coin', 'highlow', 'dice', 'oanquan'];
 const QUIZ = [
   { en:'Which planet is known as the Red Planet?', vi:'Hành tinh nào được gọi là hành tinh Đỏ?', enOptions:['Venus','Mars','Jupiter','Mercury'], viOptions:['Sao Kim','Sao Hỏa','Sao Mộc','Sao Thủy'], answer:1 },
@@ -38,6 +41,8 @@ function createTableGames({ db, now }) {
     if (!game) return null;
     const base = { id:game.id, version:game.version||0, key:game.key, tableId:game.tableId, status:game.status, players:game.players.map(id=>({id,name:game.names[id],bot:id.startsWith('bot:'),score:game.scores[id]||0})), turn:game.players[game.turnIndex], deadline:game.deadline, winnerIds:game.winnerIds||[], serverNow:now(), round:game.round||1, last:game.last||null, member:game.players.includes(walletId) };
     if(game.key==='drawing')return {...base,...drawing.view(game,walletId)};
+    if(game.key==='barista')return {...base,...barista.view(game,walletId)};
+    if(game.key==='xiangqi')return {...base,...xq.view(game,walletId)};
     if (['rps',...QUESTION_KEYS].includes(game.key)) {
       const answer=QUESTION_BANKS[game.key]?.[game.questionOrder[(game.round||1)-1]??0]||null;
       return {...base, submitted:game.players.filter(id=>game.choices[id]), myChoice:game.choices[walletId]??null, maxRounds:5, ...(answer?{question:{en:answer.en,vi:answer.vi,enOptions:answer.enOptions,viOptions:answer.viOptions}}:{})};
@@ -66,6 +71,8 @@ function createTableGames({ db, now }) {
   }
   function progress(game){
     if(game.key==='drawing'){drawing.progress(game,now(),finish);return;}
+    if(game.key==='barista'){barista.progress(game,now(),finish);return;}
+    if(game.key==='xiangqi'){xq.progress(game,now());return;}
     for(let guard=0;guard<80&&game.status==='active';guard++){
       if(game.revealUntil){if(now()<game.revealUntil)break;game.reveal=[];game.revealUntil=null;}
       const id=game.players[game.turnIndex];
@@ -88,22 +95,40 @@ function createTableGames({ db, now }) {
     const room=await tx.get(db.collection('tea_rooms').doc('main'));const table=room.exists&&room.data().tables.find(item=>item.seats.some(seat=>seat.walletId===walletId));
     if(!table)fail(409,'Sit at a table to play.','not_seated');return {table,ref:games().doc(`${table.id}-${key}`)};
   }
-  function checkPlayers(game,table){if(game.status==='active'&&game.players.some(id=>!id.startsWith('bot:')&&!table.seats.some(seat=>seat.walletId===id))){game.status='finished';game.winnerIds=[];game.last={canceled:true};game.finishedAt=now();}}
+  // Xiangqi: reading ratings must happen before any transaction write, so load them first and settle after the game moves on.
+  const preload=async(tx,game)=>game&&game.key==='xiangqi'&&game.status==='active'?xqRatings.load(tx,db,game):null;
+  function settle(tx,game,pre){for(const write of xqRatings.settle(game,pre,now()))tx.set(db.collection(write.collection).doc(write.id),write.data);}
+  function checkPlayers(game,table){
+    const gone=game.status==='active'?game.players.filter(id=>!id.startsWith('bot:')&&!table.seats.some(seat=>seat.walletId===id)):[];
+    if(gone.length&&game.key==='xiangqi'&&game.xq.history.length>=4){xq.forfeit(game,gone,now());return;}
+    if(game.status==='active'&&game.players.some(id=>!id.startsWith('bot:')&&!table.seats.some(seat=>seat.walletId===id))){game.status='finished';game.winnerIds=[];game.last={canceled:true};game.finishedAt=now();}}
   return {
     async start(walletId,input){const key=input.key,requestId=input.requestId,botCount=Number(input.botCount||0);if(!REQUEST.test(requestId||'')||!Number.isInteger(botCount)||botCount<0||botCount>3)fail(400,'Invalid game request.','bad_request');
       return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,key),snap=await tx.get(ref);if(snap.exists&&snap.data().requestId===requestId&&snap.data().startedBy===walletId)return view(snap.data(),walletId);
-        if(snap.exists&&snap.data().status==='active'){const game=snap.data();checkPlayers(game,table);progress(game);if(game.status==='active')fail(409,'This game is already running.','game_active');}
+        let late=null;
+        if(snap.exists&&snap.data().status==='active'){const game=snap.data(),pre=await preload(tx,game);checkPlayers(game,table);progress(game);if(game.status==='active')fail(409,'This game is already running.','game_active');late={game,pre};}
         if(table.ownerId!==walletId)fail(403,'The first guest at the table starts the game.','not_host');const humans=table.seats.filter(seat=>seat.walletId).map(seat=>seat.walletId);if(humans.length+botCount>8)fail(400,'A table game supports up to eight players.','bad_player_count');
-        const players=[...humans,...Array.from({length:botCount},(_,i)=>`bot:${i+1}`)],names={};for(const id of humans){const profile=await tx.get(db.collection('tea_profiles').doc(id));names[id]=profile.exists?profile.data().nickname:'Guest';}players.filter(id=>id.startsWith('bot:')).forEach((id,i)=>{names[id]=`BOT ${i+1}`;});
+        let opponent=null,level=null,xqPlayers=null;
+        if(key==='xiangqi'){
+          opponent=input.opponent==='friend'?'friend':'bot';level=xq.LEVELS.includes(input.level)?input.level:'medium';
+          if(botCount)fail(400,'Choose the Xiangqi opponent in its lobby.','bad_request');
+          if(opponent==='friend'){const others=table.seats.filter(seat=>seat.walletId&&seat.walletId!==walletId).sort((a,b)=>(a.seatedAt||0)-(b.seatedAt||0));if(!others.length)fail(400,'Xiangqi against a friend needs a second person at the table.','xiangqi_need_friend');xqPlayers=[walletId,others[0].walletId];}
+          else xqPlayers=[walletId,'bot:1'];
+        }
+        const players=xqPlayers||[...humans,...Array.from({length:botCount},(_,i)=>`bot:${i+1}`)],names={};for(const id of (xqPlayers?xqPlayers.filter(id=>!id.startsWith('bot:')):humans)){const profile=await tx.get(db.collection('tea_profiles').doc(id));names[id]=profile.exists?profile.data().nickname:'Guest';}players.filter(id=>id.startsWith('bot:')).forEach((id,i)=>{names[id]=`BOT ${i+1}`;});
         if(key==='rps'&&players.length<2)fail(400,'Add a bot or invite a friend for Rock Paper Scissors.','need_players');
         if(key==='drawing'&&(humans.length<2||botCount))fail(400,'Draw & Guess needs 2–8 people, without bots.','drawing_need_players');
-        const game={id:crypto.randomUUID(),key,tableId:table.id,status:'active',requestId,startedBy:walletId,players,names,scores:Object.fromEntries(players.map(id=>[id,0])),turnIndex:0,deadline:now()+15_000,createdAt:now(),round:1,choices:{},questionOrder:QUESTION_BANKS[key]?shuffle([...Array(QUESTION_BANKS[key].length).keys()]).slice(0,5):[],tiles:key==='memory'?shuffle(MEMORY_SYMBOLS.flatMap(symbol=>[symbol,symbol,symbol])):[],matched:[],first:[],reveal:[],botReadyAt:now()+900};if(key==='drawing')drawing.init(game,now());progress(game);tx.set(ref,game);return view(game,walletId);});
+        if(key==='barista'&&botCount)fail(400,'Play Barista solo or with real friends. No bots needed.','barista_no_bots');
+        const game={id:crypto.randomUUID(),key,tableId:table.id,status:'active',requestId,startedBy:walletId,players,names,scores:Object.fromEntries(players.map(id=>[id,0])),turnIndex:0,deadline:now()+15_000,createdAt:now(),round:1,choices:{},questionOrder:QUESTION_BANKS[key]?shuffle([...Array(QUESTION_BANKS[key].length).keys()]).slice(0,5):[],tiles:key==='memory'?shuffle(MEMORY_SYMBOLS.flatMap(symbol=>[symbol,symbol,symbol])):[],matched:[],first:[],reveal:[],botReadyAt:now()+900};if(key==='drawing')drawing.init(game,now());if(key==='barista')barista.init(game,now());if(key==='xiangqi')xq.init(game,now(),{opponent,level,ratingSnapshot:xqRatings.snapshot(game,await xqRatings.load(tx,db,game))});progress(game);tx.set(ref,game);if(late)settle(tx,late.game,late.pre);return view(game,walletId);});
     },
-    async state(walletId,key){return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,key),snap=await tx.get(ref);if(!snap.exists)return {game:null};const game=snap.data(),before=JSON.stringify(game);checkPlayers(game,table);progress(game);if(before!==JSON.stringify(game)){game.version=(game.version||0)+1;tx.set(ref,game);}return {game:view(game,walletId)};});},
-    async action(walletId,input){if(!REQUEST.test(input.requestId||''))fail(400,'Invalid request.','bad_request');return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,input.key),snap=await tx.get(ref);if(!snap.exists)fail(404,'Start a game first.','game_missing');const game=snap.data();if(game.id!==input.gameId)fail(409,'That game has ended.','old_game');if(!game.players.includes(walletId))fail(403,'You are watching this game.','spectator');
-      const attempt=attempts().doc(crypto.createHash('sha256').update(`${game.id}:${walletId}:${input.requestId}`).digest('hex')),prior=await tx.get(attempt);if(prior.exists)return prior.data().result;checkPlayers(game,table);progress(game);if(game.status!=='active')fail(409,'This game has ended.','game_finished');
-      if(game.key==='drawing'){drawing.play(game,walletId,input,now(),fail);}else if(['rps',...QUESTION_KEYS].includes(game.key)){const choices=game.key==='rps'?['rock','paper','scissors']:[0,1,2,3];if(!choices.includes(input.choice))fail(400,'Choose one of the available options.','bad_choice');if(game.round!==input.round||game.choices[walletId])fail(409,'Wait for the next round.','already_played');game.choices[walletId]=input.choice;progress(game);}else{if(game.players[game.turnIndex]!==walletId||game.revealUntil)fail(409,'Wait for your turn.','not_turn');const picked=Array.isArray(game.first)?game.first:(game.first===null?[]:[game.first]),index=Number(input.index);if(!Number.isInteger(index)||index<0||index>=18||game.matched.includes(index)||picked.includes(index))fail(400,'Choose a hidden tile.','bad_tile');flip(game,walletId,index);game.botReadyAt=now()+900;progress(game);}
-      game.version=(game.version||0)+1;const result=view(game,walletId);tx.set(ref,game);tx.create(attempt,{result,createdAt:now()});return result;});},
+    async state(walletId,key){return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,key),snap=await tx.get(ref);if(!snap.exists)return {game:null};const game=snap.data(),before=JSON.stringify(game),pre=await preload(tx,game);checkPlayers(game,table);progress(game);settle(tx,game,pre);if(before!==JSON.stringify(game)){game.version=(game.version||0)+1;tx.set(ref,game);}return {game:view(game,walletId)};});},
+    async action(walletId,input){if(!REQUEST.test(input.requestId||''))fail(400,'Invalid request.','bad_request');return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,input.key),snap=await tx.get(ref);if(!snap.exists)fail(404,'Start a game first.','game_missing');const game=snap.data();if(game.id!==input.gameId)fail(409,'That game has ended.','old_game');const emoteOnly=game.key==='xiangqi'&&input.type==='emote';if(!game.players.includes(walletId)&&!emoteOnly)fail(403,'You are watching this game.','spectator');
+      const attempt=attempts().doc(crypto.createHash('sha256').update(`${game.id}:${walletId}:${input.requestId}`).digest('hex')),prior=await tx.get(attempt);if(prior.exists)return prior.data().result;
+      let emoteName=null;if(emoteOnly)emoteName=game.names[walletId]||(await tx.get(db.collection('tea_profiles').doc(walletId))).data()?.nickname;
+      const pre=await preload(tx,game);checkPlayers(game,table);progress(game);if(game.status!=='active'&&!emoteOnly)fail(409,'This game has ended.','game_finished');
+      if(emoteOnly){xq.emote(game,walletId,emoteName,input.code,now(),fail);}else if(game.key==='xiangqi'){xq.play(game,walletId,input,now(),fail);}else if(game.key==='barista'){barista.play(game,walletId,input,now(),fail);}else if(game.key==='drawing'){drawing.play(game,walletId,input,now(),fail);}else if(['rps',...QUESTION_KEYS].includes(game.key)){const choices=game.key==='rps'?['rock','paper','scissors']:[0,1,2,3];if(!choices.includes(input.choice))fail(400,'Choose one of the available options.','bad_choice');if(game.round!==input.round||game.choices[walletId])fail(409,'Wait for the next round.','already_played');game.choices[walletId]=input.choice;progress(game);}else{if(game.players[game.turnIndex]!==walletId||game.revealUntil)fail(409,'Wait for your turn.','not_turn');const picked=Array.isArray(game.first)?game.first:(game.first===null?[]:[game.first]),index=Number(input.index);if(!Number.isInteger(index)||index<0||index>=18||game.matched.includes(index)||picked.includes(index))fail(400,'Choose a hidden tile.','bad_tile');flip(game,walletId,index);game.botReadyAt=now()+900;progress(game);}
+      settle(tx,game,pre);game.version=(game.version||0)+1;const result=view(game,walletId);tx.set(ref,game);tx.create(attempt,{result,createdAt:now()});return result;});},
+    async leaderboard(walletId){return xqRatings.leaderboard(db,walletId);},
     async cancelAfterRestart(){for(const key of [...KEYS,...RETIRED_KEYS])for(let n=1;n<=8;n++){const ref=games().doc(`t${n}-${key}`);await db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data().status==='active')tx.update(ref,{status:'finished',winnerIds:[],last:{canceled:true,reason:RETIRED_KEYS.includes(key)?'game_retired':'server_restart'},finishedAt:now()});});}},
   };
 }
