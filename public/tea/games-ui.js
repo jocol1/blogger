@@ -37,5 +37,6 @@ window.TeaGamesUI=function({api,t,toast,id,myId,myTable,isVisible}){
     if(!active){const result=$('#mini-result');result.hidden=false;const names=game.players.filter(player=>game.winnerIds.includes(player.id)).map(player=>player.name).join(', ');result.innerHTML=`<b>${names||t('gameEnded')}</b><button class="primary" id="mini-again">${t('playAgain')}</button>`;$('#mini-again').onclick=()=>{game=null;fingerprint='';render(true);};}
     timer();
   }
-  document.querySelectorAll('[data-mini-game]').forEach(button=>button.onclick=()=>{drawing.clear();barista.clear();xiangqi.clear();key=button.dataset.miniGame;game=null;fingerprint='';render(true);refresh();});setInterval(()=>{if(isVisible()){timer();refresh();}},1200);render();return{refresh,update,render};
+  function open(next){drawing.clear();barista.clear();xiangqi.clear();key=next;game=null;fingerprint='';render(true);refresh();}
+  document.querySelectorAll('[data-mini-game]').forEach(button=>button.onclick=()=>open(button.dataset.miniGame));setInterval(()=>{if(isVisible()){timer();refresh();}},1200);render();return{refresh,update,render,open};
 };

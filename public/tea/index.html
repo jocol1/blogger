@@ -32,6 +32,7 @@
   <link rel="stylesheet" href="/assets/tea/drawing.css?v=2">
   <link rel="stylesheet" href="/assets/tea/barista.css?v=1">
   <link rel="stylesheet" href="/assets/tea/xiangqi.css?v=3">
+  <link rel="stylesheet" href="/assets/tea/hub.css?v=2">
 </head>
 <body class="cafe-context landscape-panel-closed">
   <header class="topbar">
@@ -80,9 +81,9 @@
       <button class="panel-close" id="panel-close" type="button" aria-label="Close panel">×</button>
       <nav class="panel-tabs" aria-label="Café activities">
         <button class="active" data-tab="cafe"><span>☕</span><b data-i18n="cafe">Café</b></button>
-        <button data-tab="table"><span>☺</span><b data-i18n="table">Table</b><i id="chat-badge" hidden></i></button>
-        <button data-tab="cards"><span>▤</span><b data-i18n="cards">Cards</b></button>
-         <button data-tab="games"><span>✦</span><b data-i18n="games">Games</b></button>
+        <button data-tab="table"><span>☺</span><b data-i18n="hubTab">Table lobby</b><i id="chat-badge" hidden></i></button>
+        <button data-tab="cards" hidden><span>▤</span><b data-i18n="cards">Cards</b></button>
+         <button data-tab="games" hidden><span>✦</span><b data-i18n="games">Games</b></button>
       </nav>
 
       <section class="panel-view active" data-view="cafe">
@@ -98,17 +99,31 @@
 
       <section class="panel-view table-view" data-view="table">
         <div id="table-empty" class="big-empty"><span>▱</span><h2 data-i18n="pullChair">Pull up a chair</h2><p data-i18n="tableEmpty">Walk to any free chair. If people are there, ask first or sit down anyway.</p></div>
-        <div id="table-room" hidden>
-          <div class="table-header"><div><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div></div>
-          <details class="brawl-details"><summary data-i18n="pixelBrawl">Pixel brawl</summary><section class="brawl-box"><div><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section></details>
-          <div class="chat-list" id="chat-list" aria-live="polite"></div>
-          <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
-          <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>
+        <div id="table-room" class="hub-shell" hidden>
+          <header class="hub-bar">
+            <div class="hub-title"><small data-i18n="youAt">YOU'RE AT</small><h2 id="table-name">Table 1</h2></div>
+            <div class="hub-people" id="hub-people" aria-label="People at this table"></div>
+            <div class="hub-actions">
+              <button type="button" id="hub-quick" class="primary"><i aria-hidden="true">⚡</i><span class="lbl" data-i18n="hubQuick">Quick play</span></button>
+              <button type="button" id="hub-chat-open"><i aria-hidden="true">💬</i><span class="lbl" data-i18n="hubChat">Chat</span><em id="hub-chat-badge" hidden></em></button>
+              <button type="button" id="hub-menu"><i aria-hidden="true">☕</i><span class="lbl" data-i18n="hubMenu">Order</span></button>
+              <button type="button" data-invite-players><i aria-hidden="true">🔗</i><span class="lbl" data-i18n="hubInvite">Invite</span></button>
+              <button type="button" class="back-cafe" data-i18n="backCafe">Back to café</button>
+            </div>
+          </header>
+          <div class="hub-body" id="hub-body"></div>
+          <aside class="hub-chat" id="hub-chat" hidden aria-label="Table chat">
+            <div class="hub-chat-head"><b data-i18n="hubChatTitle">Table chat</b><button type="button" id="hub-chat-close" aria-label="Close" data-i18n="hubClose">Close</button></div>
+            <details class="brawl-details"><summary data-i18n="pixelBrawl">Pixel brawl</summary><section class="brawl-box"><div><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section></details>
+            <div class="chat-list" id="chat-list" aria-live="polite"></div>
+            <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
+            <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>
+          </aside>
         </div>
       </section>
 
       <section class="panel-view cards-view" data-view="cards">
-        <div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 id="card-mode-title" data-i18n="tlName">Tiến lên miền Nam</h2></div><div class="card-header-actions"><button id="card-game-switch" type="button" aria-expanded="false" data-i18n="switchCardGame" hidden>Change game</button><button type="button" data-invite-players data-i18n="invitePlayers">Invite players</button><button class="back-cafe" data-i18n="backCafe">Back to café</button></div></div>
+        <div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 id="card-mode-title" data-i18n="tlName">Tiến lên miền Nam</h2></div><div class="card-header-actions"><button type="button" class="back-hub" data-back-hub data-i18n="hubBack">← Table lobby</button><button id="card-game-switch" type="button" aria-expanded="false" data-i18n="switchCardGame" hidden>Change game</button><button type="button" data-invite-players data-i18n="invitePlayers">Invite players</button><button class="back-cafe" data-i18n="backCafe">Back to café</button></div></div>
         <div class="card-mode-picker" role="group" aria-label="Card games"><button type="button" data-card-mode="tienlen" class="active" aria-pressed="true"><span>♠ ♥</span><b data-i18n="tlName">Tiến lên miền Nam</b></button><button type="button" data-card-mode="color" aria-pressed="false"><span>▤</span><b data-i18n="colorCards">Color Cards</b></button><button type="button" data-card-mode="baicao" aria-pressed="false"><span>♣ ♦</span><b data-i18n="bcName">Bài cào</b></button><button type="button" data-card-mode="poker" aria-pressed="false"><span>♠ ♠</span><b data-i18n="pkName">Poker</b></button></div>
         <div id="tienlen-mode">
 <div id="tl-lobby" class="tl-lobby">
@@ -209,7 +224,7 @@
         <div id="card-game" hidden><div class="card-scroll-area"><div class="card-table"><div class="card-arena color-arena"><div id="card-players" class="card-players"></div><div class="card-stage"><div class="deck-block"><small data-i18n="drawPile">DRAW PILE</small><button id="draw-pile" type="button" class="playing-card back" aria-label="Draw one and pass">LOC</button></div><div class="deck-block"><small data-i18n="inPlay">IN PLAY</small><div id="top-card" class="color-play-pile"></div></div><div class="turn-sign"><b id="turn-label"></b><span id="card-clock"></span><span id="active-color"></span></div></div></div><div class="hand-area"><div class="hand-sort-row"><small data-i18n="yourHand">Your hand</small><button id="sort-color-hand" type="button" data-i18n="sortDealt">Deal order</button></div><small data-i18n="yourHand">YOUR HAND · TAP A CARD TO PLAY</small><div id="hand" class="hand"></div></div></div></div><div class="card-action-bar"><p id="card-feedback" role="status"></p><div id="color-picker" class="color-picker" hidden><span data-i18n="chooseColor">Choose the next color</span><button data-color="red" aria-label="Red"></button><button data-color="yellow" aria-label="Yellow"></button><button data-color="green" aria-label="Green"></button><button data-color="blue" aria-label="Blue"></button><button id="cancel-wild" data-i18n="cancelChoice">Cancel</button></div><button id="draw-button" class="primary" data-i18n="drawCard">Draw one & pass</button><button id="card-retry" class="primary" data-i18n="retryCard" hidden>Retry action</button><button id="new-card" class="primary" data-i18n="startGame" hidden>Start game</button></div></div>
         </div>
       </section>
-       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="xiangqi"><span>帥</span><b data-i18n="xiangqiName">Chinese Chess</b><small data-i18n="xiangqiShort">Ranked · vs bot or a friend</small></button><button data-mini-game="barista"><span>☕</span><b data-i18n="baristaName">Memory Barista</b><small data-i18n="baristaShort">Remember, mix, serve</small></button><button data-mini-game="drawing"><span>✎</span><b data-i18n="drawingName">Draw &amp; Guess</b><small data-i18n="drawingShort">Draw a word, make them guess</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="quiz"><span>🧠</span><b data-i18n="quizName">Quick Quiz</b><small data-i18n="quizShort">100 brainy questions</small></button><button data-mini-game="math"><span>➗</span><b data-i18n="mathName">Mental Maths</b><small data-i18n="mathShort">Fast arithmetic</small></button><button data-mini-game="pattern"><span>🧩</span><b data-i18n="patternName">Pattern Detective</b><small data-i18n="patternShort">Find the next number</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button></div><div id="mini-game-stage"></div></section>
+       <section class="panel-view games-view" data-view="games"><div class="game-page-heading"><div><small data-i18n="freePlay">FREE TABLE GAMES</small><h2 data-i18n="pickGame">A little friendly competition</h2></div><button type="button" class="back-hub" data-back-hub data-i18n="hubBack">← Table lobby</button><button class="back-cafe" data-i18n="backCafe">Back to café</button></div><div class="mini-game-picker"><button data-mini-game="xiangqi"><span>帥</span><b data-i18n="xiangqiName">Chinese Chess</b><small data-i18n="xiangqiShort">Ranked · vs bot or a friend</small></button><button data-mini-game="barista"><span>☕</span><b data-i18n="baristaName">Memory Barista</b><small data-i18n="baristaShort">Remember, mix, serve</small></button><button data-mini-game="drawing"><span>✎</span><b data-i18n="drawingName">Draw &amp; Guess</b><small data-i18n="drawingShort">Draw a word, make them guess</small></button><button data-mini-game="rps"><span>✌</span><b data-i18n="rpsName">Rock Paper Scissors</b><small data-i18n="rpsShort">5 secret rounds</small></button><button data-mini-game="quiz"><span>🧠</span><b data-i18n="quizName">Quick Quiz</b><small data-i18n="quizShort">100 brainy questions</small></button><button data-mini-game="math"><span>➗</span><b data-i18n="mathName">Mental Maths</b><small data-i18n="mathShort">Fast arithmetic</small></button><button data-mini-game="pattern"><span>🧩</span><b data-i18n="patternName">Pattern Detective</b><small data-i18n="patternShort">Find the next number</small></button><button data-mini-game="memory"><span>▧</span><b data-i18n="memoryName">Memory Match</b><small data-i18n="memoryShort">Find 6 matching pairs</small></button></div><div id="mini-game-stage"></div></section>
     </aside>
   </main>
 
@@ -244,7 +259,8 @@
   <script src="/assets/tea/scene.js?v=menu1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
   <script src="/assets/tea/drawing-ui.js?v=2"></script><script src="/assets/tea/barista-ui.js?v=1"></script><script src="/assets/tea/xiangqi-rules.js?v=1"></script><script src="/assets/tea/xiangqi-fx.js?v=1"></script><script src="/assets/tea/xiangqi-ui.js?v=3"></script><script src="/assets/tea/games-ui.js?v=xiangqi1"></script>
-  <script src="/assets/tea/game-words.js?v=triple-memory1"></script><script src="/assets/tea/drawing-words.js?v=1"></script><script src="/assets/tea/barista-words.js?v=1"></script><script src="/assets/tea/xiangqi-words.js?v=1"></script>
+  <script src="/assets/tea/game-words.js?v=triple-memory1"></script><script src="/assets/tea/drawing-words.js?v=1"></script><script src="/assets/tea/barista-words.js?v=1"></script><script src="/assets/tea/xiangqi-words.js?v=1"></script><script src="/assets/tea/hub-words.js?v=1"></script>
+  <script src="/assets/tea/hub-ui.js?v=1"></script>
   <script src="/assets/tea/pwa-words.js?v=pwa1"></script>
   <script src="/assets/tea/brawl-words.js?v=arena1"></script>
   <script src="/assets/tea/poker-words.js?v=poker2"></script>

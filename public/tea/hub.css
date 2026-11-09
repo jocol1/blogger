@@ -1,0 +1,63 @@
+/* Table lobby: the first screen after "Mở bàn". Full screen like the games, so everything has room. */
+body.hub-open{overflow:hidden}
+body.hub-open .topbar,body.hub-open .world-card,body.hub-open .panel-tabs,body.hub-open .panel-close{display:none!important}
+body.hub-open .cafe-shell{position:fixed;inset:0!important;height:var(--tea-visible-bottom,100dvh)!important;max-width:none;margin:0;padding:0}
+body.hub-open .side-panel{position:fixed!important;inset:0!important;width:100%!important;height:var(--tea-visible-bottom,100dvh)!important;max-height:none;min-height:0;padding:0!important;border:0;box-shadow:none!important}
+body.hub-open .table-view.active{display:flex!important;flex-direction:column;height:100%!important;min-height:0;overflow:hidden;padding:0!important;background:radial-gradient(ellipse at 30% 15%,#3d656c 0,#25444d 55%,#172e37 100%)}
+body.hub-open #table-room{position:relative;display:flex;flex:1;flex-direction:column;min-height:0;min-width:0}
+body.hub-open #table-empty{margin:auto}
+.hub-shell [hidden]{display:none!important}
+.hub-shell button{font-family:inherit;cursor:pointer}
+
+.hub-bar{flex:none;display:flex;align-items:center;gap:12px;padding:8px max(14px,env(safe-area-inset-right)) 8px max(14px,env(safe-area-inset-left));background:#172e37;border-bottom:1px solid #4d666b;color:#f2dfb9}
+.hub-title{flex:none}.hub-title small{display:block;font-size:9px;letter-spacing:1.4px;color:#9fb8b8}.hub-title h2{margin:0;font-size:18px;color:#fff;white-space:nowrap}
+.hub-people{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.hub-people::-webkit-scrollbar{display:none}
+.hub-person{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:#294650;border:1px solid #627f88;color:#f0f4ed;font-size:12px}
+.hub-person b{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hub-person small{font-size:10px;color:#a9c4c0}.hub-person em{font-style:normal;font-size:11px;font-weight:800;color:#ffb36b}.hub-person.me{background:#3a5a4a;border-color:#8fbf9a}
+.hub-actions{flex:none;display:flex;gap:6px;align-items:center}
+.hub-actions button{position:relative;display:inline-flex;align-items:center;gap:5px;min-height:38px;padding:4px 12px;border-radius:10px;background:#fff6dc;color:#3b2a18;border:2px solid #b78d55;box-shadow:0 2px #7c5a2e;font-weight:700;font-size:12px;white-space:nowrap}
+.hub-actions button i{font-style:normal;font-size:15px;line-height:1}.hub-actions button:active{transform:translateY(1px);box-shadow:none}
+.hub-actions .primary{background:#f2c26c;border-color:#c99a3b}
+.hub-actions .back-cafe{background:#263f49;color:#e4eeee;border:1px solid #59737a;box-shadow:none}
+#hub-chat-badge{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#d94f3d;color:#fff;font-style:normal;font-size:10px;line-height:18px;text-align:center}
+
+.hub-body{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:14px;width:100%;max-width:1220px;margin:0 auto;box-sizing:border-box;padding:14px max(16px,env(safe-area-inset-right)) 18px max(16px,env(safe-area-inset-left))}
+.hub-live{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;border-radius:12px;background:linear-gradient(90deg,#ffe49b,#ffd06a);color:#3b2a18;border:2px solid #c99a3b;font-size:13px;box-shadow:0 3px #8f6a1f}
+.hub-live-dot{color:#c4501c}.hub-live-go{margin-left:auto;min-height:32px;padding:3px 14px;border-radius:9px;border:2px solid #7c5a2e;background:#3f7a55;color:#fff;font-weight:800}
+.hub-group h3{margin:0 0 7px;font-size:11px;letter-spacing:1.4px;color:#a9c4c0;text-transform:uppercase}
+.hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:9px}
+.hub-tile{--edge:#cdb07a;--shade:#9a7b44;--chip:#f6e8c0;position:relative;display:grid;grid-template-columns:48px minmax(0,1fr);grid-template-rows:auto auto;column-gap:11px;row-gap:1px;align-items:center;align-content:center;text-align:left;min-height:76px;padding:9px 12px;border-radius:14px;background:#fff6dc;color:#3b2a18;border:2px solid var(--edge);box-shadow:0 3px var(--shade);transition:transform .12s,box-shadow .12s}
+.hub-tile[data-group=mind]{--edge:#4c9a6a;--shade:#2f6b48;--chip:#d8eed9}.hub-tile[data-group=cards]{--edge:#5b8bbf;--shade:#385f8a;--chip:#d9e8f7}.hub-tile[data-group=fun]{--edge:#d08a3f;--shade:#9a5f1f;--chip:#fbe4c4}
+.hub-tile:hover{transform:translateY(-2px)}.hub-tile:active{transform:translateY(2px);box-shadow:0 1px var(--shade)}
+.hub-icon{grid-row:1/span 2;display:grid;place-items:center;width:48px;height:48px;border-radius:13px;background:var(--chip);font-size:26px;line-height:1}.hub-icon.cjk{font-family:KaiTi,STKaiti,"Noto Serif CJK SC","Songti SC",SimSun,serif;font-size:30px;font-weight:800;color:#c4281c}
+.hub-tile b{align-self:end;font-size:14px;line-height:1.2}.hub-tile small{align-self:start;font-size:11px;line-height:1.3;color:#7b6444;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hub-tile.live{border-color:#e0a73e;box-shadow:0 0 0 3px rgba(255,208,106,.55),0 3px #8f6a1f}.hub-live-tag{position:absolute;top:6px;right:9px;font-style:normal;font-size:12px;color:#d94f3d;animation:hub-pulse 1.1s infinite}
+@keyframes hub-pulse{50%{opacity:.35}}@keyframes hub-slide{from{transform:translateX(24px);opacity:0}}
+
+.hub-chat{position:absolute;z-index:8;top:0;right:0;bottom:0;width:min(380px,92%);display:flex;flex-direction:column;gap:8px;padding:10px;background:#fff6dc;color:#3b2a18;border-left:3px solid #b78d55;box-shadow:-12px 0 30px rgba(0,0,0,.45);animation:hub-slide .18s ease-out}
+.hub-chat-head{display:flex;align-items:center;justify-content:space-between}.hub-chat-head b{font-size:15px}.hub-chat-head button{min-height:32px;padding:3px 12px;border-radius:9px;border:2px solid #b78d55;background:#f6ebcf;color:#3b2a18;font-weight:700;font-size:12px}
+.hub-chat .brawl-details{flex:none}.hub-chat .chat-list{flex:1;min-height:0;overflow:auto}.hub-chat .emoji-row{flex:none}.hub-chat .chat-form{flex:none}
+
+/* Invite buttons inside the game screens used to look like raw browser buttons. */
+.back-hub,[data-invite-players]{font-family:inherit;font-weight:700;font-size:12px;min-height:36px;padding:6px 12px;border-radius:9px;border:2px solid #b78d55;background:#f6ebcf;color:#3b2a18;cursor:pointer}
+.game-page-heading .back-hub{margin-left:auto;margin-right:8px}.card-header-actions .back-hub{order:-1}
+.cards-view .card-mode-picker,.mini-game-picker{display:none!important}
+body.mini-game-fullscreen .games-view .back-hub{min-height:32px;padding:4px 8px;background:#e8bd6c;border:1px solid #ffd798;color:#233b43;border-radius:4px}
+
+@media(max-width:700px){.hub-actions .lbl{display:none}.hub-actions button{padding:4px 10px}.hub-actions #hub-quick .lbl{display:inline}}
+@media(max-height:500px) and (orientation:landscape){
+ .hub-bar{gap:8px;padding-top:4px;padding-bottom:4px}.hub-title small{display:none}.hub-title h2{font-size:15px}
+ .hub-person{padding:2px 8px;font-size:11px}.hub-actions button{min-height:32px;padding:2px 9px;font-size:11px}.hub-actions button i{font-size:14px}
+ .hub-body{gap:8px;padding-top:8px;padding-bottom:10px}.hub-group h3{margin-bottom:4px;font-size:10px}
+ .hub-grid{grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:6px}
+ .hub-tile{grid-template-columns:36px minmax(0,1fr);column-gap:8px;min-height:52px;padding:5px 8px;border-radius:11px}.hub-icon{width:36px;height:36px;border-radius:10px;font-size:20px}.hub-icon.cjk{font-size:23px}
+ .hub-tile b{font-size:12px}.hub-tile small{font-size:10px;-webkit-line-clamp:1}.hub-live{padding:5px 10px;font-size:12px}.hub-live-go{min-height:26px}
+ .hub-chat{padding:6px;gap:5px}
+}
+@media(prefers-reduced-motion:reduce){.hub-tile,.hub-chat,.hub-live-tag{animation:none;transition:none}}
+
+/* Roomy screens: bigger tiles so the lobby does not look empty. */
+@media(min-height:560px) and (min-width:900px){
+ .hub-grid{grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:12px}.hub-tile{grid-template-columns:60px minmax(0,1fr);min-height:104px;padding:14px 16px;border-radius:16px}
+ .hub-icon{width:60px;height:60px;border-radius:16px;font-size:32px}.hub-icon.cjk{font-size:36px}.hub-tile b{font-size:16px}.hub-tile small{font-size:12px}.hub-group h3{font-size:12px;margin-bottom:9px}.hub-body{gap:20px;padding-top:22px}
+}

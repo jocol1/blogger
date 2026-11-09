@@ -189,7 +189,7 @@ window.TeaXiangqiUI=function({box,api,t,id,update,toast,isVisible,myTable,invite
   btn('emote','😀',t('xqEmote'),()=>{emoteOpen=!emoteOpen;paintInfo();});
   btn('resign','🏳',t('xqResign'),()=>confirmed('resign',true,'xqConfirmResign',()=>send({type:'resign'})));
   btn('sound',fx.muted?'🔇':'🔊',t('xqSound'),()=>{fx.setMuted(!fx.muted);refs.sound.querySelector('i').textContent=fx.muted?'🔇':'🔊';fx.sound('move');});
-  btn('back','⌂',t('xqBack'),()=>document.querySelector('.games-view .back-cafe')?.click());
+  btn('back','⌂',t('xqBack'),()=>document.querySelector('.games-view .back-hub')?.click());
   refs.accept.onclick=()=>send({type:game.drawOffer==='theirs'?'draw':'undo'});refs.decline.onclick=()=>send({type:'decline'});
   refs.emoteMenu=el('div',undefined,shell,'xq-emotes');refs.emoteMenu.hidden=true;el('b',t('xqEmoteTitle'),refs.emoteMenu);
   const grid=el('div',undefined,refs.emoteMenu);
