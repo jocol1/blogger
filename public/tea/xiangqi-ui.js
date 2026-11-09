@@ -266,7 +266,7 @@ window.TeaXiangqiUI=function({box,api,t,id,update,toast,isVisible,myTable,invite
   }
   const row=el('div',undefined,card,'xq-result-actions');
   if(g.member&&g.players[0].id===me)el('button',t('xqNewGame'),row,'primary').onclick=()=>startGame({opponent:g.opponent,level:g.level});
-  el('button',t('xqLobby'),row).onclick=()=>{dismissedId=g.id;overKey='';selected=null;targets=[];local=null;renderLobby();};
+  el('button',t('xqLobby'),row).onclick=()=>{dismissedId=g.id;overKey='';selected=null;targets=[];local=null;const hub=document.querySelector('.games-view .back-hub');if(hub)hub.click();else renderLobby();};
  }
 
  // ---------- effects when a new server state arrives ----------
@@ -371,7 +371,7 @@ window.TeaXiangqiUI=function({box,api,t,id,update,toast,isVisible,myTable,invite
   if(value.status!=='active'){selected=null;targets=[];}else if(selected!=null&&!interactive())selected=null,targets=[];
   paintBoard(true);paintInfo();scheduleBotPoll();
  }
- function clear(){clearTimeout(botTimer);game=null;mode='';refs={};local=null;selected=null;targets=[];dragging=null;sending=false;paintKey='';overKey='';prevId='';dismissedId=null;bubbles.clear();}
+ function clear(){clearTimeout(botTimer);game=null;mode='';refs={};local=null;selected=null;targets=[];dragging=null;sending=false;paintKey='';overKey='';prevId='';bubbles.clear();}
  setInterval(()=>{if(isVisible()&&mode==='game')paintInfo();},250);
  return{render,clear};
 };

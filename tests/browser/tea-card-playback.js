@@ -15,8 +15,8 @@ async (page) => {
       await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await live.setViewportSize(viewport);
     })();await live.waitForFunction(()=>document.querySelector('#interact-button')?.dataset.seat?.startsWith('t5-'));
     const seat=await live.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});
-    await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('[data-tab=cards]').click();
-    if(await live.locator('#card-game-switch').isVisible())await live.locator('#card-game-switch').click();await live.locator('[data-card-mode=color]').click();await live.locator('#bot-count').selectOption('2');await live.locator('#start-card').click();
+    await live.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await live.locator('#context-button').click();
+    await live.locator('.hub-tile[data-tile=color]').click();await live.locator('#bot-count').selectOption('2');await live.locator('#start-card').click();
     await live.waitForFunction(()=>document.querySelectorAll('#hand button').length===7);
     for(let round=0;round<5&&!await live.locator('#hand button:not(:disabled)').count();round++) {
       if(await live.locator('#draw-button').isEnabled())await live.locator('#draw-button').click();

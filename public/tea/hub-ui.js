@@ -1,6 +1,6 @@
 // Table lobby: the first screen after "Mở bàn". One grid for every table game, who is here, and the chat drawer.
 // It only routes into the existing game screens; nothing about how those games work lives here.
-window.TeaHubUI=function({t,state,myId,myTable,open}){
+window.TeaHubUI=function({t,state,myId,myTable,open,challengeBusy=()=>false}){
  const $=s=>document.querySelector(s),LAST='locly-hub-last';
  const TILES=[
   {id:'xiangqi',type:'game',icon:'帥',name:'xiangqiName',tag:'xiangqiShort',group:'mind',cjk:true},
@@ -60,13 +60,14 @@ window.TeaHubUI=function({t,state,myId,myTable,open}){
   const box=$('#hub-people'),table=myTable();if(!box||!table)return;
   const ids=table.seats.map(seat=>seat.walletId).filter(Boolean),guests=state()?.guests||[];
   const people=ids.map(id=>guests.find(g=>g.walletId===id)).filter(Boolean);
-  const key=people.map(p=>[p.walletId,p.nickname,p.rank?.tier,p.rank?.streak].join(':')).join('|');
+  const canChallenge=activity()?.key!=='xiangqi'&&!challengeBusy(),key=people.map(p=>[p.walletId,p.nickname,p.rank?.tier,p.rank?.streak].join(':')).join('|')+'#'+canChallenge+document.documentElement.lang;
   if(key===peopleKey)return;peopleKey=key;box.replaceChildren();
   for(const p of people){
    const chip=el('span',undefined,box,'hub-person'+(p.walletId===myId()?' me':''));chip.dataset.id=p.walletId;
    el('b',p.nickname||'Guest',chip);
-   if(p.walletId===myId())el('small',t('hubYou'),chip);
+   const title=p.rank&&p.rank.tier>=1?t('xqTier'+p.rank.tier):p.walletId===myId()?t('hubYou'):'';if(title)el('small',title,chip);
    if(p.rank?.streak>=3)el('em','🔥'+p.rank.streak,chip);
+   if(p.walletId!==myId()){const go=el('button','⚔ '+t('hubChallenge'),chip,'hub-challenge');go.type='button';go.disabled=!canChallenge;go.onclick=()=>open.challenge(p.walletId);}
   }
  }
  function openChat(show,brawl=false){

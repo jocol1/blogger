@@ -15,7 +15,7 @@ async (page)=>{
       await entry.page.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await entry.page.setViewportSize(viewport);
     })();await entry.page.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
     const seat=await entry.page.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});
-    await entry.page.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await entry.page.locator('[data-tab=cards]').click();return entry;
+    await entry.page.waitForFunction(()=>!document.querySelector('.menu-item').disabled);await entry.page.locator('#context-button').click();await entry.page.locator('.hub-tile[data-tile=tienlen]').click();return entry;
   }
   const state=async entry=>(await(await entry.context.request.get(base+'/api/tea/tienlen/current',{headers:entry.headers})).json()).game;
   let stage='join';try{
@@ -32,7 +32,7 @@ async (page)=>{
     const retained=await leader.page.locator('#tl-top').getAttribute('data-cards');if(retained.split(',').sort().join(',')!==selected.slice().sort().join(','))throw Error('Pass removed the preceding play');
     stage='second play';await leader.page.waitForFunction(()=>!document.querySelector('#tl-feedback').textContent.includes('sắp tới lượt'));await leader.page.locator('#tl-hint').click();await leader.page.locator('#tl-play').click();
     await leader.page.waitForFunction(()=>document.querySelector('#tl-top .card-pile-layer.previous')&&document.querySelector('#tl-top').dataset.playVersion==='4');
-    stage='reload';await guest.page.reload();await guest.page.waitForFunction(()=>document.querySelector('#connection-dot').classList.contains('live'));await guest.page.locator('[data-tab=cards]').click();await guest.page.waitForFunction(()=>document.querySelector('#tl-top').dataset.playVersion==='4');
+    stage='reload';await guest.page.reload();await guest.page.waitForFunction(()=>document.querySelector('#connection-dot').classList.contains('live'));await guest.page.locator('#context-button').click();await guest.page.locator('.hub-tile[data-tile=tienlen]').click();await guest.page.waitForFunction(()=>document.querySelector('#tl-top').dataset.playVersion==='4');
     const noReplay=await guest.page.locator('.card-flight').count()===0;
     await guest.page.emulateMedia({reducedMotion:'reduce'});
     const reduced=await guest.page.evaluate(()=>{

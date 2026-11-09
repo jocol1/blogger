@@ -24,7 +24,7 @@ async(page)=>{
    });
    return result;
   };
-  await p.locator('#context-button').click();await p.locator('[data-tab=games]').click();await p.locator('[data-mini-game=xiangqi]').click();
+  await p.locator('#context-button').click();await p.locator('.hub-tile[data-tile=xiangqi]').click();
   await p.locator('.xq-lobby').waitFor();await p.locator('#xq-start').waitFor();
   if(!(await p.locator('[data-opponent=friend]').isDisabled()))throw Error('Friend mode should be disabled when sitting alone');
   await p.waitForFunction(()=>document.querySelectorAll('.xq-list li').length>0);
@@ -67,7 +67,7 @@ async(page)=>{
   await p.setViewportSize({width:844,height:390});
   await p.locator('[data-xq=resign]').click();await p.locator('[data-xq=resign]').click();await p.locator('.xq-result').waitFor();await p.waitForTimeout(450);
   await p.screenshot({path:out('result-844')});checks.push('resign shows the result card');
-  await p.locator('.xq-result-actions button:not(.primary)').click();await p.locator('.xq-lobby').waitFor();checks.push('back to lobby from the result');
+  await p.locator('.xq-result-actions button:not(.primary)').click();await p.locator('.hub-shell').waitFor();checks.push('result card returns to the table lobby');await p.locator('.hub-tile[data-tile=xiangqi]').click();await p.locator('.xq-lobby').waitFor();checks.push('reopening Cờ tướng shows its own lobby, not the old result');
   await p.locator('#xq-start').click();await p.locator('.xq-shell').waitFor();await p.waitForFunction(()=>document.querySelectorAll('.xq-piece').length===32);
   await p.locator('[data-xq=back]').click();if(await p.locator('.xq-shell').isVisible())throw Error('Cannot leave to the café');checks.push('back to café works');
   if(errors.length)throw Error(errors.join('\n'));return{checks,errors};

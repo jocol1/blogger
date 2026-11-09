@@ -14,6 +14,7 @@ body.hub-open #table-empty{margin:auto}
 .hub-people{flex:1;min-width:0;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}.hub-people::-webkit-scrollbar{display:none}
 .hub-person{flex:none;display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:99px;background:#294650;border:1px solid #627f88;color:#f0f4ed;font-size:12px}
 .hub-person b{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hub-person small{font-size:10px;color:#a9c4c0}.hub-person em{font-style:normal;font-size:11px;font-weight:800;color:#ffb36b}.hub-person.me{background:#3a5a4a;border-color:#8fbf9a}
+.hub-challenge{margin-left:2px;min-height:22px;padding:0 8px;border-radius:99px;border:1px solid #ffd798;background:#e8bd6c;color:#233b43;font-size:10px;font-weight:800}.hub-challenge:disabled{opacity:.45;cursor:default}
 .hub-actions{flex:none;display:flex;gap:6px;align-items:center}
 .hub-actions button{position:relative;display:inline-flex;align-items:center;gap:5px;min-height:38px;padding:4px 12px;border-radius:10px;background:#fff6dc;color:#3b2a18;border:2px solid #b78d55;box-shadow:0 2px #7c5a2e;font-weight:700;font-size:12px;white-space:nowrap}
 .hub-actions button i{font-style:normal;font-size:15px;line-height:1}.hub-actions button:active{transform:translateY(1px);box-shadow:none}

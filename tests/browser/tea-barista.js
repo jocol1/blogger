@@ -6,7 +6,7 @@ async(page)=>{
   const p=await c.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/tra-da');await p.waitForFunction(()=>Boolean(document.querySelector('#cafe-canvas').dataset.playerX)&&document.querySelector('#connection-dot').classList.contains('live'));
   await p.keyboard.down('d');await p.waitForFunction(()=>+document.querySelector('#cafe-canvas').dataset.playerX>=180);await p.keyboard.up('d');await p.keyboard.down('w');await p.waitForFunction(()=>+document.querySelector('#cafe-canvas').dataset.playerY<=505);await p.keyboard.up('w');await p.waitForTimeout(150);
   const seat=await c.request.post(base+'/api/tea/seats/t5-3',{headers,data:{}});if(!seat.ok())throw Error(await seat.text());await p.waitForFunction(()=>!document.querySelector('.menu-item').disabled);
-  async function open(){await p.locator('#context-button').click();await p.locator('[data-tab=games]').click();await p.locator('[data-mini-game=barista]').click();}
+  async function open(){await p.locator('#context-button').click();await p.locator('.hub-tile[data-tile=barista]').click();}
   const read=async()=>(await(await c.request.get(base+'/api/tea/games/barista',{headers})).json()).game;
   await open();await p.locator('#mini-start').waitFor();if(await p.locator('#mini-bots').isVisible()||await p.locator('#mini-start').isDisabled())throw Error('Solo lobby broken');await p.locator('#mini-start').click();await p.locator('.barista-shell').waitFor();
   let expectedScore=0;

@@ -103,16 +103,18 @@ function createTableGames({ db, now }) {
     if(gone.length&&game.key==='xiangqi'&&game.xq.history.length>=4){xq.forfeit(game,gone,now());return;}
     if(game.status==='active'&&game.players.some(id=>!id.startsWith('bot:')&&!table.seats.some(seat=>seat.walletId===id))){game.status='finished';game.winnerIds=[];game.last={canceled:true};game.finishedAt=now();}}
   return {
-    async start(walletId,input){const key=input.key,requestId=input.requestId,botCount=Number(input.botCount||0);if(!REQUEST.test(requestId||'')||!Number.isInteger(botCount)||botCount<0||botCount>3)fail(400,'Invalid game request.','bad_request');
+    // trusted.partnerId is passed only by the service when someone accepts a challenge: it lets a non-host start Xiangqi against that person.
+    async start(walletId,input,trusted={}){const key=input.key,requestId=input.requestId,botCount=Number(input.botCount||0);if(!REQUEST.test(requestId||'')||!Number.isInteger(botCount)||botCount<0||botCount>3)fail(400,'Invalid game request.','bad_request');
       return db.runTransaction(async tx=>{const {table,ref}=await current(tx,walletId,key),snap=await tx.get(ref);if(snap.exists&&snap.data().requestId===requestId&&snap.data().startedBy===walletId)return view(snap.data(),walletId);
         let late=null;
         if(snap.exists&&snap.data().status==='active'){const game=snap.data(),pre=await preload(tx,game);checkPlayers(game,table);progress(game);if(game.status==='active')fail(409,'This game is already running.','game_active');late={game,pre};}
-        if(table.ownerId!==walletId)fail(403,'The first guest at the table starts the game.','not_host');const humans=table.seats.filter(seat=>seat.walletId).map(seat=>seat.walletId);if(humans.length+botCount>8)fail(400,'A table game supports up to eight players.','bad_player_count');
+        if(table.ownerId!==walletId&&!(key==='xiangqi'&&trusted.partnerId))fail(403,'The first guest at the table starts the game.','not_host');const humans=table.seats.filter(seat=>seat.walletId).map(seat=>seat.walletId);if(humans.length+botCount>8)fail(400,'A table game supports up to eight players.','bad_player_count');
         let opponent=null,level=null,xqPlayers=null;
         if(key==='xiangqi'){
-          opponent=input.opponent==='friend'?'friend':'bot';level=xq.LEVELS.includes(input.level)?input.level:'medium';
+          opponent=trusted.partnerId||input.opponent==='friend'?'friend':'bot';level=xq.LEVELS.includes(input.level)?input.level:'medium';
           if(botCount)fail(400,'Choose the Xiangqi opponent in its lobby.','bad_request');
-          if(opponent==='friend'){const others=table.seats.filter(seat=>seat.walletId&&seat.walletId!==walletId).sort((a,b)=>(a.seatedAt||0)-(b.seatedAt||0));if(!others.length)fail(400,'Xiangqi against a friend needs a second person at the table.','xiangqi_need_friend');xqPlayers=[walletId,others[0].walletId];}
+          if(trusted.partnerId){if(trusted.partnerId===walletId||!table.seats.some(seat=>seat.walletId===trusted.partnerId))fail(409,'That player left the table.','xiangqi_need_friend');xqPlayers=[walletId,trusted.partnerId];}
+          else if(opponent==='friend'){const others=table.seats.filter(seat=>seat.walletId&&seat.walletId!==walletId).sort((a,b)=>(a.seatedAt||0)-(b.seatedAt||0));if(!others.length)fail(400,'Xiangqi against a friend needs a second person at the table.','xiangqi_need_friend');xqPlayers=[walletId,others[0].walletId];}
           else xqPlayers=[walletId,'bot:1'];
         }
         const players=xqPlayers||[...humans,...Array.from({length:botCount},(_,i)=>`bot:${i+1}`)],names={};for(const id of (xqPlayers?xqPlayers.filter(id=>!id.startsWith('bot:')):humans)){const profile=await tx.get(db.collection('tea_profiles').doc(id));names[id]=profile.exists?profile.data().nickname:'Guest';}players.filter(id=>id.startsWith('bot:')).forEach((id,i)=>{names[id]=`BOT ${i+1}`;});
@@ -129,6 +131,8 @@ function createTableGames({ db, now }) {
       if(emoteOnly){xq.emote(game,walletId,emoteName,input.code,now(),fail);}else if(game.key==='xiangqi'){xq.play(game,walletId,input,now(),fail);}else if(game.key==='barista'){barista.play(game,walletId,input,now(),fail);}else if(game.key==='drawing'){drawing.play(game,walletId,input,now(),fail);}else if(['rps',...QUESTION_KEYS].includes(game.key)){const choices=game.key==='rps'?['rock','paper','scissors']:[0,1,2,3];if(!choices.includes(input.choice))fail(400,'Choose one of the available options.','bad_choice');if(game.round!==input.round||game.choices[walletId])fail(409,'Wait for the next round.','already_played');game.choices[walletId]=input.choice;progress(game);}else{if(game.players[game.turnIndex]!==walletId||game.revealUntil)fail(409,'Wait for your turn.','not_turn');const picked=Array.isArray(game.first)?game.first:(game.first===null?[]:[game.first]),index=Number(input.index);if(!Number.isInteger(index)||index<0||index>=18||game.matched.includes(index)||picked.includes(index))fail(400,'Choose a hidden tile.','bad_tile');flip(game,walletId,index);game.botReadyAt=now()+900;progress(game);}
       settle(tx,game,pre);game.version=(game.version||0)+1;const result=view(game,walletId);tx.set(ref,game);tx.create(attempt,{result,createdAt:now()});return result;});},
     async leaderboard(walletId){return xqRatings.leaderboard(db,walletId);},
+    // Title and win streak shown next to a guest's name in the café; null until they have played a ranked game.
+    async rank(walletId){const snap=await db.collection('tea_xiangqi_ratings').doc(walletId).get();return snap.exists?{tier:xqRatings.tierOf(snap.data().rating),streak:snap.data().streak||0}:null;},
     async cancelAfterRestart(){for(const key of [...KEYS,...RETIRED_KEYS])for(let n=1;n<=8;n++){const ref=games().doc(`t${n}-${key}`);await db.runTransaction(async tx=>{const snap=await tx.get(ref);if(snap.exists&&snap.data().status==='active')tx.update(ref,{status:'finished',winnerIds:[],last:{canceled:true,reason:RETIRED_KEYS.includes(key)?'game_retired':'server_restart'},finishedAt:now()});});}},
   };
 }
