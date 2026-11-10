@@ -24,7 +24,7 @@ const CATALOG = [
   { id: 'thit-heo-xay', group: 'meat', name: 'Thịt heo xay', keyword: 'thịt heo xay', unit: 'kg', must: [/(heo|lợn|thịt) xay/], not: [/bò|gà|cá|viên|chả|nem|hộp|đông lạnh|ướp|tẩm|gia vị|bột|pate|sốt|xốt/] },
   { id: 'thit-ga', group: 'meat', name: 'Thịt gà (ức)', keyword: ['ức gà', 'thịt ức gà'], unit: 'kg', must: [/ức gà/], not: [/vịt|sụn|xông|chiên|rán|đông lạnh|viên|xúc xích|ướp|tẩm|nấu|hầm|hun khói|bột|súp|cháo|nem|chả|snack|khô/] },
   { id: 'thit-bo', group: 'meat', name: 'Thịt bò (bắp)', keyword: 'bắp bò', unit: 'kg', must: [/bắp bò|bắp hoa/], not: [/xông|chiên|rán|đông lạnh|viên|xúc xích|ướp|tẩm|nấu|hầm|bột|súp|cháo|nem|chả|snack|khô|hộp|pate|sốt|xốt|gia vị|mì|phở|bún/] },
-  { id: 'ca-basa', group: 'meat', name: 'Cá basa (phi lê)', keyword: 'phi lê cá basa', unit: 'kg', must: [/basa/], not: [/bao tử|viên|chả|khô|chiên|rán|hộp|sốt|xốt|ướp|tẩm|bột|nấu|mì|phở|bún|snack|dầu|mỡ/] },
+  { id: 'ca-basa', group: 'meat', name: 'Cá basa (phi lê)', keyword: 'phi lê cá basa', unit: 'kg', must: [/basa/, /phi lê|fillet/], not: [/bao tử|viên|chả|khô|chiên|rán|hộp|sốt|xốt|ướp|tẩm|bột|nấu|mì|phở|bún|snack|dầu|mỡ/] },
 
   // Rau củ, trái cây
   { id: 'ca-rot', group: 'produce', name: 'Cà rốt', keyword: 'cà rốt', unit: 'kg', must: [fresh('cà rốt')], not: [PROCESSED, /baby|ngũ sắc/] },

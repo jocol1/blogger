@@ -39,6 +39,8 @@ body.prices-open .side-panel{position:fixed!important;inset:0!important;width:10
 .pr-button{display:inline-block;padding:8px 14px;border:2px solid #956d44;background:#3a2a1d;color:#f2ecd9;font:700 13px/1.2 "Segoe UI",sans-serif;text-decoration:none;cursor:pointer}
 .pr-status{padding:28px 8px;text-align:center;color:#d9e2d0}
 .pr-status p{margin:0 0 12px}
+.pr-source{display:block;margin-top:4px;color:#e2c58e;font-weight:400;letter-spacing:0}
+.pr-source-note{padding:9px 12px;border-left:3px solid #dfbd79;background:#344235;color:#f1dfb8;font:400 13px/1.5 "Segoe UI",sans-serif}
 @media(max-width:560px){.prices-view.active{padding:8px!important}.pr-board{padding:12px;border-width:4px}.pr-head h1{font-size:20px}.pr-cell{min-width:150px}}
 @media(max-height:480px){.pr-board{padding:10px 12px}.pr-head{margin-bottom:8px}.pr-head h1{font-size:18px}.pr-close{width:32px;height:32px}.pr-basket{padding:6px 10px;margin-bottom:8px}.pr-totals{margin-top:4px}.pr-sum{margin-top:4px}.pr-table th,.pr-table td{padding:6px 8px}.pr-unit{font-size:14px}}
 .pr-table tbody .pr-group th{position:static;background:#1d2b24;color:#d6f0b2;font-size:12px;letter-spacing:.6px;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid #3f5a4c}

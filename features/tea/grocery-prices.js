@@ -3,6 +3,7 @@
  * Prices are the online prices of each site's default store, not shelf prices. */
 
 const { CATALOG, GROUPS, DEFAULT_SIZE } = require('./grocery-catalog');
+const { readBhxSnapshot, comparableProducts } = require('./bhx-prices');
 
 const STORES = [
   { id: 'winmart', name: 'WinMart' },
@@ -109,7 +110,8 @@ function nextRefreshAt(nowMs, { hour = 8, offsetHours = 7 } = {}) {
   return target - offsetHours * HOUR;
 }
 
-function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCoop }, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
+const DEFAULT_FETCHERS = { winmart: fetchWinmart, coop: fetchCoop };
+function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
   let cache = null, inflight = null, timer = null;
 
   // One store at a time is polite to that store; the two stores run side by side.
@@ -124,7 +126,7 @@ function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCo
           if (delayMs) await sleep(delayMs);
         }
         if (failures === keywords.length) throw new Error('all searches failed');
-        cells[item.id] = pickBest(item, products);
+        cells[item.id] = { ...pickBest(item, products), checkedAt: new Date(now()).toISOString() };
       } catch (error) {
         store.errors += 1;
         const old = previous?.items.find(i => i.id === item.id)?.perStore[store.id];
@@ -136,25 +138,51 @@ function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCo
 
   async function build(previous) {
     const stores = STORES.map(s => ({ ...s, checkedAt: null, errors: 0 }));
-    const cellsByStore = await Promise.all(stores.map(store => buildStore(store, previous)));
+    const [cellsByStore, bhx] = await Promise.all([
+      Promise.all(stores.map(store => buildStore(store, previous))),
+      bhxLoader ? Promise.resolve().then(() => bhxLoader(now())).catch(() => null) : null,
+    ]);
+    if (bhxLoader) {
+      const usable = bhx && !bhx.expired;
+      const products = usable ? comparableProducts(bhx.products) : [];
+      stores.push({ id: 'bhx', name: 'Bách Hóa Xanh', checkedAt: bhx?.capturedAt || null, errors: 0,
+        snapshot: true, region: bhx?.regionLabel || null, targetRegion: 'TP.HCM',
+        referenceOnly: !usable || !bhx.regionVerified || bhx.stale, unavailable: !usable });
+      cellsByStore.push(Object.fromEntries(CATALOG.map(item => {
+        if (!usable) return [item.id, { status: 'error' }];
+        const cell = pickBest(item, products);
+        if (cell.status === 'not_found') cell.status = 'not_collected';
+        return [item.id, { ...cell, checkedAt: bhx.capturedAt, stale: bhx.stale }];
+      })));
+    }
     const items = CATALOG.map(item => ({
       id: item.id, group: item.group, name: item.name, unit: item.unit, unitLabel: item.unitLabel || UNIT_LABEL[item.unit],
       perStore: Object.fromEntries(stores.map((store, i) => [store.id, cellsByStore[i][item.id]])),
     }));
     const stamp = new Date(now()).toISOString();
-    for (const store of stores) store.checkedAt = store.errors < CATALOG.length ? stamp : (previous?.stores.find(s => s.id === store.id)?.checkedAt ?? null);
-    const both = items.filter(i => STORES.every(s => i.perStore[s.id].status === 'ok'));
-    const totals = Object.fromEntries(STORES.map(s => [s.id, both.reduce((sum, i) => sum + i.perStore[s.id].unitPrice, 0)]));
+    for (const store of stores) if (!store.snapshot) store.checkedAt = store.errors < CATALOG.length ? stamp : (previous?.stores.find(s => s.id === store.id)?.checkedAt ?? null);
+    const compared = stores.filter(s => !s.referenceOnly);
+    const both = items.filter(i => compared.every(s => i.perStore[s.id].status === 'ok' && !i.perStore[s.id].stale));
+    const totals = Object.fromEntries(compared.map(s => [s.id, both.reduce((sum, i) => sum + i.perStore[s.id].unitPrice, 0)]));
     return {
-      checkedAt: stamp, stores: stores.map(({ id, name, checkedAt, errors }) => ({ id, name, checkedAt, failed: errors > 0 })), groups: GROUPS, items,
-      basket: { count: both.length, totals },
+      checkedAt: stamp, stores: stores.map(({ errors, ...s }) => ({ ...s, failed: errors > 0 || !!s.unavailable })), groups: GROUPS, items,
+      basket: { count: both.length, totals, storeIds: compared.map(s => s.id) },
       hasErrors: stores.some(s => s.errors > 0),
     };
   }
 
   function refresh() {
     if (!inflight) {
-      inflight = build(cache?.data).then(data => { cache = { data, expiresAt: data.hasErrors ? now() + retryMs : nextRefreshAt(now(), dailyAt) }; return data; }).finally(() => { inflight = null; });
+      inflight = build(cache?.data).then(data => {
+        let expiresAt = data.hasErrors ? now() + retryMs : nextRefreshAt(now(), dailyAt);
+        for (const store of data.stores.filter(s => s.snapshot && s.checkedAt)) {
+          for (const age of [86400_000, 7 * 86400_000]) {
+            const boundary = Date.parse(store.checkedAt) + age;
+            if (boundary > now()) expiresAt = Math.min(expiresAt, boundary);
+          }
+        }
+        cache = { data, expiresAt }; return data;
+      }).finally(() => { inflight = null; });
       inflight.catch(() => {});
     }
     return inflight;
@@ -182,15 +210,15 @@ function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCo
   return { getPrices, current, start, stop };
 }
 
-const csvCell = value => { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
-const STATUS_TEXT = { ok: 'Có hàng', out_of_stock: 'Hết hàng', not_found: 'Không tìm thấy', error: 'Lỗi lấy dữ liệu' };
+const csvCell = value => { const text = String(value ?? '').replace(/^[=+@\-\t\r]/, "'$&"); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
+const STATUS_TEXT = { ok: 'Có hàng', out_of_stock: 'Hết hàng', not_found: 'Không tìm thấy', not_collected: 'Chưa thu thập mặt hàng phù hợp', error: 'Lỗi lấy dữ liệu' };
 
 /** UTF-8 with BOM so Excel shows Vietnamese correctly. */
 function toCsv(snapshot) {
-  const rows = [['Mặt hàng', 'Siêu thị', 'Sản phẩm', 'Giá bán (đ)', 'Giá niêm yết (đ)', 'Quy cách', 'Giá trên đơn vị (đ)', 'Đơn vị', 'Trạng thái', 'Link', 'Thời điểm lấy giá']];
+  const rows = [['Mặt hàng', 'Siêu thị', 'Sản phẩm', 'Giá bán (đ)', 'Giá niêm yết (đ)', 'Quy cách', 'Giá trên đơn vị (đ)', 'Đơn vị', 'Trạng thái', 'Link', 'Thời điểm lấy giá', 'Khu vực', 'Chỉ tham khảo']];
   for (const item of snapshot.items) for (const store of snapshot.stores) {
     const c = item.perStore[store.id];
-    rows.push([item.name, store.name, c.name || '', c.price ?? '', c.listPrice ?? '', c.size || '', c.unitPrice ?? '', item.unitLabel, STATUS_TEXT[c.status] + (c.stale ? ' (dữ liệu cũ)' : ''), c.url || '', store.checkedAt || '']);
+    rows.push([item.name, store.name, c.name || '', c.price ?? '', c.listPrice ?? '', c.size || '', c.unitPrice ?? '', item.unitLabel, STATUS_TEXT[c.status] + (c.stale ? ' (dữ liệu cũ)' : ''), c.url || '', c.checkedAt || store.checkedAt || '', store.region || (store.id === 'bhx' ? 'Chưa xác minh TP.HCM' : 'Cửa hàng mặc định'), store.referenceOnly ? 'Có' : '']);
   }
   return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
