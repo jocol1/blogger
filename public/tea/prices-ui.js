@@ -22,7 +22,12 @@ window.TeaPricesUI=function({t,locale,close}){
  const statusText=c=>t(c.status==='out_of_stock'?'prOut':c.status==='error'?'prError':c.status==='not_collected'?'prNotCollected':'prNotFound');
  const compare=()=>window.TeaPriceCart.compareCart(data,[...cart],[...selected]);
 
- function badge(store){const [label]=BADGE[store.id]||[store.name.slice(0,2).toUpperCase()];const b=el('span','pr-logo',label);b.style.setProperty('--brand',brand(store));return b}
+ // Pixelated copy of each store's own site icon (public/tea/logos); the initials stay as the fallback if it is missing.
+ function badge(store){
+  const [label]=BADGE[store.id]||[store.name.slice(0,2).toUpperCase()],b=el('span','pr-logo',label);b.style.setProperty('--brand',brand(store));
+  if(BADGE[store.id]){const img=el('img');img.src=`/assets/tea/logos/${store.id}.png`;img.alt='';img.width=img.height=48;img.onload=()=>{b.textContent='';b.classList.add('has-img');b.append(img)}}
+  return b;
+ }
 
  function chips(){
   const box=el('div','pr-chips');
@@ -118,32 +123,32 @@ window.TeaPricesUI=function({t,locale,close}){
   const H=tableTop+rowH*(result.items.length+2)+footH;
   const canvas=document.createElement('canvas');canvas.width=W*scale;canvas.height=H*scale;
   const g=canvas.getContext('2d');g.scale(scale,scale);
-  const font=(w,s)=>`${w} ${s}px "Segoe UI", system-ui, sans-serif`;
+  const font=(w,s)=>`${w} ${s}px "Trebuchet MS", "Segoe UI", sans-serif`;
   const fit=(text,max)=>{text=String(text);if(g.measureText(text).width<=max)return text;while(text.length>1&&g.measureText(text+'…').width>max)text=text.slice(0,-1);return text+'…'};
-  g.fillStyle='#ffffff';g.fillRect(0,0,W,H);
-  g.fillStyle='#0f9d4a';g.font=font(700,12);g.fillText(t('prSmall'),pad,pad+8);
-  g.fillStyle='#1c2a22';g.font=font(700,26);g.fillText(t('prCart'),pad,pad+42);
+  g.fillStyle='#fff1d3';g.fillRect(0,0,W,H);g.strokeStyle='#956d44';g.lineWidth=8;g.strokeRect(4,4,W-8,H-8);g.lineWidth=1;
+  g.fillStyle='#8a714f';g.font=font(700,12);g.fillText(t('prSmall'),pad,pad+8);
+  g.fillStyle='#51402e';g.font=font(700,26);g.fillText(t('prCart'),pad,pad+42);
   g.fillStyle='#6a7a71';g.font=font(400,13);g.fillText(`${new Date().toLocaleDateString(lang())} · ${t('prImageSub',{count:result.items.length})}`,pad,pad+66);
   const nameW=W-pad*2-stores.length*120,colX=i=>pad+nameW+i*120;
   const bestIndex=stores.findIndex(s=>result.best&&s.id===result.best.store.id);
-  if(bestIndex>=0){g.fillStyle='#e2f5e9';g.beginPath();g.roundRect?g.roundRect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8,10):g.rect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8);g.fill()}
+  if(bestIndex>=0){g.fillStyle='#d8e4b2';g.beginPath();g.roundRect?g.roundRect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8,10):g.rect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8);g.fill()}
   g.font=font(700,12);stores.forEach((s,i)=>{g.fillStyle=brand(s);g.textAlign='right';g.fillText(fit(s.name.toUpperCase(),108),colX(i)+112,tableTop+20)});
-  g.textAlign='left';g.fillStyle='#1c2a22';g.font=font(700,14);g.fillText(t('prItem'),pad,tableTop+20);
+  g.textAlign='left';g.fillStyle='#51402e';g.font=font(700,14);g.fillText(t('prItem'),pad,tableTop+20);
   result.items.forEach((item,r)=>{
-   const y=tableTop+rowH*(r+1);g.strokeStyle='#edf1ee';g.beginPath();g.moveTo(pad,y);g.lineTo(W-pad,y);g.stroke();
-   g.textAlign='left';g.fillStyle='#1c2a22';g.font=font(600,14);g.fillText(fit(item.name,nameW-90),pad,y+22);
+   const y=tableTop+rowH*(r+1);g.strokeStyle='#ead7ae';g.beginPath();g.moveTo(pad,y);g.lineTo(W-pad,y);g.stroke();
+   g.textAlign='left';g.fillStyle='#51402e';g.font=font(600,14);g.fillText(fit(item.name,nameW-90),pad,y+22);
    g.fillStyle='#8a9a91';g.font=font(400,11);g.fillText(`/${item.unitLabel}`,pad+nameW-80,y+22);
    const ok=stores.filter(s=>comparable(item,s)),min=ok.length?Math.min(...ok.map(s=>item.perStore[s.id].unitPrice)):null;
    stores.forEach((s,i)=>{const c=item.perStore[s.id];g.textAlign='right';
-    if(c?.status==='ok'){const cheap=comparable(item,s)&&ok.length>1&&c.unitPrice===min;g.fillStyle=cheap?'#0b7a3a':'#1c2a22';g.font=font(cheap?700:400,14);g.fillText(num(c.unitPrice),colX(i)+112,y+22)}
+    if(c?.status==='ok'){const cheap=comparable(item,s)&&ok.length>1&&c.unitPrice===min;g.fillStyle=cheap?'#3f5d33':'#51402e';g.font=font(cheap?700:400,14);g.fillText(num(c.unitPrice),colX(i)+112,y+22)}
     else{g.fillStyle='#b4c0b9';g.font=font(400,14);g.fillText('—',colX(i)+112,y+22)}});
   });
-  const ty=tableTop+rowH*(result.items.length+1);g.strokeStyle='#c9d6ce';g.lineWidth=1.5;g.beginPath();g.moveTo(pad,ty);g.lineTo(W-pad,ty);g.stroke();g.lineWidth=1;
-  g.textAlign='left';g.fillStyle='#1c2a22';g.font=font(700,14);g.fillText(t('prTotal'),pad,ty+22);
-  stores.forEach((s,i)=>{const row=result.rows.find(r=>r.store.id===s.id);g.textAlign='right';g.fillStyle=i===bestIndex?'#0b7a3a':'#1c2a22';g.font=font(800,15);g.fillText(num(row.total),colX(i)+112,ty+20);
+  const ty=tableTop+rowH*(result.items.length+1);g.strokeStyle='#795537';g.lineWidth=1.5;g.beginPath();g.moveTo(pad,ty);g.lineTo(W-pad,ty);g.stroke();g.lineWidth=1;
+  g.textAlign='left';g.fillStyle='#51402e';g.font=font(700,14);g.fillText(t('prTotal'),pad,ty+22);
+  stores.forEach((s,i)=>{const row=result.rows.find(r=>r.store.id===s.id);g.textAlign='right';g.fillStyle=i===bestIndex?'#3f5d33':'#51402e';g.font=font(800,15);g.fillText(num(row.total),colX(i)+112,ty+20);
    if(row.have<result.items.length){g.fillStyle='#a46a00';g.font=font(400,10);g.fillText(t('prSomeItems',{have:row.have,count:result.items.length}),colX(i)+112,ty+32)}});
   const fy=ty+rowH+28;g.textAlign='left';
-  if(result.best){const partial=result.best.have<result.items.length?` (${t('prSomeItems',{have:result.best.have,count:result.items.length})})`:'';g.fillStyle='#0b7a3a';g.font=font(800,20);g.fillText(fit(`${t('prCheapest')}: ${result.best.store.name} · ${money(result.best.total)}${partial}`,W-pad*2),pad,fy)}
+  if(result.best){const partial=result.best.have<result.items.length?` (${t('prSomeItems',{have:result.best.have,count:result.items.length})})`:'';g.fillStyle='#3f5d33';g.font=font(800,20);g.fillText(fit(`${t('prCheapest')}: ${result.best.store.name} · ${money(result.best.total)}${partial}`,W-pad*2),pad,fy)}
   g.fillStyle='#6a7a71';g.font=font(400,11);g.fillText(fit(t('prCartNote'),W-pad*2),pad,fy+24);g.fillText(fit(`${t('prUpdated')} ${when(data.checkedAt)} · Locly`,W-pad*2),pad,fy+42);
   canvas.toBlob(blob=>{if(!blob)return;const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`gio-hang-${new Date().toISOString().slice(0,10)}.png`;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000)},'image/png');
  }
