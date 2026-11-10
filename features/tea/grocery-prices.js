@@ -2,7 +2,7 @@
 /* Supermarket price board: WinMart and Co.op Online, both through the public JSON endpoints their own sites use.
  * Prices are the online prices of each site's default store, not shelf prices. */
 
-const { CATALOG, DEFAULT_SIZE } = require('./grocery-catalog');
+const { CATALOG, GROUPS, DEFAULT_SIZE } = require('./grocery-catalog');
 
 const STORES = [
   { id: 'winmart', name: 'WinMart' },
@@ -23,6 +23,10 @@ function measureToBase(value, unit) {
 function parseSize(name, uom, unit) {
   const text = String(name || '').toLowerCase().replace(/\s+/g, ' ');
   const uomText = String(uom || '').toLowerCase();
+  if (unit === 'cai') { // one branded pack; the label is just the size printed on it
+    const printed = text.match(new RegExp(`${NUMBER}\\s*${MEASURE}`));
+    return { qty: 1, label: printed ? `${printed[1]}${printed[2]}` : '' };
+  }
   if (unit === 'qua') {
     const count = text.match(/(\d+)\s*(?:quả|trứng|t(?=\s*x)|t\b)/);
     if (count && Number(count[1]) > 0) return { qty: Number(count[1]), label: `${count[1]} quả` };
@@ -96,47 +100,61 @@ async function fetchCoop(keyword) {
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCoop }, now = () => Date.now(), ttlMs = 6 * 3600_000, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
-  let cache = null, inflight = null;
+const HOUR = 3600_000;
+/** Next occurrence of `hour`:00 in a fixed-offset zone (Vietnam is UTC+7, no daylight saving), as epoch ms. */
+function nextRefreshAt(nowMs, { hour = 8, offsetHours = 7 } = {}) {
+  const local = new Date(nowMs + offsetHours * HOUR);
+  let target = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), hour);
+  if (target <= local.getTime()) target += 24 * HOUR;
+  return target - offsetHours * HOUR;
+}
+
+function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCoop }, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
+  let cache = null, inflight = null, timer = null;
+
+  // One store at a time is polite to that store; the two stores run side by side.
+  async function buildStore(store, previous) {
+    const cells = {};
+    for (const item of CATALOG) {
+      try {
+        const products = [], seen = new Set(); let failures = 0;
+        const keywords = [].concat(item.keyword);
+        for (const keyword of keywords) {
+          try { for (const p of await fetchers[store.id](keyword)) if (!seen.has(p.url)) { seen.add(p.url); products.push(p); } } catch (error) { failures += 1; }
+          if (delayMs) await sleep(delayMs);
+        }
+        if (failures === keywords.length) throw new Error('all searches failed');
+        cells[item.id] = pickBest(item, products);
+      } catch (error) {
+        store.errors += 1;
+        const old = previous?.items.find(i => i.id === item.id)?.perStore[store.id];
+        cells[item.id] = old && old.status !== 'error' ? { ...old, stale: true } : { status: 'error' };
+      }
+    }
+    return cells;
+  }
 
   async function build(previous) {
     const stores = STORES.map(s => ({ ...s, checkedAt: null, errors: 0 }));
-    const items = [];
-    for (const item of CATALOG) {
-      const perStore = {};
-      for (const store of stores) {
-        try {
-          const products = [], seen = new Set(); let failures = 0;
-          const keywords = [].concat(item.keyword);
-          for (const keyword of keywords) {
-            try { for (const p of await fetchers[store.id](keyword)) if (!seen.has(p.url)) { seen.add(p.url); products.push(p); } } catch (error) { failures += 1; }
-            if (delayMs) await sleep(delayMs);
-          }
-          if (failures === keywords.length) throw new Error('all searches failed');
-          perStore[store.id] = pickBest(item, products);
-        } catch (error) {
-          store.errors += 1;
-          const old = previous?.items.find(i => i.id === item.id)?.perStore[store.id];
-          perStore[store.id] = old && old.status !== 'error' ? { ...old, stale: true } : { status: 'error' };
-        }
-        if (delayMs) await sleep(delayMs);
-      }
-      items.push({ id: item.id, name: item.name, unit: item.unit, unitLabel: UNIT_LABEL[item.unit], perStore });
-    }
+    const cellsByStore = await Promise.all(stores.map(store => buildStore(store, previous)));
+    const items = CATALOG.map(item => ({
+      id: item.id, group: item.group, name: item.name, unit: item.unit, unitLabel: item.unitLabel || UNIT_LABEL[item.unit],
+      perStore: Object.fromEntries(stores.map((store, i) => [store.id, cellsByStore[i][item.id]])),
+    }));
     const stamp = new Date(now()).toISOString();
     for (const store of stores) store.checkedAt = store.errors < CATALOG.length ? stamp : (previous?.stores.find(s => s.id === store.id)?.checkedAt ?? null);
     const both = items.filter(i => STORES.every(s => i.perStore[s.id].status === 'ok'));
     const totals = Object.fromEntries(STORES.map(s => [s.id, both.reduce((sum, i) => sum + i.perStore[s.id].unitPrice, 0)]));
     return {
-      checkedAt: stamp, stores: stores.map(({ id, name, checkedAt, errors }) => ({ id, name, checkedAt, failed: errors > 0 })), items,
-      basket: { count: both.length, totals, note: '1 kg / 1 lít / 1 quả mỗi món, cùng giá trên đơn vị' },
+      checkedAt: stamp, stores: stores.map(({ id, name, checkedAt, errors }) => ({ id, name, checkedAt, failed: errors > 0 })), groups: GROUPS, items,
+      basket: { count: both.length, totals },
       hasErrors: stores.some(s => s.errors > 0),
     };
   }
 
   function refresh() {
     if (!inflight) {
-      inflight = build(cache?.data).then(data => { cache = { data, expiresAt: now() + (data.hasErrors ? retryMs : ttlMs) }; return data; }).finally(() => { inflight = null; });
+      inflight = build(cache?.data).then(data => { cache = { data, expiresAt: data.hasErrors ? now() + retryMs : nextRefreshAt(now(), dailyAt) }; return data; }).finally(() => { inflight = null; });
       inflight.catch(() => {});
     }
     return inflight;
@@ -151,7 +169,17 @@ function createGroceryPrices({ fetchers = { winmart: fetchWinmart, coop: fetchCo
     if (!cache || now() >= cache.expiresAt) refresh();
     return cache ? cache.data : null;
   }
-  return { getPrices, current };
+  /** Fetches now, then again every day at the scheduled hour. If the host slept through 08:00, the first visit afterwards refreshes via current(). */
+  function start() {
+    refresh();
+    const arm = () => {
+      timer = setTimer(() => { refresh(); arm(); }, Math.max(1000, nextRefreshAt(now(), dailyAt) - now()));
+      timer?.unref?.();
+    };
+    arm();
+  }
+  function stop() { clearTimeout(timer); timer = null; }
+  return { getPrices, current, start, stop };
 }
 
 const csvCell = value => { const text = String(value ?? ''); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
@@ -167,4 +195,4 @@ function toCsv(snapshot) {
   return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-module.exports = { CATALOG, STORES, parseSize, pickBest, fetchWinmart, fetchCoop, createGroceryPrices, toCsv };
+module.exports = { CATALOG, STORES, parseSize, pickBest, fetchWinmart, fetchCoop, createGroceryPrices, nextRefreshAt, toCsv };

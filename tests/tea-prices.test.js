@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const express = require('express');
 const { CATALOG } = require('../features/tea/grocery-catalog');
-const { parseSize, pickBest, createGroceryPrices, toCsv } = require('../features/tea/grocery-prices');
+const { parseSize, pickBest, createGroceryPrices, nextRefreshAt, toCsv } = require('../features/tea/grocery-prices');
 const { createTeaRouter } = require('../features/tea/routes');
 
 const item = id => CATALOG.find(i => i.id === id);
@@ -62,8 +62,10 @@ test('pickBest tells out of stock apart from not found and keeps pack sizes sens
 // Both fake stores sell every item at 1 kg / 1 l / 10 eggs, WinMart pricier by a fixed amount.
 const fakeStore = extra => async keyword => {
   const base = { 'trứng gà': 'Trứng gà tươi hộp 10 quả', 'ba rọi heo': 'Ba rọi heo 1kg', 'ức gà': 'Ức gà 1kg', 'thịt ức gà': 'Ức gà 1kg', 'cà rốt': 'Cà rốt 1kg', 'khoai tây': 'Khoai tây 1kg', 'cà chua': 'Cà chua 1kg', 'đường': 'Đường tinh luyện 1kg', 'đường tinh luyện': 'Đường tinh luyện 1kg', 'muối tinh': 'Muối tinh 1kg', 'nước mắm': 'Nước mắm 500ml', 'sữa tươi 1l': 'Sữa tươi hộp 1 lít', 'dầu ăn': 'Dầu ăn 1 lít', 'dầu thực vật': 'Dầu ăn 1 lít' }[keyword];
+  if (!base) return [];
   return [product(base, 10000 + extra, { url: `https://winmart.vn/products/${encodeURIComponent(base)}` })];
 };
+const KNOWN = 11; // catalog items the fake stores know a keyword for
 const clock = start => { let value = start; return { now: () => value, advance: ms => { value += ms; } }; };
 
 test('getPrices caches, shares one refresh between callers and survives one store failing', async () => {
@@ -92,9 +94,9 @@ test('a store that fails later keeps its last good prices, marked as old', async
   let broken = false;
   const prices = createGroceryPrices({ now: time.now, delayMs: 0, fetchers: { winmart: fakeStore(5000), coop: async k => { if (broken) throw new Error('down'); return fakeStore(0)(k); } } });
   const first = await prices.getPrices();
-  assert.equal(first.basket.count, CATALOG.length);
+  assert.equal(first.basket.count, KNOWN);
   assert.ok(first.basket.totals.winmart > first.basket.totals.coop);
-  broken = true; time.advance(7 * 3600_000);
+  broken = true; time.advance(18 * 3600_000);
   const second = await prices.getPrices();
   const cell = second.items[0].perStore.coop;
   assert.equal(cell.status, 'ok');
@@ -108,7 +110,7 @@ test('current never waits: null at first, then the snapshot, refreshed once it e
   assert.equal(prices.current(), null);
   const built = await prices.getPrices();
   assert.equal(prices.current(), built);
-  time.advance(7 * 3600_000);
+  time.advance(18 * 3600_000); // 09:00 ICT the next morning, past the 08:00 run
   assert.equal(prices.current(), built, 'stale snapshot is served while a refresh runs');
   const refreshed = await prices.getPrices();
   assert.notEqual(refreshed, built);
@@ -158,4 +160,35 @@ test('the café wires the price board: tab, view, scripts, cache list and wall b
   for (const file of ['prices-ui.js', 'prices-words.js', 'prices.css']) { assert.match(worker, new RegExp(file.replace('.', '\\.'))); assert.ok(fs.existsSync(path.join(__dirname, '..', 'public/tea', file))); }
   assert.match(read('public/tea/scene.js'), /BẢNG GIÁ/);
   assert.match(read('public/tea/prices-ui.js'), /textContent/); assert.doesNotMatch(read('public/tea/prices-ui.js'), /innerHTML/);
+});
+
+test('nextRefreshAt is the next 08:00 in Vietnam (UTC+7), never the current instant', () => {
+  const iso = ms => new Date(ms).toISOString();
+  assert.equal(iso(nextRefreshAt(Date.parse('2026-11-10T00:30:00Z'))), '2026-11-10T01:00:00.000Z', '07:30 ICT waits for 08:00 today');
+  assert.equal(iso(nextRefreshAt(Date.parse('2026-11-10T01:00:00Z'))), '2026-11-11T01:00:00.000Z', 'exactly 08:00 means tomorrow');
+  assert.equal(iso(nextRefreshAt(Date.parse('2026-11-10T20:00:00Z'))), '2026-11-11T01:00:00.000Z', '03:00 ICT next day, still before 08:00');
+  assert.equal(iso(nextRefreshAt(Date.parse('2026-12-31T23:00:00Z'))), '2027-01-01T01:00:00.000Z', 'crosses the year');
+  assert.equal(iso(nextRefreshAt(Date.parse('2026-11-10T00:30:00Z'), { hour: 6, offsetHours: 7 })), '2026-11-10T23:00:00.000Z', '07:30 ICT is past 06:00, so tomorrow');
+});
+
+test('prices stay fresh until 08:00, then refresh; start() arms a daily timer', async () => {
+  const time = clock(Date.parse('2026-11-10T02:00:00Z')); // 09:00 ICT, just after the morning run
+  const timers = []; let calls = 0;
+  const prices = createGroceryPrices({ now: time.now, delayMs: 0, setTimer: (fn, ms) => { const t = { fn, ms, unref() {} }; timers.push(t); return t; }, fetchers: { winmart: async k => { calls += 1; return fakeStore(0)(k); }, coop: fakeStore(0) } });
+  prices.start();
+  await prices.getPrices();
+  assert.equal(timers.length, 1);
+  assert.equal(timers[0].ms, 23 * 3600_000, 'next run is 08:00 ICT tomorrow, 23 hours after 09:00');
+  const afterFirst = calls;
+  time.advance(22 * 3600_000); // 07:00 ICT
+  await prices.getPrices();
+  assert.equal(calls, afterFirst, 'still the same morning snapshot at 07:00');
+  time.advance(2 * 3600_000); // 09:00 ICT, past 08:00
+  const stale = prices.current();
+  assert.ok(stale, 'serves the old snapshot instantly while refreshing');
+  await prices.getPrices();
+  assert.ok(calls > afterFirst, 'refreshed after 08:00');
+  timers[0].fn(); // the 08:00 timer fires: refresh and re-arm
+  assert.equal(timers.length, 2, 'rearmed for the next day');
+  prices.stop();
 });

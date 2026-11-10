@@ -15,7 +15,7 @@ window.TeaPricesUI=function({t,locale,close}){
   td.append(el('b','pr-unit',`${money(c.unitPrice)}/${item.unitLabel}`));
   const pack=el('span','pr-pack'),name=LINK.test(c.url||'')?Object.assign(el('a','pr-link',c.name),{href:c.url,target:'_blank',rel:'noopener noreferrer'}):el('span','',c.name);
   pack.append(name);td.append(pack);
-  const price=el('span','pr-price',`${c.size} · ${money(c.price)}`);
+  const price=el('span','pr-price',[c.size,money(c.price)].filter(Boolean).join(' · '));
   if(c.listPrice)price.append(' ',el('s','',money(c.listPrice)));
   if(c.stale)price.append(' · ',t('prStale'));
   td.append(price);return td;
@@ -37,7 +37,9 @@ window.TeaPricesUI=function({t,locale,close}){
   head.append(el('th','',t('prItem')));for(const s of data.stores)head.append(el('th','',s.name));
   const thead=el('thead');thead.append(head);tbl.append(thead);
   const body=el('tbody');
+  let group=null;
   for(const item of data.items){
+   if(item.group!==group){group=item.group;const label=data.groups?.find(g=>g.id===group)?.name;if(label){const gr=el('tr','pr-group'),gh=el('th','',label);gh.colSpan=data.stores.length+1;gr.append(gh);body.append(gr)}}
    const tr=el('tr'),th=el('th','pr-name',item.name);th.scope='row';tr.append(th);
    const ok=data.stores.filter(s=>item.perStore[s.id].status==='ok'),prices=ok.map(s=>item.perStore[s.id].unitPrice);
    const cmp=ok.length>1&&Math.min(...prices)!==Math.max(...prices)?{best:ok[prices.indexOf(Math.min(...prices))].id}:null;

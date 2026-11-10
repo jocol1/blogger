@@ -132,7 +132,7 @@ app.use((err,req,res,next)=>{console.error(err);res.status(500).send(layout('L�
 async function start() {
   try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
   if (firestore) { try { await teaService.recoverAfterRestart(); } catch (error) { console.error('Tea restart recovery failed:', error.message); } teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)); setInterval(() => teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)), 60_000).unref(); }
-  groceryPrices.current();
+  groceryPrices.start();
   httpServer.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
 }
 start();
