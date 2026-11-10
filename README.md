@@ -24,6 +24,15 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 
 Menu quán mặc định đóng trên máy tính và điện thoại, kể cả khi tải lại. Đi tới ghế và bấm **Ngồi**, sau đó bấm **Mở bàn / E** để gọi món, chat hoặc chọn trò chơi. Nút Ngồi/Đứng dùng chung vị trí ở góc phải vùng quán. Đến gần mặt trước quầy có **Xem thực đơn / E**; chỉ xem giá, muốn đặt món vẫn cần ngồi. Đóng bảng bằng × hoặc Escape; rời quầy/đứng dậy cũng đóng bảng. Menu mở cạnh vùng quán, không phủ lên nhân vật; ô chat và nút gửi giữ trong khung, thách đấu nằm trong mục gấp mở. **Về quán** từ trò chơi đóng bảng và trả lại bản đồ; có thể mở bàn để xem lại ván đang chạy, đồng hồ server vẫn tiếp tục.
 
+
+### Bảng giá siêu thị (PWA v51)
+
+Trên tường quán, bên trái quầy trà, có tấm bảng phấn **BẢNG GIÁ**. Đi tới trước bảng (không cần ngồi) rồi bấm **Xem bảng giá / E** để mở bảng so sánh giá 11 mặt hàng thiết yếu giữa **WinMart** và **Co.op Online**: trứng gà, ba rọi heo, ức gà, cà rốt, khoai tây, cà chua, đường, muối, nước mắm, sữa tươi hộp 1 lít, dầu ăn. Mỗi ô hiện giá trên kg/lít/quả của loại rẻ nhất còn hàng, tên sản phẩm kèm link, giá niêm yết và thời điểm lấy giá; ô rẻ hơn được tô nổi, kèm tổng giỏ hàng và nút **Tải CSV** (mở được bằng Excel).
+
+- Nguồn: API tìm kiếm công khai mà chính website WinMart (`api-crownx.winmart.vn`, cửa hàng 1535) và Co.op Online (`discovery.tekoapis.com`, terminal 26607) đang dùng, gọi từ server. Bách Hóa Xanh và MM Mega Market không được dùng vì chặn truy cập tự động; muốn thêm siêu thị khác thì thêm một hàm lấy giá vào `features/tea/grocery-prices.js`.
+- Giá là **giá online của cửa hàng mặc định** từng website, có thể khác giá tại quầy hoặc theo khu vực.
+- Danh mục, từ khóa và bộ lọc nằm trong `features/tea/grocery-catalog.js`. Mỗi món có `must`/`not` để loại hàng na ná (cháo cà rốt, tương cà chua, dầu gội…) và khoảng quy cách hợp lý (sữa 1 lít, dầu 1–2 lít…). Món không có hoặc hết hàng được ghi rõ "Không tìm thấy" / "Hết hàng".
+- Server lấy giá khi khởi động rồi làm mới mỗi 6 giờ (5 phút nếu có lỗi); mất một siêu thị thì vẫn giữ giá lần trước và đánh dấu "dữ liệu cũ". API `GET /api/tea/prices` không bao giờ chờ siêu thị: trả `202` khi chưa có dữ liệu, `GET /api/tea/prices.csv` tải file.
 PWA cache v39 cập nhật thao tác làm vườn trực tiếp; người đang mở bản cũ dùng nút cập nhật khi chơi xong, không cần cài APK mới. Chạy `tests/browser/tea-cafe-context.js` trên một phiên `node tests/preview.js` mới để kiểm tra menu, gần quầy, ghế, chat, QR giả, trò chơi và sao lưu. `tea-cards-mobile.js`, `tea-brawl-controls.js` và `tea-pwa-landscape.js` kiểm tra hồi quy bố cục/điều khiển. Các kích thước điện thoại là mô phỏng trình duyệt, chưa xác nhận trên thiết bị thật.
 
 ### Di chuyển chung cho quán và nông trại

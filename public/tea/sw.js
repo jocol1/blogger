@@ -1,4 +1,4 @@
-const CACHE='locly-tea-v50';
+const CACHE='locly-tea-v51';
 const SHELL=['/tra-da','/tra-da.webmanifest','/assets/tea/style.css','/assets/tea/courtyard.css','/assets/tea/cafe-context.css','/assets/tea/games.css','/assets/tea/pwa.css','/assets/tea/cards-mobile.css','/assets/tea/cards-fullscreen.css','/assets/tea/cards-skin.css','/assets/tea/all-games-fullscreen.css','/assets/tea/world.js','/assets/tea/menu.js','/assets/tea/scene.js','/assets/tea/touch-controls.js','/assets/tea/games-ui.js','/assets/tea/game-words.js','/assets/tea/pwa-words.js','/assets/tea/app.js','/assets/tea/pwa.js','/assets/tea/icons/icon-192.png','/assets/tea/icons/icon-512.png','/assets/tea/icons/icon-maskable-512.png'];
 SHELL.push('/tra-da/farm','/assets/tea/farm.css','/assets/tea/farm-outbox.js','/assets/tea/farm-world.js','/assets/tea/farm-expansion.js','/assets/tea/farm-ranch.js','/assets/tea/farm-motion.js','/assets/tea/farm-avatar.js','/assets/tea/farm.js');
 SHELL.push('/assets/tea/movement.js','/assets/tea/walk-controls.js','/assets/tea/walk-controls.css','/assets/tea/prediction.js','/assets/tea/cafe-walker.js');
@@ -6,6 +6,7 @@ SHELL.push('/assets/tea/farm-tools.js','/assets/tea/farm-hands.js','/assets/tea/
 SHELL.push('/assets/tea/fishing-rules.js','/assets/tea/fish-art.js','/assets/tea/fishing.css');
 SHELL.push('/assets/tea/barista-ui.js','/assets/tea/barista-words.js','/assets/tea/barista.css');
 SHELL.push('/assets/tea/drawing-ui.js','/assets/tea/drawing-words.js','/assets/tea/drawing.css');
+SHELL.push('/assets/tea/prices-ui.js','/assets/tea/prices-words.js','/assets/tea/prices.css');
 SHELL.push('/assets/tea/hub-ui.js','/assets/tea/hub-words.js','/assets/tea/hub.css');
 SHELL.push('/assets/tea/xiangqi-rules.js','/assets/tea/xiangqi-fx.js','/assets/tea/xiangqi-ui.js','/assets/tea/xiangqi-words.js','/assets/tea/xiangqi.css');
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL.map(url=>new Request(url,{cache:'reload'}))))));

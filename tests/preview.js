@@ -9,6 +9,7 @@ const { createChatRouter } = require('../features/chat/routes');
 const { createPartyRouter } = require('../features/party/routes');
 const { createTeaService } = require('../features/tea/service');
 const { createTeaRouter, attachTeaSockets } = require('../features/tea/routes');
+const { createGroceryPrices } = require('../features/tea/grocery-prices');
 const { Server: SocketServer } = require('socket.io');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
 if (process.env.NODE_ENV === 'production') throw new Error('Do not run the UI fixture in production.');
@@ -34,7 +35,14 @@ app.post('/__test/tea/advance', express.json(), (req, res) => {
 });
 const teaService = createTeaService({ db, config, now: () => Date.now() + teaClockOffset });
 attachTeaSockets(io, teaService);
-app.use(createTeaRouter({ service: teaService, isAdmin: req => req.session.user === 'admin' }));
+// Price board: fixed fake supermarket data so UI tests stay offline. TEA_PRICES_LIVE=1 asks the real supermarkets instead.
+const fakePrices = (extra, skip = '') => async keyword => {
+  const names = { 'trứng gà': ['Trứng gà tươi hộp 10 quả', 'Hộp'], 'ba rọi heo': ['Ba rọi heo', 'Kg'], 'ức gà': ['Ức gà phi lê 500g', 'Gói'], 'cà rốt': ['Cà rốt', '1 KG'], 'khoai tây': ['Khoai tây', 'Kg'], 'cà chua': ['Cà chua', 'Kg'], 'đường': ['Đường tinh luyện 1kg', 'Gói'], 'muối tinh': ['Muối tinh 1kg', 'Gói'], 'nước mắm': ['Nước mắm Nhất vị 500ml', 'Chai'], 'sữa tươi 1l': ['Sữa tươi tiệt trùng hộp 1 lít', 'Hộp'], 'dầu ăn': ['Dầu ăn thực vật 1 lít', 'Chai'] };
+  const hit = names[keyword]; if (!hit || keyword === skip) return [];
+  return [{ name: hit[0], uom: hit[1], price: (hit[0].length * 700 % 40000) + 9000 + extra, listPrice: extra ? 0 : 99000, inStock: keyword !== 'cà rốt' || !extra, url: 'https://winmart.vn/products/' + encodeURIComponent(hit[0]) }];
+};
+const groceryPrices = createGroceryPrices(process.env.TEA_PRICES_LIVE === '1' ? {} : { delayMs: 0, fetchers: { winmart: fakePrices(0, 'muối tinh'), coop: fakePrices(1500) } });
+app.use(createTeaRouter({ service: teaService, groceryPrices, isAdmin: req => req.session.user === 'admin' }));
 app.use(createDonationRouter({ db, config, teaService }));
 app.use(createChatRouter({ db, bucket, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));
 app.use(createPartyRouter({ db, secret: 'local-party-secret', isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));

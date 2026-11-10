@@ -44,6 +44,9 @@ window.TeaScene = (() => {
     // A low painted shopfront and a few pots replace the garden border.
     for(let x=20;x<960;x+=40){p(c,'#8d6650',x,0,36,54);p(c,'#b4805c',x+2,0,32,46);p(c,'#c69a70',x+4,5,24,34);p(c,'#705545',x+14,8,3,30);p(c,'#e1c39a',x+6,42,24,3)}
     for(const x of [38,922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
+    // Chalkboard price list on the shopfront, left of the tea stall.
+    p(c,'#6b4a2f',222,6,92,50);p(c,'#8a6340',224,8,88,46);p(c,'#26372f',228,12,80,38);p(c,'#33493f',228,12,80,4);c.fillStyle='#f1ecd8';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('BẢNG GIÁ',268,26);c.textAlign='left';
+    p(c,'#e8d8ae',236,31,36,2);p(c,'#e8d8ae',276,31,24,2);p(c,'#e8d8ae',236,37,28,2);p(c,'#e8d8ae',268,37,32,2);p(c,'#e8d8ae',236,43,40,2);p(c,'#e8d8ae',282,43,18,2);
     for(const x of [190,786]){p(c,'#5a4532',x,56,6,58);p(c,'#7a583b',x-8,106,22,6);p(c,'#4d4030',x-12,48,28,6);p(c,'#be8e45',x-8,54,20,26);p(c,'#fae49b',x-4,56,12,20);p(c,'#fff5bf',x,60,4,10)}
     // Tea stall: shelves, tile roof, wooden boards, checkered awning.
     p(c,'#836347',342,22,280,124);p(c,'#583f30',350,30,264,102);p(c,'#bd905f',358,36,248,88);

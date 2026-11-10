@@ -17,6 +17,7 @@ const { createChatRouter } = require('./features/chat/routes');
 const { createPartyRouter } = require('./features/party/routes');
 const { createBirthdayRouter } = require('./features/birthday/routes');
 const { createTeaService } = require('./features/tea/service');
+const { createGroceryPrices } = require('./features/tea/grocery-prices');
 const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
 const { Server: SocketServer } = require('socket.io');
 
@@ -92,7 +93,8 @@ app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', re
 const donationConfig = readConfig();
 const teaService = createTeaService({ db: firestore, config: donationConfig });
 attachTeaSockets(io, teaService);
-app.use(createTeaRouter({ service: teaService, isAdmin: req => req.session.user === 'admin' }));
+const groceryPrices = createGroceryPrices();
+app.use(createTeaRouter({ service: teaService, groceryPrices, isAdmin: req => req.session.user === 'admin' }));
 app.use(createDonationRouter({ db: firestore, config: donationConfig, teaService, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
@@ -130,6 +132,7 @@ app.use((err,req,res,next)=>{console.error(err);res.status(500).send(layout('L�
 async function start() {
   try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
   if (firestore) { try { await teaService.recoverAfterRestart(); } catch (error) { console.error('Tea restart recovery failed:', error.message); } teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)); setInterval(() => teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)), 60_000).unref(); }
+  groceryPrices.current();
   httpServer.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
 }
 start();

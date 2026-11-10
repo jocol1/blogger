@@ -3,10 +3,11 @@ const path = require('node:path');
 const express = require('express');
 const { TeaError } = require('./service');
 const MENU = require('../../public/tea/menu');
+const { toCsv: groceryCsv } = require('./grocery-prices');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
-function createTeaRouter({ service, isAdmin }) {
+function createTeaRouter({ service, isAdmin, groceryPrices }) {
   const router = express.Router();
   const assets = path.join(__dirname, '../../public/tea');
   const json = express.json({ limit: '24kb' });
@@ -44,6 +45,17 @@ function createTeaRouter({ service, isAdmin }) {
     res.sendFile(path.join(assets, 'farm.html'));
   });
   router.use('/api/tea', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+  // Public supermarket prices. Never waits on the supermarkets: 202 while the first snapshot is still being built.
+  router.get('/api/tea/prices', (req, res) => {
+    const snapshot = groceryPrices?.current();
+    if (!snapshot) return res.status(groceryPrices ? 202 : 503).json({ loading: Boolean(groceryPrices) });
+    res.json(snapshot);
+  });
+  router.get('/api/tea/prices.csv', (req, res) => {
+    const snapshot = groceryPrices?.current();
+    if (!snapshot) return res.status(503).type('text/plain').send('Price board is still loading, try again in a minute.');
+    res.type('text/csv; charset=utf-8').set('Content-Disposition', 'attachment; filename="bang-gia-sieu-thi.csv"').send(groceryCsv(snapshot));
+  });
   router.get('/api/tea/farm', asyncRoute(async (req, res) => res.json(await service.farmState(token(req)))));
   router.post('/api/tea/farm/enter', json, asyncRoute(async (req, res) => res.json(await service.enterFarm(token(req)))));
   router.post('/api/tea/farm/actions', json, asyncRoute(async (req, res) => res.json(await service.farmAction(token(req), req.body))));
