@@ -2,10 +2,12 @@
 // product names are third-party text, so every node is built with textContent and never from markup strings.
 window.TeaPricesUI=function({t,locale,close}){
  const root=document.querySelector('#prices-view'),LINK=/^https:\/\/(winmart\.vn|cooponline\.vn|kingfoodmart\.com|www\.lottemart\.vn|www\.bachhoaxanh\.com)\//;
- const PAGE=10,CART_KEY='locly-price-cart',BADGE={winmart:['WM','#d6262b'],coop:['CO','#0a58a8'],kingfood:['KF','#1d3f8f'],lotte:['LT','#e2231a'],bhx:['BHX','#0a8a3e']};
+ const PAGE=10,CART_KEY='locly-price-cart',STORES_KEY='locly-price-stores',BADGE={winmart:['WM','#d6262b'],coop:['CO','#0a58a8'],kingfood:['KF','#1d3f8f'],lotte:['LT','#e2231a'],bhx:['BHX','#0a8a3e']};
  let data=null,timer=null,failed=false,query='',page=1,selected=null,parts=null,cart=new Set();
  try{cart=new Set(JSON.parse(localStorage.getItem(CART_KEY)||'[]'))}catch{}
+ try{const saved=JSON.parse(localStorage.getItem(STORES_KEY)||'null');if(Array.isArray(saved)&&saved.length)selected=new Set(saved)}catch{}
  const saveCart=()=>{try{localStorage.setItem(CART_KEY,JSON.stringify([...cart]))}catch{}};
+ const saveStores=()=>{try{localStorage.setItem(STORES_KEY,JSON.stringify([...selected]))}catch{}};
  const el=(tag,cls,text)=>{const node=document.createElement(tag);if(cls)node.className=cls;if(text!=null)node.textContent=text;return node};
  const button=(cls,text,onclick)=>{const b=el('button',cls,text);b.type='button';b.onclick=onclick;return b};
  const lang=()=>locale()==='vi'?'vi-VN':'en-GB';
@@ -25,7 +27,7 @@ window.TeaPricesUI=function({t,locale,close}){
  function chips(){
   const box=el('div','pr-chips');
   for(const s of data.stores){
-   const on=selected.has(s.id),chip=button(`pr-chip${on?' is-on':''}`,null,()=>{if(on&&selected.size===1)return;on?selected.delete(s.id):selected.add(s.id);update()});chip.setAttribute('aria-pressed',String(on));
+   const on=selected.has(s.id),chip=button(`pr-chip${on?' is-on':''}`,null,()=>{if(on&&selected.size===1)return;on?selected.delete(s.id):selected.add(s.id);saveStores();update()});chip.setAttribute('aria-pressed',String(on));
    chip.append(badge(s),el('span','pr-chip-name',s.name),el('span','pr-chip-state',t(on?'prSelected':'prPick')));
    if(s.referenceOnly)chip.append(el('small','pr-chip-note',t('prReference')));
    box.append(chip);
