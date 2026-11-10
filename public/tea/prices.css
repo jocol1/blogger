@@ -1,46 +1,111 @@
-/* Supermarket price board: full screen chalkboard, same takeover pattern as the table lobby. */
+/* Supermarket price board: full screen, same takeover pattern as the table lobby, light card design. */
 body.prices-open{overflow:hidden}
 body.prices-open .topbar,body.prices-open .world-card,body.prices-open .panel-tabs,body.prices-open .panel-close{display:none!important}
 body.prices-open .cafe-shell{position:fixed;inset:0!important;height:var(--tea-visible-bottom,100dvh)!important;max-width:none;margin:0;padding:0}
-body.prices-open .side-panel{position:fixed!important;inset:0!important;width:100%!important;height:var(--tea-visible-bottom,100dvh)!important;max-height:none;min-height:0;padding:0!important;border:0;box-shadow:none!important}
-.prices-view.active{display:block!important;height:100%!important;min-height:0;overflow-y:auto!important;overflow-x:hidden!important;padding:14px 16px!important;background:radial-gradient(ellipse at 30% 10%,#3a5a4c 0,#24382f 60%,#17241d 100%);color:#f2ecd9}
-.pr-board{max-width:920px;margin:0 auto;padding:16px 18px 18px;border:6px solid #956d44;outline:2px solid #694c33;background:#26372f;box-shadow:0 8px 0 rgba(0,0,0,.25)}
-.pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px}
-.pr-head small{font:700 10px/1.4 "Segoe UI",sans-serif;letter-spacing:1.6px;color:#aab8a2}
-.pr-head h1{margin:4px 0 0;font-size:24px;line-height:1.2;color:#f2ecd9;letter-spacing:-.4px}
-.pr-close{flex:none;width:38px;height:38px;border:2px solid #956d44;background:#3a2a1d;color:#f2ecd9;font:700 16px/1 "Segoe UI",sans-serif;cursor:pointer}
-.pr-close:hover,.pr-button:hover{background:#4d3724}
-.pr-basket{margin:0 0 12px;padding:10px 12px;border:2px dashed #7f9486;color:#f2ecd9;font-size:14px}
-.pr-basket small{color:#aab8a2}
-.pr-totals{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.pr-total{padding:4px 10px;border:2px solid #5d7566;font-weight:700;font-variant-numeric:tabular-nums}
-.pr-total.is-best{border-color:#b9e08a;background:rgba(185,224,138,.14);color:#d6f0b2}
-.pr-sum{margin:8px 0 0;color:#d6f0b2;font-weight:700}
-.pr-scroll{overflow-x:auto;border:2px solid #5d7566;-webkit-overflow-scrolling:touch}
-.pr-table{width:100%;min-width:560px;border-collapse:collapse;font-size:13px}
-.pr-table th,.pr-table td{padding:9px 10px;border-bottom:1px solid #3f5a4c;text-align:left;vertical-align:top}
-.pr-table thead th{position:sticky;top:0;background:#1d2b24;color:#d9e2d0;font-size:12px;letter-spacing:.4px;z-index:1}
-.pr-name{position:sticky;left:0;background:#26372f;font-weight:700;color:#f2ecd9;white-space:nowrap;z-index:1}
-.pr-table thead th:first-child{position:sticky;left:0;z-index:2}
-.pr-cell{position:relative;min-width:180px}
-.pr-cell.is-best{background:rgba(185,224,138,.12)}
-.pr-tag{display:inline-block;margin-bottom:3px;padding:1px 6px;background:#b9e08a;color:#1f2b1a;font:800 10px/1.5 "Segoe UI",sans-serif;letter-spacing:.5px;text-transform:uppercase}
-.pr-unit{display:block;font-size:16px;color:#fff6d8;font-variant-numeric:tabular-nums}
-.pr-pack{display:block;margin-top:2px;color:#cfd8c4;line-height:1.35}
-.pr-link{color:#cfe3ff;text-decoration:underline;text-underline-offset:2px}
-.pr-price{display:block;margin-top:2px;color:#9fb0a2;font-size:12px;font-variant-numeric:tabular-nums}
-.pr-price s{color:#8a9a8c}
-.pr-cell.is-empty{color:#8a9a8c}
-.pr-empty{font-style:italic}
-.pr-foot{margin-top:12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:12px;color:#aab8a2}
+body.prices-open .side-panel{position:fixed!important;inset:0!important;width:100%!important;height:var(--tea-visible-bottom,100dvh)!important;max-height:none;min-height:0;padding:0!important;border:0;outline:0;box-shadow:none!important;background:#f2f5f3}
+.prices-view{--pr-ink:#1c2a22;--pr-muted:#6a7a71;--pr-line:#e2e9e4;--pr-soft:#f2f5f3;--pr-green:#0f9d4a;--pr-green-ink:#0b7a3a;--pr-green-soft:#e2f5e9}
+.prices-view.active{display:block!important;height:100%!important;min-height:0;overflow-y:auto!important;overflow-x:hidden!important;padding:18px 16px 28px!important;background:var(--pr-soft);color:var(--pr-ink);font:14px/1.45 "Segoe UI",system-ui,sans-serif}
+.pr-board{max-width:980px;margin:0 auto;padding:20px 22px 22px;background:#fff;border-radius:18px;box-shadow:0 1px 2px rgba(20,40,30,.06),0 12px 32px rgba(20,40,30,.08)}
+.pr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px}
+.pr-head small{font:700 11px/1.4 "Segoe UI",sans-serif;letter-spacing:1.4px;color:var(--pr-green)}
+.pr-head h1{margin:2px 0 0;font-size:24px;line-height:1.2;color:var(--pr-ink);letter-spacing:-.3px}
+.pr-close{flex:none;width:40px;height:40px;border:0;border-radius:50%;background:var(--pr-soft);color:var(--pr-ink);font:600 16px/1 "Segoe UI",sans-serif;cursor:pointer}
+.pr-close:hover{background:#e6ebe8}
+.pr-search{display:flex;gap:10px;margin-bottom:6px}
+.pr-search input{flex:1;min-width:0;height:46px;padding:0 18px;border:1px solid #d3ddd7;border-radius:999px;background:#fff;color:var(--pr-ink);font:15px "Segoe UI",sans-serif;outline:0;transition:border-color .15s,box-shadow .15s}
+.pr-search input::placeholder{color:#8b9a91}
+.pr-search input:focus{border-color:var(--pr-green);box-shadow:0 0 0 3px rgba(15,157,74,.18)}
+.pr-search-go{flex:none;width:46px;height:46px;border:0;border-radius:50%;background:var(--pr-green);cursor:pointer;display:grid;place-items:center}
+.pr-search-go:hover{background:var(--pr-green-ink)}
+.pr-search-icon{position:relative;width:14px;height:14px;border:2.5px solid #fff;border-radius:50%;margin:-3px 0 0 -3px}
+.pr-search-icon::after{content:"";position:absolute;width:7px;height:2.5px;background:#fff;border-radius:2px;right:-6px;bottom:-4px;transform:rotate(45deg)}
+.pr-h2{margin:20px 0 10px;font-size:17px;font-weight:700;color:var(--pr-ink)}
+.pr-chips{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.pr-chip{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px 10px;border:1px solid var(--pr-line);border-radius:14px;background:#fff;color:var(--pr-ink);font:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .1s}
+.pr-chip:hover{border-color:#c9d6ce;box-shadow:0 4px 12px rgba(20,40,30,.06)}
+.pr-chip:active{transform:scale(.98)}
+.pr-chip:focus-visible,.pr-page:focus-visible,.pr-close:focus-visible,.pr-button:focus-visible,.pr-price:focus-visible{outline:3px solid rgba(15,157,74,.35);outline-offset:2px}
+.pr-logo{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;background:var(--brand);color:#fff;font:800 11px/1 "Segoe UI",sans-serif;letter-spacing:.3px}
+.pr-chip-name{font-size:13px;font-weight:600}
+.pr-chip-state{padding:2px 10px;border-radius:999px;background:var(--pr-soft);color:var(--pr-muted);font-size:12px;font-weight:600}
+.pr-chip.is-on .pr-chip-state{background:var(--pr-green-soft);color:var(--pr-green-ink)}
+.pr-chip:not(.is-on) .pr-logo{filter:grayscale(1);opacity:.5}
+.pr-chip:not(.is-on) .pr-chip-name{color:var(--pr-muted)}
+.pr-chip-note{font-size:11px;color:#a46a00}
+.pr-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pr-table{width:100%;min-width:520px;border-collapse:collapse}
+.pr-table th,.pr-table td{padding:11px 10px;border-bottom:1px solid #edf1ee;vertical-align:middle}
+.pr-table thead th{padding-top:6px;font-size:12px;font-weight:700;text-align:right;color:var(--brand,#5b6b62);text-transform:uppercase;letter-spacing:.4px;white-space:nowrap}
+.pr-table thead th small{display:block;font-size:10px;font-weight:600;color:#a46a00;text-transform:none;letter-spacing:0}
+.pr-table thead .pr-col-item{text-align:left;color:var(--pr-ink);font-size:15px;text-transform:none;letter-spacing:0}
+.pr-name{text-align:left;position:sticky;left:0;background:#fff;z-index:1;min-width:150px}
+.pr-name-text{display:inline-block;vertical-align:middle}
+.pr-name-text span{display:block;font-size:14px;font-weight:600;color:var(--pr-ink)}
+.pr-name-text small{display:block;font-size:12px;font-weight:400;color:var(--pr-muted)}
+.pr-table tbody tr:not(.pr-group):hover td,.pr-table tbody tr:not(.pr-group):hover .pr-name{background:#fafcfb}
+.pr-group th{padding:8px 10px;background:var(--pr-soft)!important;color:var(--pr-muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;text-align:left}
+.pr-cell{text-align:right;white-space:nowrap}
+.pr-price{display:inline-block;padding:4px 10px;border-radius:999px;color:var(--pr-ink);font-size:15px;font-variant-numeric:tabular-nums;text-decoration:none}
+a.pr-price:hover{background:var(--pr-soft)}
+.pr-cell.is-best .pr-price{background:var(--pr-green-soft);color:var(--pr-green-ink);font-weight:700}
+.pr-none{padding:4px 10px;color:#b4c0b9}
+.pr-sale,.pr-stale{display:block;margin:1px 10px 0 0;font-size:11px}
+.pr-sale{color:#d6262b}
+.pr-stale{color:#a46a00}
+.pr-pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.pr-page{min-width:34px;height:34px;padding:0 10px;border:1px solid var(--pr-line);border-radius:10px;background:#fff;color:var(--pr-ink);font:600 13px "Segoe UI",sans-serif;cursor:pointer}
+.pr-page:hover:not(:disabled){border-color:#c9d6ce;background:var(--pr-soft)}
+.pr-page.is-current{background:var(--pr-green);border-color:var(--pr-green);color:#fff;opacity:1}
+.pr-page:disabled:not(.is-current){opacity:.4;cursor:default}
+.pr-gap{color:var(--pr-muted);padding:0 2px}
+.pr-count{margin-left:auto;color:var(--pr-muted);font-size:12px}
+.pr-empty-search{padding:26px 8px;text-align:center;color:var(--pr-muted)}
+.pr-pill{padding:3px 12px;border-radius:999px;background:var(--pr-green-soft);color:var(--pr-green-ink);font-size:12px;font-weight:700}
+.pr-muted{color:var(--pr-muted)}
+.pr-fine{margin:6px 0 0;font-size:12px;color:var(--pr-muted)}
+.pr-source-note{margin:14px 0 0;padding:8px 12px;border-radius:10px;background:#fff7e6;color:#7a5200;font-size:12px}
+.pr-foot{margin-top:14px;display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;font-size:12px;color:var(--pr-muted)}
 .pr-foot p{margin:0}
-.pr-updated{flex:1 1 100%;color:#d9e2d0;font-variant-numeric:tabular-nums}
-.pr-note{flex:1 1 320px;line-height:1.45}
-.pr-button{display:inline-block;padding:8px 14px;border:2px solid #956d44;background:#3a2a1d;color:#f2ecd9;font:700 13px/1.2 "Segoe UI",sans-serif;text-decoration:none;cursor:pointer}
-.pr-status{padding:28px 8px;text-align:center;color:#d9e2d0}
-.pr-status p{margin:0 0 12px}
-.pr-source{display:block;margin-top:4px;color:#e2c58e;font-weight:400;letter-spacing:0}
-.pr-source-note{padding:9px 12px;border-left:3px solid #dfbd79;background:#344235;color:#f1dfb8;font:400 13px/1.5 "Segoe UI",sans-serif}
-@media(max-width:560px){.prices-view.active{padding:8px!important}.pr-board{padding:12px;border-width:4px}.pr-head h1{font-size:20px}.pr-cell{min-width:150px}}
-@media(max-height:480px){.pr-board{padding:10px 12px}.pr-head{margin-bottom:8px}.pr-head h1{font-size:18px}.pr-close{width:32px;height:32px}.pr-basket{padding:6px 10px;margin-bottom:8px}.pr-totals{margin-top:4px}.pr-sum{margin-top:4px}.pr-table th,.pr-table td{padding:6px 8px}.pr-unit{font-size:14px}}
-.pr-table tbody .pr-group th{position:static;background:#1d2b24;color:#d6f0b2;font-size:12px;letter-spacing:.6px;text-transform:uppercase;padding:7px 10px;border-bottom:1px solid #3f5a4c}
+.pr-updated{flex:1 1 100%;font-variant-numeric:tabular-nums}
+.pr-note{flex:1 1 320px;line-height:1.5}
+.pr-button{display:inline-block;padding:9px 16px;border:1px solid var(--pr-green);border-radius:999px;background:#fff;color:var(--pr-green-ink);font:700 13px/1.2 "Segoe UI",sans-serif;text-decoration:none;cursor:pointer}
+.pr-button:hover{background:var(--pr-green-soft)}
+.pr-status{padding:36px 8px;text-align:center;color:var(--pr-muted)}
+.pr-status p{margin:10px 0 12px}
+.pr-spinner{display:inline-block;width:26px;height:26px;border:3px solid var(--pr-green-soft);border-top-color:var(--pr-green);border-radius:50%;animation:pr-spin .9s linear infinite}
+@keyframes pr-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.pr-spinner{animation-duration:2.5s}.pr-chip,.pr-search input{transition:none}}
+@media(max-width:560px){.prices-view.active{padding:8px 8px 20px!important}.pr-board{padding:14px;border-radius:14px}.pr-head h1{font-size:19px}.pr-chips{grid-template-columns:repeat(auto-fit,minmax(118px,1fr))}}
+@media(max-height:480px){.prices-view.active{padding:8px 12px 16px!important}.pr-board{padding:12px 16px}.pr-head{margin-bottom:8px}.pr-head h1{font-size:18px}.pr-close{width:34px;height:34px}.pr-search input,.pr-search-go{height:40px}.pr-search-go{width:40px}.pr-h2{margin:12px 0 8px;font-size:15px}.pr-chips{grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:8px}.pr-chip.is-on{border-color:var(--pr-green);background:var(--pr-green-soft)}.pr-chip{flex-direction:row;justify-content:flex-start;padding:7px 9px;gap:7px;min-width:0}.pr-chip-name{min-width:0;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pr-chip-state{display:none}.pr-chip-note{display:none}.pr-logo{width:28px;height:28px;font-size:9px}.pr-chip-state{margin-left:auto}.pr-table th,.pr-table td{padding:8px}.pr-cart{padding:12px 14px}}
+.pr-auto{margin:4px 0 0;font-size:12px;color:var(--pr-muted)}
+.pr-add{display:inline-grid;place-items:center;vertical-align:middle;width:28px;height:28px;margin-right:10px;border:1.5px solid #c9d6ce;border-radius:50%;background:#fff;color:var(--pr-green-ink);font:700 16px/1 "Segoe UI",sans-serif;cursor:pointer;transition:background .15s,border-color .15s}
+.pr-add:hover{border-color:var(--pr-green);background:var(--pr-green-soft)}
+.pr-add.is-on{background:var(--pr-green);border-color:var(--pr-green);color:#fff;font-size:14px}
+.pr-add:focus-visible,.pr-chip-x:focus-visible,.pr-link-button:focus-visible{outline:3px solid rgba(15,157,74,.35);outline-offset:2px}
+.pr-table tbody tr.is-in-cart td,.pr-table tbody tr.is-in-cart .pr-name{background:#f6fbf8}
+.pr-cart{margin-top:18px;padding:16px 18px;border:1px solid var(--pr-line);border-radius:16px;background:linear-gradient(180deg,#fbfdfc,#fff)}
+.pr-cart-top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.pr-cart h2{display:flex;align-items:center;gap:8px;margin:0;font-size:18px;color:var(--pr-ink)}
+.pr-pill{padding:3px 12px;border-radius:999px;background:var(--pr-green-soft);color:var(--pr-green-ink);font-size:12px;font-weight:700}
+.pr-cart-actions{display:flex;gap:8px}
+.pr-button:disabled{opacity:.45;cursor:default}
+.pr-button-quiet{border-color:var(--pr-line);color:var(--pr-muted)}
+.pr-link-button{padding:0;border:0;background:none;color:var(--pr-green-ink);font:inherit;font-weight:700;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.pr-cart-items{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 0;padding:0;list-style:none}
+.pr-cart-items li{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 12px;border-radius:999px;background:var(--pr-soft);font-size:13px}
+.pr-chip-x{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--pr-muted);font:600 15px/1 "Segoe UI",sans-serif;cursor:pointer}
+.pr-chip-x:hover{background:#e3e9e5;color:var(--pr-ink)}
+.pr-cart-stores{margin:14px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+.pr-cart-store{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:center;gap:6px 14px;padding:10px 12px;border:1px solid var(--pr-line);border-radius:12px;background:#fff}
+.pr-cart-store.is-best{border-color:var(--pr-green);background:var(--pr-green-soft)}
+.pr-cart-store.is-reference{opacity:.75}
+.pr-cart-name{display:flex;align-items:center;gap:10px;min-width:0}
+.pr-cart-name .pr-logo{width:30px;height:30px;font-size:9px}
+.pr-cart-name b{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pr-cart-info{font-size:12px;color:var(--pr-muted);white-space:nowrap}
+.pr-cart-amount{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:150px}
+.pr-cart-amount strong{font-size:17px;font-variant-numeric:tabular-nums;color:var(--pr-ink)}
+.pr-cart-store.is-best .pr-cart-amount strong{color:var(--pr-green-ink);font-size:19px}
+.pr-diff{font-size:12px;color:#c0392b;font-variant-numeric:tabular-nums}
+.pr-cart-missing{grid-column:1/-1;font-size:11px;color:#a46a00}
+@media(max-width:560px){.pr-cart-store{grid-template-columns:minmax(0,1fr) auto}.pr-cart-info{grid-column:1;grid-row:2}.pr-cart-amount{grid-row:1/3;grid-column:2;min-width:0;flex-direction:column;align-items:flex-end;gap:2px}}

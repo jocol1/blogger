@@ -192,3 +192,56 @@ test('prices stay fresh until 08:00, then refresh; start() arms a daily timer', 
   assert.equal(timers.length, 2, 'rearmed for the next day');
   prices.stop();
 });
+
+test('Kingfoodmart results map to the common product shape (sale price, stock, safe search link)', async () => {
+  const { fetchKingfood } = require('../features/tea/grocery-prices');
+  const real = global.fetch; let seen;
+  global.fetch = async (url, init) => { seen = { url: String(url), init }; return new Response(JSON.stringify({ products: [{ name: 'Sữa tươi Nuti hộp 1L', discountPrice: 33500, originalPrice: 36000, inStock: 12, variants: [{ unit: { name: 'Hộp' } }] }, { name: 'Hết hàng 1L', discountPrice: 0, originalPrice: 20000, inStock: 0 }] }), { headers: { 'content-type': 'application/json' } }); };
+  try {
+    const [a, b] = await fetchKingfood('sữa tươi 1l');
+    assert.equal(seen.init.method, 'GET');
+    assert.equal(seen.init.headers['x-ol-tenant'], 'kingfood');
+    assert.match(seen.url, /keyword=s%E1%BB%AFa%20t%C6%B0%C6%A1i%201l/);
+    assert.deepEqual(a, { name: 'Sữa tươi Nuti hộp 1L', uom: 'Hộp', price: 33500, listPrice: 36000, inStock: true, url: 'https://kingfoodmart.com/search?keyword=S%E1%BB%AFa%20t%C6%B0%C6%A1i%20Nuti%20h%E1%BB%99p%201L' });
+    assert.equal(b.price, 20000, 'no discount means the original price');
+    assert.equal(b.inStock, false);
+  } finally { global.fetch = real; }
+});
+
+test('LOTTE Mart results map selling price, list price, stock and product link', async () => {
+  const { fetchLotte } = require('../features/tea/grocery-prices');
+  const real = global.fetch; let seen;
+  global.fetch = async (url, init) => { seen = { url: String(url), init }; return new Response(JSON.stringify({ data: { items: [{ name: 'Sữa Tươi Devondale Nguyên Kem 1L', url_key: 'sua-tuoi-devondale-1l', in_stock: 1, stock_qty: 147, price: { VND: { default: 49900, price: 70500 } } }, { name: 'Hết 1L', url_key: 'het', in_stock: 0, stock_qty: 0, price: { VND: { default: 41000, price: 41000 } } }] } }), { headers: { 'content-type': 'application/json' } }); };
+  try {
+    const [a, b] = await fetchLotte('sữa tươi 1l');
+    assert.equal(seen.init.method, 'POST');
+    assert.deepEqual(JSON.parse(seen.init.body).where, { query: 'sữa tươi 1l' });
+    assert.deepEqual(a, { name: 'Sữa Tươi Devondale Nguyên Kem 1L', uom: '', price: 49900, listPrice: 70500, inStock: true, url: 'https://www.lottemart.vn/vi-nsg/product/sua-tuoi-devondale-1l' });
+    assert.equal(b.inStock, false);
+  } finally { global.fetch = real; }
+});
+
+test('cart compares the whole cart per store: complete stores first, cheapest wins, reference stores never win', () => {
+  const { compareCart } = require('../public/tea/prices-cart');
+  const ok = unitPrice => ({ status: 'ok', unitPrice });
+  const data = {
+    stores: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'c', name: 'C' }, { id: 'r', name: 'R', referenceOnly: true }],
+    items: [
+      { id: 'egg', name: 'Trứng', perStore: { a: ok(3000), b: ok(2500), c: ok(2000), r: ok(100) } },
+      { id: 'milk', name: 'Sữa', perStore: { a: ok(40000), b: ok(38000), c: { status: 'not_found' }, r: ok(100) } },
+      { id: 'salt', name: 'Muối', perStore: { a: ok(9000), b: { ...ok(5000), stale: true }, c: ok(7000), r: ok(100) } },
+    ],
+  };
+  const result = compareCart(data, ['egg', 'milk'], ['a', 'b', 'c', 'r']);
+  assert.deepEqual(result.rows.map(r => r.store.id), ['b', 'a', 'c', 'r'], 'complete stores by total, then partial, reference last');
+  assert.equal(result.best.store.id, 'b');
+  assert.equal(result.best.total, 40500);
+  assert.deepEqual(result.rows.find(r => r.store.id === 'c').missing, ['Sữa']);
+  assert.equal(compareCart(data, ['salt'], ['a', 'b']).best.store.id, 'a', 'a stale price does not count');
+  assert.equal(compareCart(data, [], ['a']).best, null);
+  assert.equal(compareCart(data, ['egg'], ['r']).best, null, 'reference-only prices never win');
+  const partial = compareCart(data, ['egg', 'milk'], ['c', 'r']);
+  assert.equal(partial.best.store.id, 'c', 'when nobody has everything, the verified store with the most items wins');
+  assert.equal(partial.best.have, 1);
+  assert.equal(compareCart(data, ['milk'], ['c']).best, null, 'a store with none of the items is not a winner');
+});

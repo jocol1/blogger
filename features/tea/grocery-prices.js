@@ -8,10 +8,12 @@ const { readBhxSnapshot, comparableProducts } = require('./bhx-prices');
 const STORES = [
   { id: 'winmart', name: 'WinMart' },
   { id: 'coop', name: 'Co.op Online' },
+  { id: 'kingfood', name: 'Kingfoodmart' },
+  { id: 'lotte', name: 'LOTTE Mart' },
 ];
 
 
-const UNIT_LABEL = { kg: 'kg', l: 'lít', qua: 'quả' };
+const UNIT_LABEL = { kg: 'kg', l: 'lít', qua: 'quả', cuon: 'cuộn' };
 const NUMBER = '(\\d+(?:[.,]\\d+)?)';
 const MEASURE = '(kg|g|ml|lít|lit|l)(?![a-zà-ỹ])';
 const toNumber = text => Number(String(text).replace(',', '.'));
@@ -28,9 +30,9 @@ function parseSize(name, uom, unit) {
     const printed = text.match(new RegExp(`${NUMBER}\\s*${MEASURE}`));
     return { qty: 1, label: printed ? `${printed[1]}${printed[2]}` : '' };
   }
-  if (unit === 'qua') {
-    const count = text.match(/(\d+)\s*(?:quả|trứng|t(?=\s*x)|t\b)/);
-    if (count && Number(count[1]) > 0) return { qty: Number(count[1]), label: `${count[1]} quả` };
+  if (unit === 'qua' || unit === 'cuon') {
+    const count = text.match(unit === 'qua' ? /(\d+)\s*(?:quả|trứng|t(?=\s*x)|t\b)/ : /(\d+)\s*cuộn/);
+    if (count && Number(count[1]) > 0) return { qty: Number(count[1]), label: `${count[1]} ${UNIT_LABEL[unit]}` };
     return null;
   }
   const base = unit === 'kg' ? 'kg' : 'l';
@@ -66,7 +68,7 @@ function pickBest(item, products) {
 // ---- real fetchers ----
 const MAX_BODY = 3_000_000;
 async function postJsonOnce(url, headers, body) {
-  const response = await fetch(url, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'LoclyTeaPriceBoard/1.0', ...headers }, body: JSON.stringify(body) });
+  const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'LoclyTeaPriceBoard/1.0', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (Number(response.headers.get('content-length') || 0) > MAX_BODY) throw new Error('Response too large');
   const text = await response.text();
@@ -99,6 +101,25 @@ async function fetchCoop(keyword) {
   }));
 }
 
+// Kingfoodmart's own web app search (robots.txt allows product pages); the tenant header is how its API picks the shop.
+async function fetchKingfood(keyword) {
+  const json = await postJson(`https://onelife-api.kingfoodmart.com/v1/products/search?type=NORMAL&keyword=${encodeURIComponent(keyword)}&page=1&limit=30`, { 'x-ol-tenant': 'kingfood' });
+  return (Array.isArray(json.products) ? json.products : []).map(p => ({
+    name: p.name, uom: p.variants?.[0]?.unit?.name || '', price: Number(p.discountPrice || p.originalPrice || 0), listPrice: Number(p.originalPrice ?? 0),
+    // shortcut: search results carry no product-page path, so link to the shop's search for that name; upgrade if the API exposes one.
+    inStock: Number(p.inStock ?? 0) > 0, url: `https://kingfoodmart.com/search?keyword=${encodeURIComponent(p.name || keyword)}`,
+  }));
+}
+
+// LOTTE Mart's own web search (empty robots.txt), store "nsg" = Nam Sài Gòn. price.VND.default is today's selling price.
+async function fetchLotte(keyword) {
+  const json = await postJson('https://www.lottemart.vn/v1/p/mart/es/vi_nsg/products/search', {}, { limit: 30, offset: 1, facet_filters: {}, fields: ['name', 'price', 'url_key', 'in_stock', 'stock_qty'], where: { query: keyword } });
+  return (Array.isArray(json.data?.items) ? json.data.items : []).map(p => ({
+    name: p.name, uom: '', price: Number(p.price?.VND?.default ?? 0), listPrice: Number(p.price?.VND?.price ?? 0),
+    inStock: Number(p.in_stock) === 1 && Number(p.stock_qty ?? 1) > 0, url: p.url_key ? `https://www.lottemart.vn/vi-nsg/product/${encodeURIComponent(p.url_key)}` : 'https://www.lottemart.vn',
+  }));
+}
+
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 const HOUR = 3600_000;
@@ -110,7 +131,7 @@ function nextRefreshAt(nowMs, { hour = 8, offsetHours = 7 } = {}) {
   return target - offsetHours * HOUR;
 }
 
-const DEFAULT_FETCHERS = { winmart: fetchWinmart, coop: fetchCoop };
+const DEFAULT_FETCHERS = { winmart: fetchWinmart, coop: fetchCoop, kingfood: fetchKingfood, lotte: fetchLotte };
 function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
   let cache = null, inflight = null, timer = null;
 
@@ -137,7 +158,7 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
   }
 
   async function build(previous) {
-    const stores = STORES.map(s => ({ ...s, checkedAt: null, errors: 0 }));
+    const stores = STORES.filter(s => fetchers[s.id]).map(s => ({ ...s, checkedAt: null, errors: 0 })); // a store without a fetcher is simply not on the board
     const [cellsByStore, bhx] = await Promise.all([
       Promise.all(stores.map(store => buildStore(store, previous))),
       bhxLoader ? Promise.resolve().then(() => bhxLoader(now())).catch(() => null) : null,
@@ -223,4 +244,4 @@ function toCsv(snapshot) {
   return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-module.exports = { CATALOG, STORES, parseSize, pickBest, fetchWinmart, fetchCoop, createGroceryPrices, nextRefreshAt, toCsv };
+module.exports = { CATALOG, STORES, parseSize, pickBest, fetchWinmart, fetchCoop, fetchKingfood, fetchLotte, createGroceryPrices, nextRefreshAt, toCsv };
