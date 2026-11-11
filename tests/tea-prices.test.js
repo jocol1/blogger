@@ -128,7 +128,7 @@ test('CSV opens in Excel: BOM, quoted cells, one row per item and store', async 
 
 test('price routes answer 202 while loading, then JSON and a CSV download', async () => {
   let release; const gate = new Promise(resolve => { release = resolve; });
-  const prices = createGroceryPrices({ delayMs: 0, fetchers: { winmart: async k => { await gate; return fakeStore(0)(k); }, coop: fakeStore(100) } });
+  const prices = createGroceryPrices({ delayMs: 0, fetchers: { winmart: async k => { await gate; return fakeStore(0)(k); }, coop: async k => { await gate; return fakeStore(100)(k); } } });
   const app = express(); app.use(createTeaRouter({ service: {}, isAdmin: () => false, groceryPrices: prices }));
   const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -527,4 +527,56 @@ test('price endpoints serve a prepared response: ETag/304, no bookkeeping fields
     assert.equal(res.statusCode, 202);
     assert.equal(res.headers['retry-after'], '5');
   } finally { await new Promise(resolve => waiting.close(resolve)); }
+});
+
+// ---- bounded refresh: one slow or dead supermarket must not hold the board hostage ----
+const flat = async () => [];
+test('a shop that stops answering is abandoned after a streak of failures, its older prices are kept, the others finish', async () => {
+  const time = clock(Date.parse('2026-11-10T08:00:00Z'));
+  const dead = { calls: 0 };
+  const healthy = createGroceryPrices({ now: time.now, delayMs: 0, fetchers: { winmart: fakeStore(0), coop: fakeStore(100) } });
+  const before = await healthy.getPrices();
+  // the same instance keeps `previous`: winmart now never answers
+  const fetchers = { winmart: async () => { dead.calls += 1; throw new Error('HTTP 504'); }, coop: fakeStore(100) };
+  const prices = createGroceryPrices({ now: time.now, delayMs: 0, fetchers, maxFailureStreak: 4, store: { load: async () => before, save: async () => {} }, log: { warn: () => {} }, setTimer: () => ({ unref() {} }) });
+  await prices.start();
+  time.advance(20 * 3600_000);
+  const data = await prices.getPrices({ force: true });
+  assert.ok(dead.calls < 20, `gave up after a few failures instead of trying all ${CATALOG.length * 2} lookups (made ${dead.calls})`);
+  assert.equal(data.items.find(i => i.id === 'ca-rot').perStore.winmart.stale, true, "yesterday's price is kept, marked old");
+  assert.equal(data.items.find(i => i.id === 'ca-rot').perStore.coop.status, 'ok', 'the healthy shop is unaffected');
+  assert.deepEqual(data.updating, []);
+  assert.equal(data.stores.find(s => s.id === 'winmart').failed, true);
+});
+
+test('lookups per shop run a few at a time, and a shop past its deadline falls back instead of taking forever', async () => {
+  const time = clock(Date.parse('2026-11-10T08:00:00Z'));
+  let running = 0, peak = 0;
+  const parallel = createGroceryPrices({ now: time.now, delayMs: 0, concurrency: 3, fetchers: { winmart: async k => { running += 1; peak = Math.max(peak, running); await new Promise(r => setTimeout(r, 2)); running -= 1; return fakeStore(0)(k); } } });
+  await parallel.getPrices();
+  assert.ok(peak > 1 && peak <= 3, `parallel but polite: peak ${peak}`);
+
+  let looked = 0;
+  const slow = createGroceryPrices({ now: time.now, delayMs: 0, concurrency: 1, storeDeadlineMs: 30_000, fetchers: { winmart: async k => { looked += 1; time.advance(10_000); return fakeStore(0)(k); } } });
+  const data = await slow.getPrices();
+  assert.ok(looked <= 8, `stopped starting new lookups after the deadline (made ${looked})`);
+  assert.equal(data.items.length, CATALOG.length, 'every item still has a cell');
+});
+
+test('the board is published as shops finish, with the slow one marked as updating', async () => {
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  const prices = createGroceryPrices({ delayMs: 0, fetchers: { winmart: async k => { await gate; return fakeStore(0)(k); }, coop: fakeStore(100) } });
+  assert.equal(prices.current(), null);
+  for (let i = 0; i < 50 && !prices.current(); i++) await new Promise(resolve => setTimeout(resolve, 5));
+  const partial = prices.current();
+  assert.ok(partial, 'the fast shop is already on the board');
+  assert.deepEqual(partial.updating, ['winmart']);
+  assert.equal(partial.items.find(i => i.id === 'ca-rot').perStore.coop.status, 'ok');
+  assert.equal(partial.items.find(i => i.id === 'ca-rot').perStore.winmart.status, 'pending');
+  assert.equal(partial.basket.count, 0, 'no basket yet: one shop is not a comparison');
+  release();
+  const full = await prices.getPrices();
+  assert.deepEqual(full.updating, []);
+  assert.equal(full.items.find(i => i.id === 'ca-rot').perStore.winmart.status, 'ok');
+  assert.ok(full.basket.count > 0);
 });

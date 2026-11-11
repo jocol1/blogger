@@ -68,15 +68,15 @@ function pickBest(item, products) {
 // ---- real fetchers ----
 const MAX_BODY = 3_000_000;
 async function postJsonOnce(url, headers, body) {
-  const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000), headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'LoclyTeaPriceBoard/1.0', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(url, { method: body === undefined ? 'GET' : 'POST', redirect: 'error', signal: AbortSignal.timeout(7000), headers: { 'content-type': 'application/json', accept: 'application/json', 'user-agent': 'LoclyTeaPriceBoard/1.0', ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   if (Number(response.headers.get('content-length') || 0) > MAX_BODY) throw new Error('Response too large');
   const text = await response.text();
   if (text.length > MAX_BODY) throw new Error('Response too large');
   return JSON.parse(text);
 }
-// WinMart sometimes stalls a request; one quick retry is cheaper than showing "error" for six hours.
-async function postJson(url, headers, body, retries = 2) {
+// A supermarket sometimes stalls a request; one quick retry is cheaper than showing "error" for a day.
+async function postJson(url, headers, body, retries = 1) {
   for (let attempt = 0; ; attempt++) {
     try { return await postJsonOnce(url, headers, body); } catch (error) {
       if (attempt >= retries) throw error;
@@ -147,71 +147,94 @@ function firestorePriceStore(db, { collection = 'tea_prices', id = 'latest' } = 
 }
 
 const DEFAULT_FETCHERS = { winmart: fetchWinmart, coop: fetchCoop, kingfood: fetchKingfood, lotte: fetchLotte };
-function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300, store = null, log = console } = {}) {
+function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300, concurrency = 3, storeDeadlineMs = 150_000, maxFailureStreak = 6, store = null, log = console } = {}) {
   let cache = null, inflight = null, timer = null;
 
-  // One store at a time is polite to that store; the two stores run side by side.
-  async function buildStore(store, previous) {
-    const cells = {};
-    for (const item of CATALOG) {
-      try {
-        const products = [], seen = new Set(); let failures = 0;
-        const keywords = [].concat(item.keyword);
-        for (const keyword of keywords) {
-          try { for (const p of await fetchers[store.id](keyword)) if (!seen.has(p.url)) { seen.add(p.url); products.push(p); } } catch (error) { failures += 1; }
-          if (delayMs) await sleep(delayMs);
-        }
-        if (failures === keywords.length) throw new Error('all searches failed');
-        cells[item.id] = { ...pickBest(item, products), checkedAt: new Date(now()).toISOString() };
-      } catch (error) {
-        store.errors += 1;
-        const old = previous?.items.find(i => i.id === item.id)?.perStore[store.id];
-        cells[item.id] = old && old.status !== 'error' ? { ...old, stale: true } : { status: 'error' };
+  // Each supermarket is queried by a few lookups at a time (polite, like a browser). A shop that stops answering cannot
+  // hold the board hostage: after `maxFailureStreak` failures in a row, or `storeDeadlineMs`, the rest of its items fall
+  // back to yesterday's prices (marked old) and the other shops carry on.
+  async function buildShop(shop, previous) {
+    const cells = {}, started = now(); let next = 0, streak = 0, gaveUp = false;
+    const fallback = item => {
+      shop.errors += 1;
+      const old = previous?.items.find(i => i.id === item.id)?.perStore[shop.id];
+      return old && old.status !== 'error' && old.status !== 'pending' ? { ...old, stale: true } : { status: 'error' };
+    };
+    async function lookup(item) {
+      const products = [], seen = new Set(); let failures = 0;
+      const keywords = [].concat(item.keyword);
+      for (const keyword of keywords) {
+        try { for (const p of await fetchers[shop.id](keyword)) if (!seen.has(p.url)) { seen.add(p.url); products.push(p); } } catch (error) { failures += 1; }
+        if (delayMs) await sleep(delayMs);
+      }
+      if (failures === keywords.length) throw new Error('all searches failed');
+      return { ...pickBest(item, products), checkedAt: new Date(now()).toISOString() };
+    }
+    async function worker() {
+      while (next < CATALOG.length) {
+        const item = CATALOG[next++];
+        if (gaveUp || now() - started > storeDeadlineMs) { cells[item.id] = fallback(item); continue; }
+        try { cells[item.id] = await lookup(item); streak = 0; }
+        catch (error) { cells[item.id] = fallback(item); if (++streak >= maxFailureStreak && !gaveUp) { gaveUp = true; log.warn?.(`${shop.name} stopped answering; using older prices for the rest`); } }
       }
     }
+    await Promise.all(Array.from({ length: concurrency }, worker));
     return cells;
   }
 
-  async function build(previous) {
-    const stores = STORES.filter(s => fetchers[s.id]).map(s => ({ ...s, checkedAt: null, errors: 0 })); // a store without a fetcher is simply not on the board
-    const [cellsByStore, bhx] = await Promise.all([
-      Promise.all(stores.map(store => buildStore(store, previous))),
-      bhxLoader ? Promise.resolve().then(() => bhxLoader(now())).catch(() => null) : null,
-    ]);
-    if (bhxLoader) {
-      const usable = bhx && !bhx.expired;
-      const products = usable ? comparableProducts(bhx.products) : [];
-      stores.push({ id: 'bhx', name: 'Bách Hóa Xanh', checkedAt: bhx?.capturedAt || null, errors: 0,
-        snapshot: true, region: bhx?.regionLabel || null, targetRegion: 'TP.HCM',
-        referenceOnly: !usable || !bhx.regionVerified || bhx.stale, unavailable: !usable });
-      cellsByStore.push(Object.fromEntries(CATALOG.map(item => {
-        if (!usable) return [item.id, { status: 'error' }];
-        const cell = pickBest(item, products);
-        if (cell.status === 'not_found') cell.status = 'not_collected';
-        return [item.id, { ...cell, checkedAt: bhx.capturedAt, stale: bhx.stale }];
-      })));
-    }
+  const cellsFromBhx = bhx => {
+    const usable = bhx && !bhx.expired, products = usable ? comparableProducts(bhx.products) : [];
+    const shop = { id: 'bhx', name: 'Bách Hóa Xanh', checkedAt: bhx?.capturedAt || null, errors: 0, snapshot: true, region: bhx?.regionLabel || null, targetRegion: 'TP.HCM', referenceOnly: !usable || !bhx.regionVerified || bhx.stale, unavailable: !usable };
+    return { shop, cells: Object.fromEntries(CATALOG.map(item => {
+      if (!usable) return [item.id, { status: 'error' }];
+      const cell = pickBest(item, products);
+      if (cell.status === 'not_found') cell.status = 'not_collected';
+      return [item.id, { ...cell, checkedAt: bhx.capturedAt, stale: bhx.stale }];
+    })) };
+  };
+
+  // Turns whatever has finished so far into a snapshot. Shops still working show their older prices (or "updating").
+  function assemble({ shops, cells, previous, updating }) {
     const items = CATALOG.map(item => ({
       id: item.id, group: item.group, name: item.name, unit: item.unit, unitLabel: item.unitLabel || UNIT_LABEL[item.unit],
-      perStore: Object.fromEntries(stores.map((store, i) => [store.id, cellsByStore[i][item.id]])),
+      perStore: Object.fromEntries(shops.map(shop => [shop.id, cells[shop.id][item.id]])),
     }));
     const stamp = new Date(now()).toISOString(), today = dayKey(now());
     // Yesterday's prices: the previous snapshot if it is from an earlier day, else the baseline already carried today.
     const baseline = previous?.baseline?.day === today ? previous.baseline
       : { day: today, prices: previous?.checkedAt && dayKey(Date.parse(previous.checkedAt)) !== today ? unitPrices(previous) : null };
-    for (const item of items) for (const [storeId, cell] of Object.entries(item.perStore)) {
-      const before = baseline.prices?.[item.id]?.[storeId];
-      if (cell.status === 'ok' && !cell.stale && !stores.find(x => x.id === storeId)?.snapshot && Number.isFinite(before)) cell.change = cell.unitPrice - before;
+    for (const item of items) for (const [shopId, cell] of Object.entries(item.perStore)) {
+      const before = baseline.prices?.[item.id]?.[shopId];
+      if (cell.status === 'ok' && !cell.stale && !shops.find(x => x.id === shopId)?.snapshot && Number.isFinite(before)) cell.change = cell.unitPrice - before;
     }
-    for (const store of stores) if (!store.snapshot) store.checkedAt = store.errors < CATALOG.length ? stamp : (previous?.stores.find(s => s.id === store.id)?.checkedAt ?? null);
-    const compared = stores.filter(s => !s.referenceOnly);
-    const both = items.filter(i => compared.every(s => i.perStore[s.id].status === 'ok' && !i.perStore[s.id].stale));
-    const totals = Object.fromEntries(compared.map(s => [s.id, both.reduce((sum, i) => sum + i.perStore[s.id].unitPrice, 0)]));
+    for (const shop of shops) if (!shop.snapshot) shop.checkedAt = updating.includes(shop.id) ? (previous?.stores.find(x => x.id === shop.id)?.checkedAt ?? null) : shop.errors < CATALOG.length ? stamp : (previous?.stores.find(x => x.id === shop.id)?.checkedAt ?? null);
+    const compared = shops.filter(x => !x.referenceOnly);
+    const both = items.filter(i => compared.every(x => i.perStore[x.id].status === 'ok' && !i.perStore[x.id].stale));
+    const totals = Object.fromEntries(compared.map(x => [x.id, both.reduce((sum, i) => sum + i.perStore[x.id].unitPrice, 0)]));
     return {
-      checkedAt: stamp, catalogKey: catalogKey(), baseline, stores: stores.map(({ errors, ...s }) => ({ ...s, failed: errors > 0 || !!s.unavailable })), groups: GROUPS, items,
-      basket: { count: both.length, totals, storeIds: compared.map(s => s.id) },
-      hasErrors: stores.some(s => s.errors > 0),
+      checkedAt: stamp, catalogKey: catalogKey(), baseline, stores: shops.map(({ errors, ...x }) => ({ ...x, failed: errors > 0 || !!x.unavailable })), groups: GROUPS, items,
+      basket: { count: both.length, totals, storeIds: compared.map(x => x.id) },
+      hasErrors: shops.some(x => x.errors > 0), updating,
     };
+  }
+
+  // Shops are fetched side by side and the board is published as each one finishes (`onPartial`), so a slow shop
+  // does not keep the fast ones off the page.
+  async function build(previous, onPartial = () => {}) {
+    const shops = STORES.filter(x => fetchers[x.id]).map(x => ({ ...x, checkedAt: null, errors: 0 })); // a shop without a fetcher is simply not on the board
+    const cells = {}, pending = new Set(shops.map(x => x.id));
+    const older = id => previous?.items ? Object.fromEntries(CATALOG.map(item => { const old = previous.items.find(i => i.id === item.id)?.perStore[id]; return [item.id, old && old.status !== 'error' && old.status !== 'pending' ? { ...old, stale: true } : { status: 'pending' }]; })) : Object.fromEntries(CATALOG.map(item => [item.id, { status: 'pending' }]));
+    for (const shop of shops) cells[shop.id] = older(shop.id);
+    if (bhxLoader) {
+      const before = previous?.stores.find(x => x.id === 'bhx');
+      shops.push(before ? { ...before, errors: 0 } : { id: 'bhx', name: 'Bách Hóa Xanh', checkedAt: null, errors: 0, snapshot: true, targetRegion: 'TP.HCM', referenceOnly: true, unavailable: true });
+      cells.bhx = older('bhx'); pending.add('bhx');
+    }
+    const publish = () => { if (pending.size) onPartial(assemble({ shops, cells, previous, updating: [...pending] })); }; // only once a shop has finished: an all-"updating" board helps nobody
+    const jobs = shops.filter(x => !x.snapshot).map(async shop => { cells[shop.id] = await buildShop(shop, previous); pending.delete(shop.id); publish(); });
+    if (bhxLoader) jobs.push(Promise.resolve().then(() => bhxLoader(now())).catch(() => null).then(bhx => { const loaded = cellsFromBhx(bhx), at = shops.findIndex(x => x.id === 'bhx'); shops[at] = loaded.shop; cells.bhx = loaded.cells; pending.delete('bhx'); publish(); }));
+    await Promise.all(jobs);
+    return assemble({ shops, cells, previous, updating: [] });
   }
 
   /** When a snapshot taken at `at` is due for a refresh: the next 08:00 (or soon, after errors), or when a dated BHX capture ages out. */
@@ -227,7 +250,7 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
   }
   function refresh() {
     if (!inflight) {
-      inflight = build(cache?.data).then(data => {
+      inflight = build(cache?.data, partial => { cache = { data: partial, expiresAt: now() + retryMs }; }).then(data => {
         cache = { data, expiresAt: expiryOf(data, now()) };
         if (store) Promise.resolve().then(() => store.save(data)).catch(error => log.warn?.('Price snapshot was not saved:', error.message));
         return data;
@@ -238,7 +261,7 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
   }
   /** Resolves with fresh data, waiting for a refresh when the cache is empty or expired. */
   async function getPrices({ force = false } = {}) {
-    if (!force && cache && now() < cache.expiresAt) return cache.data;
+    if (!force && cache && now() < cache.expiresAt && !cache.data.updating?.length) return cache.data; // a half-built board is not "fresh data": wait for the build
     return refresh();
   }
   /** Never waits: returns the cached snapshot (even if stale) or null, and starts a refresh when it is due. */
@@ -265,7 +288,7 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
 }
 
 const csvCell = value => { const text = String(value ?? '').replace(/^[=+@\-\t\r]/, "'$&"); return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text; };
-const STATUS_TEXT = { ok: 'Có hàng', out_of_stock: 'Hết hàng', not_found: 'Không tìm thấy', not_collected: 'Chưa thu thập mặt hàng phù hợp', error: 'Lỗi lấy dữ liệu' };
+const STATUS_TEXT = { ok: 'Có hàng', out_of_stock: 'Hết hàng', not_found: 'Không tìm thấy', not_collected: 'Chưa thu thập mặt hàng phù hợp', pending: 'Đang cập nhật', error: 'Lỗi lấy dữ liệu' };
 
 /** UTF-8 with BOM so Excel shows Vietnamese correctly. */
 function toCsv(snapshot) {

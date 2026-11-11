@@ -4,7 +4,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  const root=document.querySelector('#prices-view'),LINK=/^https:\/\/(winmart\.vn|cooponline\.vn|kingfoodmart\.com|www\.lottemart\.vn|www\.bachhoaxanh\.com)\//;
  const PAGE=10,CART_KEY='locly-price-cart',STORES_KEY='locly-price-stores',BADGE={winmart:['WM','#d6262b'],coop:['CO','#0a58a8'],kingfood:['KF','#1d3f8f'],lotte:['LT','#e2231a'],bhx:['BHX','#0a8a3e']};
  const TC=window.TeaPriceCart,compactQuery=window.matchMedia?window.matchMedia('(max-width:640px)'):null;
- let data=null,timer=null,failed=false,query='',group='',page=1,selected=null,parts=null,cart=new Set(),pendingScroll=null,urlApplied=false;
+ let data=null,timer=null,failed=false,query='',group='',page=1,selected=null,parts=null,cart=new Set(),pendingScroll=null,urlApplied=false,raw='';
  try{cart=new Set(JSON.parse(localStorage.getItem(CART_KEY)||'[]'))}catch{}
  try{const saved=JSON.parse(localStorage.getItem(STORES_KEY)||'null');if(Array.isArray(saved)&&saved.length)selected=new Set(saved)}catch{}
  const saveCart=()=>{try{localStorage.setItem(CART_KEY,JSON.stringify([...cart]))}catch{}};
@@ -24,7 +24,8 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  const brand=s=>(BADGE[s.id]||[])[1]||'#5b6b62';
  const shown=()=>data.stores.filter(s=>selected.has(s.id));
  const matches=()=>{const q=fold(query.trim());return data.items.filter(i=>(!group||i.group===group)&&(!q||fold(i.name).includes(q)))};
- const statusText=c=>t(c.status==='out_of_stock'?'prOut':c.status==='error'?'prError':c.status==='not_collected'?'prNotCollected':'prNotFound');
+ const statusText=c=>t(c.status==='pending'?'prPending':c.status==='out_of_stock'?'prOut':c.status==='error'?'prError':c.status==='not_collected'?'prNotCollected':'prNotFound');
+ const updatingNames=()=>(data.updating||[]).map(id=>data.stores.find(s=>s.id===id)?.name).filter(Boolean).join(', ');
  const compare=()=>TC.compareCart(data,[...cart],[...selected]);
  const compact=()=>Boolean(compactQuery?.matches);
  const imgSrc=u=>'/api/tea/prices/img?u='+encodeURIComponent(u),badPhotos=new Set(); // e.g. originals over the relay's size cap
@@ -62,7 +63,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
    const value=el('span','pr-bar-value',money(row.total));if(row.have<result.items.length)value.append(el('small','',t('prSomeItems',{have:row.have,count:result.items.length})));
    const track=el('span','pr-bar-track');track.append(fill);li.append(label,track,value);bars.append(li);
   }
-  box.append(bars,el('small','pr-hero-time',t('prSyncShort',{time:when(data.checkedAt)})),button('pr-button pr-button-green',t('prHeroTry'),()=>{setCart(ids);pendingScroll='cart';update()}));
+  box.append(bars,el('small','pr-hero-time',t('prSyncShort',{time:when(data.checkedAt)})+(data.updating?.length?' · '+t('prNotYet',{stores:updatingNames()}):'')),button('pr-button pr-button-green',t('prHeroTry'),()=>{setCart(ids);pendingScroll='cart';update()}));
   return box;
  }
 
@@ -305,12 +306,13 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  }
 
  function render(){
+  const kept={page:window.scrollY,panel:root.scrollTop,restore:!pendingScroll};
   root.replaceChildren();
   const board=el('div','pr-board'),head=el('header','pr-head'),title=el('div');
   const exit=standalone?Object.assign(el('a','pr-button pr-enter',t('prEnterCafe')),{href:'/tra-da'}):button('pr-close','✕',close);
   if(!standalone)exit.setAttribute('aria-label',t('prClose'));
   title.append(el('small','',t('prSmall')),el('h1','',t('prTitle')));
-  if(data){const sync=el('p',`pr-auto${isStale(data.checkedAt)?' is-stale':''}`);sync.append(el('b','',t('prSync',{time:when(data.checkedAt),age:ageText(data.checkedAt)})),el('small','',isStale(data.checkedAt)?t('prStaleWarn'):t('prAutoNote')));title.append(sync)}
+  if(data){const sync=el('p',`pr-auto${isStale(data.checkedAt)?' is-stale':''}`);sync.append(el('b','',t('prSync',{time:when(data.checkedAt),age:ageText(data.checkedAt)})),el('small','',data.updating?.length?t('prUpdating',{stores:updatingNames()}):isStale(data.checkedAt)?t('prStaleWarn'):t('prAutoNote')));title.append(sync)}
   head.append(title,exit);board.append(head);
   if(!data){
    const status=el('div','pr-status');status.setAttribute('role','status');
@@ -337,6 +339,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
   foot.append(el('p','pr-updated',`${t('prUpdated')}: ${data.stores.map(s=>`${s.name} ${when(s.checkedAt)}`).join(' · ')}`),el('p','pr-note',t('prNote')));
   const csv=el('a','pr-button',t('prCsv'));csv.href='/api/tea/prices.csv';csv.download='bang-gia-sieu-thi.csv';foot.append(csv);
   board.append(foot);root.append(board,parts.bar);update();
+  if(kept.restore&&(kept.page||kept.panel)){window.scrollTo(0,kept.page);root.scrollTop=kept.panel}
  }
 
  async function load(){
@@ -345,7 +348,10 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
    const response=await fetch('/api/tea/prices',{cache:'no-cache'});
    if(response.status===202){render();timer=setTimeout(load,4000+Math.random()*3000);return}
    if(!response.ok)throw new Error('prices');
-   data=await response.json();
+   const text=await response.text();
+   if(data&&text===raw){if(data.updating?.length)timer=setTimeout(load,10000+Math.random()*4000);return}
+   raw=text;data=JSON.parse(text);
+   if(data.updating?.length)timer=setTimeout(load,10000+Math.random()*4000);
    if(!urlApplied&&search){urlApplied=true;const ids=TC.cartFromQuery(search,data.items.map(i=>i.id));if(ids.length){setCart(ids);pendingScroll='cart'}}
   }catch{if(!data)failed=true}
   render();
