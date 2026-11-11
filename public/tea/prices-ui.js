@@ -15,7 +15,10 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  const lang=()=>locale()==='vi'?'vi-VN':'en-GB';
  const num=n=>new Intl.NumberFormat(lang()).format(Math.round(n));
  const money=n=>num(n)+'đ';
- const when=iso=>iso?new Date(iso).toLocaleString(lang(),{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'–';
+ const when=iso=>iso?new Intl.DateTimeFormat(lang(),{timeZone:'Asia/Ho_Chi_Minh',hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(iso)):'–';
+ const ageMs=iso=>iso?Math.max(0,Date.now()-Date.parse(iso)):0;
+ const ageText=iso=>{const m=Math.round(ageMs(iso)/60000);return m<2?t('prAgeNow'):m<60?t('prAgeMin',{n:m}):m<2880?t('prAgeHour',{n:Math.round(m/60)}):t('prAgeDay',{n:Math.round(m/1440)})};
+ const isStale=iso=>ageMs(iso)>26*3600_000; // the board refreshes every morning, so more than a day means the refresh failed
  const fold=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/đ/gi,'d').toLowerCase();
  const comparable=(item,s)=>!s.referenceOnly&&item.perStore[s.id]?.status==='ok'&&!item.perStore[s.id].stale;
  const brand=s=>(BADGE[s.id]||[])[1]||'#5b6b62';
@@ -59,7 +62,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
    const value=el('span','pr-bar-value',money(row.total));if(row.have<result.items.length)value.append(el('small','',t('prSomeItems',{have:row.have,count:result.items.length})));
    const track=el('span','pr-bar-track');track.append(fill);li.append(label,track,value);bars.append(li);
   }
-  box.append(bars,button('pr-button pr-button-green',t('prHeroTry'),()=>{setCart(ids);pendingScroll='cart';update()}));
+  box.append(bars,el('small','pr-hero-time',t('prSyncShort',{time:when(data.checkedAt)})),button('pr-button pr-button-green',t('prHeroTry'),()=>{setCart(ids);pendingScroll='cart';update()}));
   return box;
  }
 
@@ -196,7 +199,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  }
 
  // ---- cart: the chosen items, then each store's total for all of them (one store, one trip) ------------------------
- function summaryText(result){return result.best?t('prShareText',{count:result.items.length,store:result.best.store.name,total:money(result.best.total)}):t('prTitle')}
+ function summaryText(result){return result.best?t('prShareText',{count:result.items.length,store:result.best.store.name,total:money(result.best.total)})+' · '+t('prSyncShort',{time:when(data.checkedAt)}):t('prTitle')}
  async function shareCart(){
   const ids=[...cart];if(!ids.length)return;
   const url=`${location.origin}/gia?${TC.cartQuery(ids)}`,text=summaryText(compare());
@@ -307,7 +310,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
   const exit=standalone?Object.assign(el('a','pr-button pr-enter',t('prEnterCafe')),{href:'/tra-da'}):button('pr-close','✕',close);
   if(!standalone)exit.setAttribute('aria-label',t('prClose'));
   title.append(el('small','',t('prSmall')),el('h1','',t('prTitle')));
-  if(data)title.append(el('p','pr-auto',t('prAuto',{time:when(data.checkedAt)})));
+  if(data){const sync=el('p',`pr-auto${isStale(data.checkedAt)?' is-stale':''}`);sync.append(el('b','',t('prSync',{time:when(data.checkedAt),age:ageText(data.checkedAt)})),el('small','',isStale(data.checkedAt)?t('prStaleWarn'):t('prAutoNote')));title.append(sync)}
   head.append(title,exit);board.append(head);
   if(!data){
    const status=el('div','pr-status');status.setAttribute('role','status');
@@ -339,8 +342,8 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
  async function load(){
   clearTimeout(timer);failed=false;
   try{
-   const response=await fetch('/api/tea/prices',{cache:'no-store'});
-   if(response.status===202){render();timer=setTimeout(load,3000);return}
+   const response=await fetch('/api/tea/prices',{cache:'no-cache'});
+   if(response.status===202){render();timer=setTimeout(load,4000+Math.random()*3000);return}
    if(!response.ok)throw new Error('prices');
    data=await response.json();
    if(!urlApplied&&search){urlApplied=true;const ids=TC.cartFromQuery(search,data.items.map(i=>i.id));if(ids.length){setCart(ids);pendingScroll='cart'}}

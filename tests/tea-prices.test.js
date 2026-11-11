@@ -389,6 +389,7 @@ test('/gia is a standalone page with link-preview tags that state today\'s answe
     assert.match(page.body, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/assets\/tea\/og-prices\.png"/);
     assert.match(page.body, /Hôm nay giỏ cơ bản 10 món rẻ nhất ở Siêu thị &quot;A&quot; &lt;x&gt;: 20\.000đ/, 'the headline is in the preview, escaped');
     assert.doesNotMatch(page.body, /<!--PREVIEW-->/);
+    assert.match(page.body, /giá đồng bộ lúc 08:00 11\/11\/2026/, 'the preview says when prices were synced, in Vietnam time');
 
     const spoof = await get(server.address().port, '/gia', 'evil.example"><script>alert(1)</script>');
     assert.doesNotMatch(spoof.body, /<script>alert\(1\)/, 'a hostile Host header cannot inject markup');
@@ -418,4 +419,112 @@ test('the headline basket only counts items every live store has, so totals are 
   assert.equal(result.skipped, 1);
   assert.deepEqual(result.rows.map(r => [r.store.id, r.total]), [['a', 20], ['b', 50]], 'the reference store is not part of it');
   assert.equal(result.best.store.id, 'a');
+});
+
+// ---- load protection: photo cache and per-snapshot prepared responses ----
+const imageResponse = (bytes = 10, type = 'image/jpeg', extra = {}) => new Response(Buffer.alloc(bytes, 1), { headers: { 'content-type': type, ...extra } });
+const instantResize = async body => ({ body: body.subarray(0, 3), type: 'image/webp' });
+
+test('photo cache: equal requests share one download, later ones come from memory, and it expires', async () => {
+  const { createImageCache } = require('../features/tea/price-images');
+  const time = clock(1_000_000); let downloads = 0;
+  const cache = createImageCache({ fetchImage: async () => { downloads += 1; await new Promise(r => setTimeout(r, 5)); return imageResponse(); }, resize: instantResize, now: time.now, ttlMs: 1000 });
+  const results = await Promise.all(Array.from({ length: 8 }, () => cache.get('https://img.example/a.jpg')));
+  assert.equal(downloads, 1, 'a crowd arriving together costs one download');
+  assert.ok(results.every(r => r && r.type === 'image/webp' && r.body.length === 3 && /^"/.test(r.etag)));
+  await cache.get('https://img.example/a.jpg');
+  assert.equal(downloads, 1, 'now served from memory');
+  time.advance(1500);
+  await cache.get('https://img.example/a.jpg');
+  assert.equal(downloads, 2, 'refetched after the lifetime ends');
+});
+
+test('photo cache: limits parallel work, remembers failures, evicts the least recently used, and rejects non-images', async () => {
+  const { createImageCache } = require('../features/tea/price-images');
+  let running = 0, peak = 0;
+  const slow = createImageCache({ fetchImage: async () => imageResponse(), resize: async body => { running += 1; peak = Math.max(peak, running); await new Promise(r => setTimeout(r, 10)); running -= 1; return { body, type: 'image/webp' }; }, concurrency: 2 });
+  await Promise.all(Array.from({ length: 7 }, (_, i) => slow.get(`https://img.example/${i}.jpg`)));
+  assert.equal(peak, 2, 'never more than two at once');
+
+  const time = clock(5_000_000); let calls = 0, fail = true;
+  const flaky = createImageCache({ fetchImage: async () => { calls += 1; if (fail) throw new Error('down'); return imageResponse(); }, resize: instantResize, now: time.now, failTtlMs: 60_000 });
+  assert.equal(await flaky.get('https://img.example/x.jpg'), null);
+  assert.equal(await flaky.get('https://img.example/x.jpg'), null);
+  assert.equal(calls, 1, 'a failure is not retried on every page view');
+  fail = false; time.advance(61_000);
+  assert.ok(await flaky.get('https://img.example/x.jpg'), 'retried after the pause');
+
+  const fetched = []; const small = createImageCache({ fetchImage: async url => { fetched.push(url); return imageResponse(); }, resize: instantResize, maxEntries: 2 });
+  await small.get('a'); await small.get('b'); await small.get('a'); await small.get('c'); // b is now the least recently used
+  await small.get('a'); await small.get('b');
+  assert.deepEqual(fetched, ['a', 'b', 'c', 'b'], 'a and c stayed, b was evicted and fetched again');
+  assert.ok(small.stats().entries <= 2);
+
+  const picky = createImageCache({ fetchImage: async url => url.includes('html') ? imageResponse(10, 'text/html') : imageResponse(10, 'image/png', { 'content-length': '99000000' }), resize: instantResize });
+  assert.equal(await picky.get('https://x/page.html'), null, 'not an image');
+  assert.equal(await picky.get('https://x/huge.png'), null, 'declared far too large');
+});
+
+test('photo cache: when shrinking fails a small original is served as is, a big one is refused', async () => {
+  const { createImageCache } = require('../features/tea/price-images');
+  const broken = async () => { throw new Error('corrupt'); };
+  const small = createImageCache({ fetchImage: async () => imageResponse(1000, 'image/png'), resize: broken });
+  assert.equal((await small.get('https://x/s.png')).type, 'image/png');
+  const big = createImageCache({ fetchImage: async () => imageResponse(300_000, 'image/png'), resize: broken });
+  assert.equal(await big.get('https://x/b.png'), null);
+  const { shrink } = require('../features/tea/price-images');
+  const sharp = require('sharp');
+  const original = await sharp({ create: { width: 900, height: 700, channels: 3, background: '#cc3322' } }).png().toBuffer();
+  const thumb = await shrink(original);
+  assert.equal(thumb.type, 'image/webp');
+  assert.ok(thumb.body.length < original.length / 5 && thumb.body.length < 5000, 'a thumbnail is a few KB');
+});
+
+test('price endpoints serve a prepared response: ETag/304, no bookkeeping fields, photos fetched once, CSV reused', async () => {
+  const http = require('node:http');
+  const photo = 'https://img.example/p.jpg';
+  const prices = createGroceryPrices({ delayMs: 0, fetchers: { winmart: async k => (await fakeStore(0)(k)).map(p => ({ ...p, image: photo })) } });
+  await prices.getPrices();
+  let downloads = 0;
+  const app = express(); app.use(createTeaRouter({ service: {}, isAdmin: () => false, groceryPrices: prices, imageFetch: async () => { downloads += 1; return imageResponse(20, 'image/png'); }, imageResize: async b => ({ body: b.subarray(0, 4), type: 'image/webp' }) }));
+  const server = await new Promise(resolve => { const l = app.listen(0, '127.0.0.1', () => resolve(l)); });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const raw = (pathname, headers = {}) => new Promise((resolve, reject) => http.get(`${base}${pathname}`, { headers }, res => { const chunks = []; res.on('data', c => chunks.push(c)); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) })); }).on('error', reject));
+  try {
+    const first = await raw('/api/tea/prices');
+    assert.equal(first.status, 200);
+    assert.match(first.headers['cache-control'], /public, max-age=30/);
+    const json = JSON.parse(first.body);
+    for (const field of ['baseline', 'catalogKey', 'hasErrors']) assert.equal(field in json, false, `${field} stays on the server`);
+    assert.equal(json.items.length, CATALOG.length);
+    const again = await raw('/api/tea/prices');
+    assert.equal(again.headers.etag, first.headers.etag, 'same snapshot, same ETag');
+    assert.deepEqual(again.body, first.body);
+    const revalidated = await raw('/api/tea/prices', { 'If-None-Match': first.headers.etag });
+    assert.equal(revalidated.status, 304);
+    assert.equal(revalidated.body.length, 0);
+
+    const csv = await raw('/api/tea/prices.csv'), csv2 = await raw('/api/tea/prices.csv');
+    assert.equal(csv.status, 200);
+    assert.deepEqual(csv.body, csv2.body);
+
+    const url = `/api/tea/prices/img?u=${encodeURIComponent(photo)}`;
+    const img1 = await raw(url), img2 = await raw(url);
+    assert.equal(img1.status, 200);
+    assert.equal(img1.headers['content-type'], 'image/webp');
+    assert.match(img1.headers['cache-control'], /max-age=86400, immutable/);
+    assert.equal(img1.body.length, 4);
+    assert.equal(downloads, 1, 'the second visitor never reaches the supermarket');
+    assert.equal((await raw(url, { 'If-None-Match': img1.headers.etag })).status, 304);
+    assert.equal((await raw(`/api/tea/prices/img?u=${encodeURIComponent('https://other.example/x.jpg')}`)).status, 404);
+    assert.equal((await raw(`/api/tea/prices/img?u=${'a'.repeat(700)}`)).status, 404);
+  } finally { await new Promise(resolve => server.close(resolve)); }
+
+  const empty = express(); empty.use(createTeaRouter({ service: {}, isAdmin: () => false, groceryPrices: { current: () => null } }));
+  const waiting = await new Promise(resolve => { const l = empty.listen(0, '127.0.0.1', () => resolve(l)); });
+  try {
+    const res = await new Promise(resolve => http.get(`http://127.0.0.1:${waiting.address().port}/api/tea/prices`, r => { r.resume(); r.on('end', () => resolve(r)); }));
+    assert.equal(res.statusCode, 202);
+    assert.equal(res.headers['retry-after'], '5');
+  } finally { await new Promise(resolve => waiting.close(resolve)); }
 });

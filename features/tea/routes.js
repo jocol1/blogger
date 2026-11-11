@@ -5,11 +5,12 @@ const express = require('express');
 const { TeaError } = require('./service');
 const MENU = require('../../public/tea/menu');
 const { toCsv: groceryCsv } = require('./grocery-prices');
+const { createImageCache } = require('./price-images');
 const { commonCart, PRESETS, presetIds } = require('../../public/tea/prices-cart');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
-function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch }) {
+function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch, imageResize, images = createImageCache({ fetchImage: imageFetch, ...(imageResize ? { resize: imageResize } : {}) }) }) {
   const router = express.Router();
   const assets = path.join(__dirname, '../../public/tea');
   const json = express.json({ limit: '24kb' });
@@ -48,50 +49,70 @@ function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch }
   });
   // Standalone price page. The link-preview tags carry today's headline, so a shared link already shows the answer.
   const PRICE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+  const previewText = new WeakMap(); // snapshot -> description, so a crowd does not recompute it
+  let pageTemplate = null;
+  const priceTemplate = () => process.env.NODE_ENV === 'production' ? (pageTemplate ??= fs.readFileSync(path.join(assets, 'prices.html'), 'utf8')) : fs.readFileSync(path.join(assets, 'prices.html'), 'utf8');
+  const syncedAt = iso => new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
   function pricePreview(req) {
     const host = String(req.get('host') || 'locly.lol'), origin = `${/^(localhost|127\.|\[::1\])/.test(host) ? 'http' : 'https'}://${host}`;
     const snapshot = groceryPrices?.current();
+    if (snapshot && previewText.has(snapshot)) return { origin, description: previewText.get(snapshot) };
     let description = `So giá ${snapshot?.items.length ?? 70} món thực phẩm và đồ gia dụng ở WinMart, Co.op, Kingfoodmart, LOTTE Mart. Tự cập nhật 8h sáng mỗi ngày.`;
     if (snapshot) {
       const result = commonCart(snapshot, presetIds(snapshot, PRESETS[0]), snapshot.stores.filter(store => !store.referenceOnly).map(store => store.id));
       if (result.best && result.items.length >= 3) description = `Hôm nay giỏ cơ bản ${result.items.length} món rẻ nhất ở ${result.best.store.name}: ${new Intl.NumberFormat('vi-VN').format(Math.round(result.best.total))}đ. ${description}`;
     }
+    if (snapshot) { description += ` (giá đồng bộ lúc ${syncedAt(snapshot.checkedAt)})`; previewText.set(snapshot, description); }
     return { origin, description };
   }
   router.get('/gia', (req, res) => {
     const { origin, description } = pricePreview(req), title = 'Hôm nay mua ở đâu rẻ nhất? · Bảng giá siêu thị';
     const tags = [['name', 'description', description], ['property', 'og:type', 'website'], ['property', 'og:title', title], ['property', 'og:description', description], ['property', 'og:url', `${origin}/gia`], ['property', 'og:image', `${origin}/assets/tea/og-prices.png`], ['property', 'og:image:width', '1200'], ['property', 'og:image:height', '630'], ['name', 'twitter:card', 'summary_large_image']]
       .map(([kind, name, value]) => `<meta ${kind}="${name}" content="${esc(value)}">`).join('\n  ');
-    res.set({ 'Content-Security-Policy': PRICE_CSP, 'Cache-Control': 'no-cache' }).type('html').send(fs.readFileSync(path.join(assets, 'prices.html'), 'utf8').replace('<!--PREVIEW-->', tags));
+    res.set({ 'Content-Security-Policy': PRICE_CSP, 'Cache-Control': 'no-cache' }).type('html').send(priceTemplate().replace('<!--PREVIEW-->', tags));
   });
   router.get('/so-sanh-gia', (req, res) => res.redirect(302, '/gia' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '')));
   router.use('/api/tea', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   // Public supermarket prices. Never waits on the supermarkets: 202 while the first snapshot is still being built.
+  // Everything a crowd asks for is prepared once per snapshot (it changes once a day), so serving it costs a memory read.
+  const rendered = new WeakMap();
+  function renderSnapshot(snapshot) {
+    let r = rendered.get(snapshot);
+    if (!r) {
+      const { baseline, catalogKey, hasErrors, ...pub } = snapshot; // server-side bookkeeping the page never uses
+      const json = Buffer.from(JSON.stringify(pub));
+      r = { json, etag: `W/"${crypto.createHash('sha1').update(json).digest('base64url').slice(0, 22)}"`, csv: null, photos: null };
+      rendered.set(snapshot, r);
+    }
+    return r;
+  }
+  // Public supermarket prices. Never waits on the supermarkets: 202 while the very first snapshot is still being built.
   router.get('/api/tea/prices', (req, res) => {
     const snapshot = groceryPrices?.current();
-    if (!snapshot) return res.status(groceryPrices ? 202 : 503).json({ loading: Boolean(groceryPrices) });
-    res.json(snapshot);
+    if (!snapshot) return res.status(groceryPrices ? 202 : 503).set('Retry-After', '5').json({ loading: Boolean(groceryPrices) });
+    const r = renderSnapshot(snapshot);
+    // ETag + a short public lifetime: browsers revalidate for a 304, shared caches can absorb a burst.
+    res.set({ ETag: r.etag, 'Cache-Control': 'public, max-age=30, stale-while-revalidate=120' }).type('json').send(r.json);
   });
-  // Product thumbnails for the price board, relayed so the page CSP stays 'self'. Only pictures that are in the
-  // current snapshot are served, which keeps this from becoming an open proxy.
+  // Product thumbnails, relayed so the page CSP stays 'self'. Only photos in the current snapshot are served (no open
+  // proxy); each is fetched once, shrunk to a tiny WebP and cached in memory (see price-images.js).
   router.get('/api/tea/prices/img', asyncRoute(async (req, res) => {
-    const wanted = String(req.query.u || '');
-    const snapshot = groceryPrices?.current();
-    const known = snapshot && snapshot.items.some(item => Object.values(item.perStore).some(cell => cell.image === wanted));
+    const wanted = String(req.query.u || ''), snapshot = groceryPrices?.current();
+    if (!snapshot || wanted.length > 600) return res.status(404).end();
+    const r = renderSnapshot(snapshot);
+    r.photos ??= new Set(snapshot.items.flatMap(item => Object.values(item.perStore).map(cell => cell.image).filter(Boolean)));
     let url; try { url = new URL(wanted); } catch { url = null; }
-    if (!known || !url || url.protocol !== 'https:') return res.status(404).end();
-    let upstream;
-    try { upstream = await imageFetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'LoclyTeaPriceBoard/1.0', accept: 'image/*' } }); } catch { return res.status(502).end(); }
-    const type = String(upstream.headers.get('content-type') || '').toLowerCase();
-    if (!upstream.ok || !/^image\/(png|jpe?g|webp|gif|avif)/.test(type) || Number(upstream.headers.get('content-length') || 0) > 1_500_000) return res.status(502).end();
-    const body = Buffer.from(await upstream.arrayBuffer());
-    if (body.length > 1_500_000) return res.status(502).end();
-    res.set({ 'Cache-Control': 'public, max-age=86400', 'Content-Type': type.split(';')[0], 'X-Content-Type-Options': 'nosniff' }).send(body);
+    if (!r.photos.has(wanted) || !url || url.protocol !== 'https:') return res.status(404).end();
+    const image = await images.get(wanted);
+    if (!image) return res.status(502).set('Cache-Control', 'public, max-age=60').end();
+    res.set({ ETag: image.etag, 'Cache-Control': 'public, max-age=86400, immutable', 'Content-Type': image.type, 'X-Content-Type-Options': 'nosniff' }).send(image.body);
   }));
   router.get('/api/tea/prices.csv', (req, res) => {
     const snapshot = groceryPrices?.current();
     if (!snapshot) return res.status(503).type('text/plain').send('Price board is still loading, try again in a minute.');
-    res.type('text/csv; charset=utf-8').set('Content-Disposition', 'attachment; filename="bang-gia-sieu-thi.csv"').send(groceryCsv(snapshot));
+    const r = renderSnapshot(snapshot);
+    r.csv ??= Buffer.from(groceryCsv(snapshot));
+    res.type('text/csv; charset=utf-8').set('Content-Disposition', 'attachment; filename="bang-gia-sieu-thi.csv"').send(r.csv);
   });
   router.get('/api/tea/farm', asyncRoute(async (req, res) => res.json(await service.farmState(token(req)))));
   router.post('/api/tea/farm/enter', json, asyncRoute(async (req, res) => res.json(await service.enterFarm(token(req)))));
