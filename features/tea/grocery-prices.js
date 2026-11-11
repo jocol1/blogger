@@ -62,7 +62,7 @@ function pickBest(item, products) {
   const inStock = sized.filter(x => x.p.inStock);
   if (!inStock.length) return { status: 'out_of_stock', name: sized[0].p.name, url: sized[0].p.url };
   const best = inStock.map(x => ({ ...x, unitPrice: x.p.price / x.size.qty })).sort((a, b) => a.unitPrice - b.unitPrice)[0];
-  return { status: 'ok', name: best.p.name, price: best.p.price, listPrice: best.p.listPrice > best.p.price ? best.p.listPrice : null, size: best.size.label, unitPrice: Math.round(best.unitPrice), url: best.p.url };
+  return { status: 'ok', name: best.p.name, price: best.p.price, listPrice: best.p.listPrice > best.p.price ? best.p.listPrice : null, size: best.size.label, unitPrice: Math.round(best.unitPrice), image: /^https:\/\//.test(best.p.image || '') ? best.p.image : undefined, url: best.p.url };
 }
 
 // ---- real fetchers ----
@@ -89,7 +89,7 @@ async function fetchWinmart(keyword) {
   const json = await postJson('https://api-crownx.winmart.vn/ss/api/v2/public/winmart/item-search', { 'x-api-merchant': 'WCM' }, { keyword, pageNumber: 1, pageSize: 20, storeNo: '1535', storeGroupCode: '1998', applicationType: 'Winmart' });
   return (Array.isArray(json.data) ? json.data : []).map(p => ({
     name: p.description, uom: p.uomName, price: Number(p.price?.salePrice ?? 0), listPrice: Number(p.price?.originPrice ?? 0),
-    inStock: Number(p.warehouse?.availableQuantity ?? 0) > 0, url: p.seoName ? `https://winmart.vn/products/${p.seoName}` : 'https://winmart.vn',
+    inStock: Number(p.warehouse?.availableQuantity ?? 0) > 0, url: p.seoName ? `https://winmart.vn/products/${p.seoName}` : 'https://winmart.vn', image: p.image || undefined,
   }));
 }
 
@@ -97,7 +97,7 @@ async function fetchCoop(keyword) {
   const json = await postJson('https://discovery.tekoapis.com/api/v2/search-skus-v2', {}, { terminalId: 26607, page: 1, pageSize: 20, query: keyword, filter: {}, sorting: { sort: 'SORT_BY_UNSPECIFIED', order: 'ORDER_BY_UNSPECIFIED' }, returnFilterable: [] });
   return (Array.isArray(json.data?.products) ? json.data.products : []).map(p => ({
     name: p.name, uom: p.uomName, price: Number(p.latestPrice ?? 0), listPrice: Number(p.supplierRetailPrice ?? 0),
-    inStock: p.sellable !== false && Number(p.totalAvailable ?? 0) > 0, url: p.canonical ? `https://cooponline.vn/${p.canonical}` : 'https://cooponline.vn',
+    inStock: p.sellable !== false && Number(p.totalAvailable ?? 0) > 0, url: p.canonical ? `https://cooponline.vn/${p.canonical}` : 'https://cooponline.vn', image: p.imageUrl ? (p.imageUrl.includes('=') ? p.imageUrl : `${p.imageUrl}=w160`) : undefined,
   }));
 }
 
@@ -107,16 +107,16 @@ async function fetchKingfood(keyword) {
   return (Array.isArray(json.products) ? json.products : []).map(p => ({
     name: p.name, uom: p.variants?.[0]?.unit?.name || '', price: Number(p.discountPrice || p.originalPrice || 0), listPrice: Number(p.originalPrice ?? 0),
     // shortcut: search results carry no product-page path, so link to the shop's search for that name; upgrade if the API exposes one.
-    inStock: Number(p.inStock ?? 0) > 0, url: `https://kingfoodmart.com/search?keyword=${encodeURIComponent(p.name || keyword)}`,
+    inStock: Number(p.inStock ?? 0) > 0, url: `https://kingfoodmart.com/search?keyword=${encodeURIComponent(p.name || keyword)}`, image: p.thumbnail || p.images?.[0] || undefined,
   }));
 }
 
 // LOTTE Mart's own web search (empty robots.txt), store "nsg" = Nam Sài Gòn. price.VND.default is today's selling price.
 async function fetchLotte(keyword) {
-  const json = await postJson('https://www.lottemart.vn/v1/p/mart/es/vi_nsg/products/search', {}, { limit: 30, offset: 1, facet_filters: {}, fields: ['name', 'price', 'url_key', 'in_stock', 'stock_qty'], where: { query: keyword } });
+  const json = await postJson('https://www.lottemart.vn/v1/p/mart/es/vi_nsg/products/search', {}, { limit: 30, offset: 1, facet_filters: {}, fields: ['name', 'price', 'url_key', 'in_stock', 'stock_qty', 'image_url'], where: { query: keyword } });
   return (Array.isArray(json.data?.items) ? json.data.items : []).map(p => ({
     name: p.name, uom: '', price: Number(p.price?.VND?.default ?? 0), listPrice: Number(p.price?.VND?.price ?? 0),
-    inStock: Number(p.in_stock) === 1 && Number(p.stock_qty ?? 1) > 0, url: p.url_key ? `https://www.lottemart.vn/vi-nsg/product/${encodeURIComponent(p.url_key)}` : 'https://www.lottemart.vn',
+    inStock: Number(p.in_stock) === 1 && Number(p.stock_qty ?? 1) > 0, url: p.url_key ? `https://www.lottemart.vn/vi-nsg/product/${encodeURIComponent(p.url_key)}` : 'https://www.lottemart.vn', image: p.image_url || undefined,
   }));
 }
 

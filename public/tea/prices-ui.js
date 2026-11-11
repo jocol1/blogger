@@ -21,6 +21,7 @@ window.TeaPricesUI=function({t,locale,close}){
  const matches=()=>{const q=fold(query.trim());return q?data.items.filter(i=>fold(i.name).includes(q)):data.items};
  const statusText=c=>t(c.status==='out_of_stock'?'prOut':c.status==='error'?'prError':c.status==='not_collected'?'prNotCollected':'prNotFound');
  const compare=()=>window.TeaPriceCart.compareCart(data,[...cart],[...selected]);
+ const imgSrc=u=>'/api/tea/prices/img?u='+encodeURIComponent(u),badPhotos=new Set(); // e.g. originals over the relay's size cap
 
  // Pixelated copy of each store's own site icon (public/tea/logos); the initials stay as the fallback if it is missing.
  function badge(store){
@@ -47,6 +48,7 @@ window.TeaPricesUI=function({t,locale,close}){
   const node=LINK.test(c.url||'')?Object.assign(el('a','pr-price',label),{href:c.url,target:'_blank',rel:'noopener noreferrer'}):el('span','pr-price',label);
   node.title=detail;node.setAttribute('aria-label',`${store.name}: ${money(c.unitPrice)}/${item.unitLabel}. ${detail}`);
   if(best===store.id){td.classList.add('is-best');node.title=`${t('prBest')} · ${detail}`}
+  if(c.image&&!badPhotos.has(c.image)){const photo=el('img','pr-thumb');photo.src=imgSrc(c.image);photo.alt='';photo.title=detail;photo.loading='lazy';photo.decoding='async';photo.width=photo.height=34;photo.onerror=()=>{badPhotos.add(c.image);photo.remove()};td.append(photo)}
   td.append(node);
   if(c.stale)td.append(el('small','pr-stale',t('prStale')));
   else if(c.listPrice)td.append(el('small','pr-sale','-'+Math.round((1-c.price/c.listPrice)*100)+'%'));
@@ -117,12 +119,19 @@ window.TeaPricesUI=function({t,locale,close}){
  }
 
  // Draws the cart comparison on a canvas and downloads it as a PNG (no third-party code, nothing leaves the browser).
- function exportImage(){
+ async function exportImage(){
   const result=compare(),stores=result.rows.map(r=>r.store).slice(0,6);if(!result.items.length)return;
-  const scale=2,W=Math.max(720,320+stores.length*120),rowH=34,pad=32,headH=118,tableTop=headH+10,footH=96;
+  const scale=2,W=Math.max(720,320+stores.length*120),rowH=42,pad=32,headH=118,tableTop=headH+10,footH=96;
   const H=tableTop+rowH*(result.items.length+2)+footH;
   const canvas=document.createElement('canvas');canvas.width=W*scale;canvas.height=H*scale;
   const g=canvas.getContext('2d');g.scale(scale,scale);
+  const load=src=>new Promise(resolve=>{const img=new Image(),done=v=>{clearTimeout(timer);resolve(v)},timer=setTimeout(()=>done(null),5000);img.onload=()=>done(img);img.onerror=()=>done(null);img.src=src});
+  const photos=new Map(),logos=new Map();
+  await Promise.all([
+   ...result.items.flatMap(item=>stores.map(s=>{const c=item.perStore[s.id];return c?.status==='ok'&&c.image&&!badPhotos.has(c.image)?load(imgSrc(c.image)).then(img=>{if(img)photos.set(item.id+'|'+s.id,img)}):null})),
+   ...stores.filter(s=>BADGE[s.id]).map(s=>load(`/assets/tea/logos/${s.id}.png`).then(img=>{if(img)logos.set(s.id,img)})),
+  ]);
+  const photo=(img,x,y,size)=>{g.fillStyle='#ffffff';g.fillRect(x,y,size,size);const r=Math.min(size/img.naturalWidth,size/img.naturalHeight),w=img.naturalWidth*r,h=img.naturalHeight*r;g.drawImage(img,x+(size-w)/2,y+(size-h)/2,w,h);g.strokeStyle='#cfb48b';g.strokeRect(x+.5,y+.5,size-1,size-1)};
   const font=(w,s)=>`${w} ${s}px "Trebuchet MS", "Segoe UI", sans-serif`;
   const fit=(text,max)=>{text=String(text);if(g.measureText(text).width<=max)return text;while(text.length>1&&g.measureText(text+'…').width>max)text=text.slice(0,-1);return text+'…'};
   g.fillStyle='#fff1d3';g.fillRect(0,0,W,H);g.strokeStyle='#956d44';g.lineWidth=8;g.strokeRect(4,4,W-8,H-8);g.lineWidth=1;
@@ -132,16 +141,16 @@ window.TeaPricesUI=function({t,locale,close}){
   const nameW=W-pad*2-stores.length*120,colX=i=>pad+nameW+i*120;
   const bestIndex=stores.findIndex(s=>result.best&&s.id===result.best.store.id);
   if(bestIndex>=0){g.fillStyle='#d8e4b2';g.beginPath();g.roundRect?g.roundRect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8,10):g.rect(colX(bestIndex)+4,tableTop-6,112,rowH*(result.items.length+2)+8);g.fill()}
-  g.font=font(700,12);stores.forEach((s,i)=>{g.fillStyle=brand(s);g.textAlign='right';g.fillText(fit(s.name.toUpperCase(),108),colX(i)+112,tableTop+20)});
+  g.font=font(700,12);stores.forEach((s,i)=>{g.fillStyle=brand(s);g.textAlign='right';g.fillText(fit(s.name.toUpperCase(),80),colX(i)+112,tableTop+20);const logo=logos.get(s.id);if(logo){g.imageSmoothingEnabled=false;g.drawImage(logo,colX(i)+8,tableTop+3,22,22);g.imageSmoothingEnabled=true}});
   g.textAlign='left';g.fillStyle='#51402e';g.font=font(700,14);g.fillText(t('prItem'),pad,tableTop+20);
   result.items.forEach((item,r)=>{
    const y=tableTop+rowH*(r+1);g.strokeStyle='#ead7ae';g.beginPath();g.moveTo(pad,y);g.lineTo(W-pad,y);g.stroke();
-   g.textAlign='left';g.fillStyle='#51402e';g.font=font(600,14);g.fillText(fit(item.name,nameW-90),pad,y+22);
-   g.fillStyle='#8a9a91';g.font=font(400,11);g.fillText(`/${item.unitLabel}`,pad+nameW-80,y+22);
+   g.textAlign='left';g.fillStyle='#51402e';g.font=font(600,14);g.fillText(fit(item.name,nameW-90),pad,y+26);
+   g.fillStyle='#8a9a91';g.font=font(400,11);g.fillText(`/${item.unitLabel}`,pad+nameW-80,y+26);
    const ok=stores.filter(s=>comparable(item,s)),min=ok.length?Math.min(...ok.map(s=>item.perStore[s.id].unitPrice)):null;
    stores.forEach((s,i)=>{const c=item.perStore[s.id];g.textAlign='right';
-    if(c?.status==='ok'){const cheap=comparable(item,s)&&ok.length>1&&c.unitPrice===min;g.fillStyle=cheap?'#3f5d33':'#51402e';g.font=font(cheap?700:400,14);g.fillText(num(c.unitPrice),colX(i)+112,y+22)}
-    else{g.fillStyle='#b4c0b9';g.font=font(400,14);g.fillText('—',colX(i)+112,y+22)}});
+    if(c?.status==='ok'){const cheap=comparable(item,s)&&ok.length>1&&c.unitPrice===min;g.fillStyle=cheap?'#3f5d33':'#51402e';g.font=font(cheap?700:400,14);g.fillText(num(c.unitPrice),colX(i)+112,y+26);const img=photos.get(item.id+'|'+s.id);if(img)photo(img,colX(i)+10,y+5,32)}
+    else{g.fillStyle='#b4c0b9';g.font=font(400,14);g.fillText('—',colX(i)+112,y+26)}});
   });
   const ty=tableTop+rowH*(result.items.length+1);g.strokeStyle='#795537';g.lineWidth=1.5;g.beginPath();g.moveTo(pad,ty);g.lineTo(W-pad,ty);g.stroke();g.lineWidth=1;
   g.textAlign='left';g.fillStyle='#51402e';g.font=font(700,14);g.fillText(t('prTotal'),pad,ty+22);

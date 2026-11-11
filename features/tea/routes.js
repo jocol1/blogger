@@ -7,7 +7,7 @@ const { toCsv: groceryCsv } = require('./grocery-prices');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
-function createTeaRouter({ service, isAdmin, groceryPrices }) {
+function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch }) {
   const router = express.Router();
   const assets = path.join(__dirname, '../../public/tea');
   const json = express.json({ limit: '24kb' });
@@ -51,6 +51,22 @@ function createTeaRouter({ service, isAdmin, groceryPrices }) {
     if (!snapshot) return res.status(groceryPrices ? 202 : 503).json({ loading: Boolean(groceryPrices) });
     res.json(snapshot);
   });
+  // Product thumbnails for the price board, relayed so the page CSP stays 'self'. Only pictures that are in the
+  // current snapshot are served, which keeps this from becoming an open proxy.
+  router.get('/api/tea/prices/img', asyncRoute(async (req, res) => {
+    const wanted = String(req.query.u || '');
+    const snapshot = groceryPrices?.current();
+    const known = snapshot && snapshot.items.some(item => Object.values(item.perStore).some(cell => cell.image === wanted));
+    let url; try { url = new URL(wanted); } catch { url = null; }
+    if (!known || !url || url.protocol !== 'https:') return res.status(404).end();
+    let upstream;
+    try { upstream = await imageFetch(url, { redirect: 'follow', signal: AbortSignal.timeout(8000), headers: { 'user-agent': 'LoclyTeaPriceBoard/1.0', accept: 'image/*' } }); } catch { return res.status(502).end(); }
+    const type = String(upstream.headers.get('content-type') || '').toLowerCase();
+    if (!upstream.ok || !/^image\/(png|jpe?g|webp|gif|avif)/.test(type) || Number(upstream.headers.get('content-length') || 0) > 1_500_000) return res.status(502).end();
+    const body = Buffer.from(await upstream.arrayBuffer());
+    if (body.length > 1_500_000) return res.status(502).end();
+    res.set({ 'Cache-Control': 'public, max-age=86400', 'Content-Type': type.split(';')[0], 'X-Content-Type-Options': 'nosniff' }).send(body);
+  }));
   router.get('/api/tea/prices.csv', (req, res) => {
     const snapshot = groceryPrices?.current();
     if (!snapshot) return res.status(503).type('text/plain').send('Price board is still loading, try again in a minute.');

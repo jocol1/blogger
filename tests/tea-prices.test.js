@@ -202,7 +202,7 @@ test('Kingfoodmart results map to the common product shape (sale price, stock, s
     assert.equal(seen.init.method, 'GET');
     assert.equal(seen.init.headers['x-ol-tenant'], 'kingfood');
     assert.match(seen.url, /keyword=s%E1%BB%AFa%20t%C6%B0%C6%A1i%201l/);
-    assert.deepEqual(a, { name: 'Sữa tươi Nuti hộp 1L', uom: 'Hộp', price: 33500, listPrice: 36000, inStock: true, url: 'https://kingfoodmart.com/search?keyword=S%E1%BB%AFa%20t%C6%B0%C6%A1i%20Nuti%20h%E1%BB%99p%201L' });
+    assert.deepEqual(a, { name: 'Sữa tươi Nuti hộp 1L', uom: 'Hộp', price: 33500, listPrice: 36000, inStock: true, url: 'https://kingfoodmart.com/search?keyword=S%E1%BB%AFa%20t%C6%B0%C6%A1i%20Nuti%20h%E1%BB%99p%201L', image: undefined });
     assert.equal(b.price, 20000, 'no discount means the original price');
     assert.equal(b.inStock, false);
   } finally { global.fetch = real; }
@@ -216,7 +216,7 @@ test('LOTTE Mart results map selling price, list price, stock and product link',
     const [a, b] = await fetchLotte('sữa tươi 1l');
     assert.equal(seen.init.method, 'POST');
     assert.deepEqual(JSON.parse(seen.init.body).where, { query: 'sữa tươi 1l' });
-    assert.deepEqual(a, { name: 'Sữa Tươi Devondale Nguyên Kem 1L', uom: '', price: 49900, listPrice: 70500, inStock: true, url: 'https://www.lottemart.vn/vi-nsg/product/sua-tuoi-devondale-1l' });
+    assert.deepEqual(a, { name: 'Sữa Tươi Devondale Nguyên Kem 1L', uom: '', price: 49900, listPrice: 70500, inStock: true, url: 'https://www.lottemart.vn/vi-nsg/product/sua-tuoi-devondale-1l', image: undefined });
     assert.equal(b.inStock, false);
   } finally { global.fetch = real; }
 });
@@ -244,4 +244,28 @@ test('cart compares the whole cart per store: complete stores first, cheapest wi
   assert.equal(partial.best.store.id, 'c', 'when nobody has everything, the verified store with the most items wins');
   assert.equal(partial.best.have, 1);
   assert.equal(compareCart(data, ['milk'], ['c']).best, null, 'a store with none of the items is not a winner');
+});
+
+test('price cells keep an https product photo and the relay serves only photos in the snapshot', async () => {
+  const eggs = CATALOG.find(i => i.id === 'trung-ga');
+  assert.equal(pickBest(eggs, [product('Trứng gà tươi hộp 10 quả', 30000, { image: 'https://img.example/egg.jpg' })]).image, 'https://img.example/egg.jpg');
+  assert.equal(pickBest(eggs, [product('Trứng gà tươi hộp 10 quả', 30000, { image: 'http://img.example/egg.jpg' })]).image, undefined, 'plain http is dropped');
+
+  const photo = 'https://img.example/egg.jpg';
+  const prices = createGroceryPrices({ delayMs: 0, fetchers: { winmart: async k => (await fakeStore(0)(k)).map(p => ({ ...p, image: photo })) } });
+  await prices.getPrices();
+  const upstream = [];
+  const imageFetch = async url => { upstream.push(String(url)); return String(url).endsWith('.jpg') ? new Response(Buffer.from([0xff, 0xd8, 0xff]), { headers: { 'content-type': 'image/jpeg' } }) : new Response('<html>', { headers: { 'content-type': 'text/html' } }); };
+  const app = express(); app.use(createTeaRouter({ service: {}, isAdmin: () => false, groceryPrices: prices, imageFetch }));
+  const server = await new Promise(resolve => { const listener = app.listen(0, '127.0.0.1', () => resolve(listener)); });
+  const base = `http://127.0.0.1:${server.address().port}/api/tea/prices/img?u=`;
+  try {
+    const ok = await fetch(base + encodeURIComponent(photo));
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('content-type'), 'image/jpeg');
+    assert.match(ok.headers.get('cache-control'), /max-age=86400/);
+    assert.equal((await fetch(base + encodeURIComponent('https://evil.example/x.jpg'))).status, 404, 'not in the snapshot');
+    assert.equal((await fetch(base + encodeURIComponent('file:///etc/passwd'))).status, 404);
+    assert.deepEqual(upstream, [photo], 'unknown URLs are never fetched');
+  } finally { await new Promise(resolve => server.close(resolve)); }
 });
