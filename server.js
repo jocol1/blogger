@@ -17,7 +17,7 @@ const { createChatRouter } = require('./features/chat/routes');
 const { createPartyRouter } = require('./features/party/routes');
 const { createBirthdayRouter } = require('./features/birthday/routes');
 const { createTeaService } = require('./features/tea/service');
-const { createGroceryPrices } = require('./features/tea/grocery-prices');
+const { createGroceryPrices, firestorePriceStore } = require('./features/tea/grocery-prices');
 const { createBhxCollector } = require('./features/tea/bhx-collector');
 const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
 const { Server: SocketServer } = require('socket.io');
@@ -95,7 +95,7 @@ const donationConfig = readConfig();
 const teaService = createTeaService({ db: firestore, config: donationConfig });
 attachTeaSockets(io, teaService);
 // BHX: collected from its public sitemap + product-page JSON-LD during the same 08:00 refresh (see bhx-collector.js).
-const groceryPrices = createGroceryPrices({ bhxLoader: createBhxCollector().loader });
+const groceryPrices = createGroceryPrices({ bhxLoader: createBhxCollector().loader, store: firestore ? firestorePriceStore(firestore) : null });
 app.use(createTeaRouter({ service: teaService, groceryPrices, isAdmin: req => req.session.user === 'admin' }));
 app.use(createDonationRouter({ db: firestore, config: donationConfig, teaService, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));

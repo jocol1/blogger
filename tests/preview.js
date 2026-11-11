@@ -39,9 +39,13 @@ attachTeaSockets(io, teaService);
 const fakePrices = (extra, skip = '') => async keyword => {
   const names = { 'trứng gà': ['Trứng gà tươi hộp 10 quả', 'Hộp'], 'ba rọi heo': ['Ba rọi heo', 'Kg'], 'ức gà': ['Ức gà phi lê 500g', 'Gói'], 'cà rốt': ['Cà rốt', '1 KG'], 'khoai tây': ['Khoai tây', 'Kg'], 'cà chua': ['Cà chua', 'Kg'], 'đường': ['Đường tinh luyện 1kg', 'Gói'], 'muối tinh': ['Muối tinh 1kg', 'Gói'], 'nước mắm': ['Nước mắm Nhất vị 500ml', 'Chai'], 'sữa tươi 1l': ['Sữa tươi tiệt trùng hộp 1 lít', 'Hộp'], 'dầu ăn': ['Dầu ăn thực vật 1 lít', 'Chai'] };
   const hit = names[keyword]; if (!hit || keyword === skip) return [];
-  return [{ name: hit[0], uom: hit[1], price: (hit[0].length * 700 % 40000) + 9000 + extra, listPrice: extra ? 0 : 99000, inStock: keyword !== 'cà rốt' || !extra, url: 'https://winmart.vn/products/' + encodeURIComponent(hit[0]) }];
+  return [{ name: hit[0], uom: hit[1], price: (hit[0].length * 700 % 40000) + 9000 + extra, listPrice: extra ? 0 : Math.round(((hit[0].length * 700 % 40000) + 9000) * 1.22), inStock: keyword !== 'cà rốt' || !extra, url: 'https://winmart.vn/products/' + encodeURIComponent(hit[0]) }];
 };
-const groceryPrices = createGroceryPrices(process.env.TEA_PRICES_LIVE === '1' ? {} : { delayMs: 0, fetchers: { winmart: fakePrices(0, 'muối tinh'), coop: fakePrices(1500) } });
+// A yesterday snapshot is saved first so the board shows the day-over-day arrows; the store lives in memory.
+let savedPrices = null;
+const priceStore = { load: async () => savedPrices, save: async data => { savedPrices = data; } };
+const groceryPrices = createGroceryPrices(process.env.TEA_PRICES_LIVE === '1' ? { store: priceStore } : { delayMs: 0, store: priceStore, fetchers: { winmart: fakePrices(0, 'muối tinh'), coop: fakePrices(1500) } });
+if (process.env.TEA_PRICES_LIVE !== '1') createGroceryPrices({ now: () => Date.now() - 86_400_000, delayMs: 0, store: priceStore, log: {}, fetchers: { winmart: fakePrices(600, 'muối tinh'), coop: fakePrices(1900) } }).getPrices().then(() => groceryPrices.start());
 app.use(createTeaRouter({ service: teaService, groceryPrices, isAdmin: req => req.session.user === 'admin' }));
 app.use(createDonationRouter({ db, config, teaService }));
 app.use(createChatRouter({ db, bucket, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));

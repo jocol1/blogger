@@ -269,3 +269,153 @@ test('price cells keep an https product photo and the relay serves only photos i
     assert.deepEqual(upstream, [photo], 'unknown URLs are never fetched');
   } finally { await new Promise(resolve => server.close(resolve)); }
 });
+
+test('prices are saved to Firestore, served at once after a restart, and refreshed behind a stale or foreign snapshot', async () => {
+  const { MemoryFirestore } = require('./helpers/memory-firestore');
+  const { firestorePriceStore } = require('../features/tea/grocery-prices');
+  const db = new MemoryFirestore(), store = firestorePriceStore(db);
+  const time = clock(Date.parse('2026-11-10T08:00:00Z')); // 15:00 in Vietnam
+  let calls = 0;
+  const fetchers = { winmart: async k => { calls += 1; return fakeStore(0)(k); } };
+  const first = createGroceryPrices({ now: time.now, delayMs: 0, fetchers, store, log: {} });
+  await first.getPrices();
+  await new Promise(resolve => setImmediate(resolve));
+  const saved = await store.load();
+  assert.equal(saved.items.length, CATALOG.length);
+  assert.equal(saved.catalogKey, CATALOG.map(i => i.id).join(','));
+
+  time.advance(2 * 3600_000);
+  calls = 0;
+  const second = createGroceryPrices({ now: time.now, delayMs: 0, fetchers, store, log: {}, setTimer: () => ({ unref() {} }) });
+  await second.start();
+  assert.equal(second.current().checkedAt, saved.checkedAt, 'the saved snapshot is served immediately');
+  assert.equal(calls, 0, 'still fresh before the next 08:00, so no rebuild');
+
+  const later = clock(time.now() + 20 * 3600_000); // past 08:00 next morning
+  const third = createGroceryPrices({ now: later.now, delayMs: 0, fetchers, store, log: {}, setTimer: () => ({ unref() {} }) });
+  await third.start();
+  assert.equal(third.current().checkedAt, saved.checkedAt, 'the old snapshot is served while the refresh runs');
+  await third.getPrices();
+  assert.ok(calls > 0, 'refreshed after 08:00');
+
+  await db.collection('tea_prices').doc('latest').set({ json: JSON.stringify({ ...saved, catalogKey: 'old,catalog' }), savedAt: saved.checkedAt });
+  calls = 0;
+  const fourth = createGroceryPrices({ now: time.now, delayMs: 0, fetchers, store, log: {}, setTimer: () => ({ unref() {} }) });
+  await fourth.start();
+  await fourth.getPrices();
+  assert.ok(calls > 0, 'a snapshot built for another catalog is refreshed straight away');
+});
+
+test('a failing or unreadable store never breaks the board', async () => {
+  const warnings = [];
+  const time = clock(Date.parse('2026-11-10T08:00:00Z'));
+  const store = { load: async () => { throw new Error('no db'); }, save: async () => { throw new Error('write failed'); } };
+  const prices = createGroceryPrices({ now: time.now, delayMs: 0, fetchers: { winmart: fakeStore(0) }, store, log: { warn: (...a) => warnings.push(a.join(' ')) }, setTimer: () => ({ unref() {} }) });
+  await prices.start();
+  const data = await prices.getPrices();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(data.items.length, CATALOG.length);
+  assert.ok(warnings.some(w => /unreadable/.test(w)) && warnings.some(w => /not saved/.test(w)));
+});
+
+test('each price knows how it moved since yesterday, and a restart within the day keeps the same yardstick', async () => {
+  const time = clock(Date.parse('2026-11-10T08:00:00Z')); // 15:00 Vietnam, 10 Nov
+  let extra = 5000;
+  const prices = createGroceryPrices({ now: time.now, delayMs: 0, fetchers: { winmart: k => fakeStore(extra)(k) } });
+  const cell = data => data.items.find(i => i.id === 'ca-rot').perStore.winmart;
+  const day1 = await prices.getPrices();
+  assert.equal(day1.baseline.prices, null, 'no yesterday on the very first run');
+  assert.equal(cell(day1).change, undefined);
+
+  time.advance(24 * 3600_000); extra = 4000; // 11 Nov
+  const day2 = await prices.getPrices({ force: true });
+  assert.equal(day2.baseline.day, '2026-11-11');
+  assert.equal(cell(day2).change, -1000, 'cheaper than yesterday');
+
+  time.advance(3 * 3600_000); extra = 3000; // later on 11 Nov, e.g. after a restart
+  const later = await prices.getPrices({ force: true });
+  assert.equal(later.baseline.day, '2026-11-11');
+  assert.equal(cell(later).change, -2000, 'still measured against 10 Nov, not against this morning');
+  assert.equal(later.items.find(i => i.id === 'ca-rot').perStore.bhx, undefined, 'only live stores get an arrow');
+});
+
+test('ready-made carts only name real catalog items, and deals, drops and share links behave', () => {
+  const { PRESETS, presetIds, topDeals, priceDrops, cartQuery, cartFromQuery, compareCart } = require('../public/tea/prices-cart');
+  const ids = CATALOG.map(i => i.id);
+  for (const preset of PRESETS) {
+    assert.ok(preset.ids.length >= 5, preset.id);
+    for (const id of preset.ids) assert.ok(ids.includes(id), `${preset.id} names ${id}, which is not in the catalog`);
+  }
+  assert.deepEqual(presetIds({ items: [{ id: 'gao' }] }, PRESETS[0]), ['gao'], 'missing items are skipped');
+
+  const cell = (unitPrice, extra = {}) => ({ status: 'ok', unitPrice, price: unitPrice, ...extra });
+  const data = {
+    stores: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'r', name: 'Ref', referenceOnly: true }],
+    items: [
+      { id: 'egg', name: 'Trứng', perStore: { a: cell(3000, { price: 27000, listPrice: 33000, image: 'https://x/e.jpg', change: -600 }), b: cell(3500, { price: 35000, listPrice: 36000, change: 100 }), r: cell(100, { price: 100, listPrice: 1000, change: -50 }) } },
+      { id: 'milk', name: 'Sữa', perStore: { a: cell(40000, { price: 40000, listPrice: 40000 }), b: cell(38000, { price: 38000, listPrice: 50000, change: -9000 }), r: { status: 'error' } } },
+      { id: 'salt', name: 'Muối', perStore: { a: { ...cell(9000, { price: 9000, listPrice: 20000 }), stale: true }, b: { status: 'not_found' }, r: { status: 'error' } } },
+    ],
+  };
+  const deals = topDeals(data);
+  assert.deepEqual(deals.map(d => [d.item.id, d.store.id, d.percent]), [['egg', 'a', 18], ['milk', 'b', 24]], 'photos first, reference and stale prices never count, tiny markdowns are dropped');
+  const drops = priceDrops(data);
+  assert.deepEqual(drops.map(d => [d.item.id, d.store.id, d.percent]), [['milk', 'b', 19], ['egg', 'a', 17]], 'biggest percentage first; a rise or a reference store is ignored');
+  assert.equal(drops[0].before, 47000);
+
+  assert.equal(cartQuery(['gao', 'trung-ga']), 'gio=gao,trung-ga');
+  assert.deepEqual(cartFromQuery('?gio=gao,trung-ga,../x,<b>,gao', ids), ['gao', 'trung-ga'], 'unknown, unsafe and duplicate ids are dropped');
+  assert.deepEqual(cartFromQuery('', ids), []);
+  assert.equal(compareCart(data, ['egg'], ['a', 'b']).best.store.id, 'a');
+});
+
+test('/gia is a standalone page with link-preview tags that state today\'s answer, and /so-sanh-gia redirects to it', async () => {
+  const http = require('node:http');
+  const { PRESETS } = require('../public/tea/prices-cart');
+  const cell = unitPrice => ({ status: 'ok', unitPrice, price: unitPrice });
+  const items = PRESETS[0].ids.map(id => ({ id, name: id, perStore: { a: cell(2000), b: cell(3000) } }));
+  const snapshot = { checkedAt: '2026-11-11T01:00:00Z', stores: [{ id: 'a', name: 'Siêu thị "A" <x>' }, { id: 'b', name: 'B' }], items };
+  const app = express(); app.use(createTeaRouter({ service: {}, isAdmin: () => false, groceryPrices: { current: () => snapshot } }));
+  const bare = express(); bare.use(createTeaRouter({ service: {}, isAdmin: () => false }));
+  const listen = application => new Promise(resolve => { const listener = application.listen(0, '127.0.0.1', () => resolve(listener)); });
+  const get = (port, pathname, host) => new Promise((resolve, reject) => http.get({ host: '127.0.0.1', port, path: pathname, headers: host ? { Host: host } : {} }, res => { let body = ''; res.setEncoding('utf8'); res.on('data', d => body += d); res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body })); }).on('error', reject));
+  const [server, plain] = [await listen(app), await listen(bare)];
+  try {
+    const page = await get(server.address().port, '/gia');
+    assert.equal(page.status, 200);
+    assert.match(page.headers['content-type'], /text\/html/);
+    assert.match(page.headers['content-security-policy'], /script-src 'self'/);
+    assert.match(page.body, /<main id="prices-view"/);
+    assert.match(page.body, /property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/assets\/tea\/og-prices\.png"/);
+    assert.match(page.body, /Hôm nay giỏ cơ bản 10 món rẻ nhất ở Siêu thị &quot;A&quot; &lt;x&gt;: 20\.000đ/, 'the headline is in the preview, escaped');
+    assert.doesNotMatch(page.body, /<!--PREVIEW-->/);
+
+    const spoof = await get(server.address().port, '/gia', 'evil.example"><script>alert(1)</script>');
+    assert.doesNotMatch(spoof.body, /<script>alert\(1\)/, 'a hostile Host header cannot inject markup');
+
+    const generic = await get(plain.address().port, '/gia');
+    assert.match(generic.body, /So giá 70 món/, 'before any prices exist the preview is generic');
+
+    const moved = await get(server.address().port, '/so-sanh-gia?gio=gao,trung-ga');
+    assert.equal(moved.status, 302);
+    assert.equal(moved.headers.location, '/gia?gio=gao,trung-ga');
+  } finally { await Promise.all([server, plain].map(s => new Promise(resolve => s.close(resolve)))); }
+});
+
+test('the headline basket only counts items every live store has, so totals are like for like', () => {
+  const { commonCart } = require('../public/tea/prices-cart');
+  const ok = unitPrice => ({ status: 'ok', unitPrice, price: unitPrice });
+  const data = {
+    stores: [{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }, { id: 'r', name: 'Ref', referenceOnly: true }],
+    items: [
+      { id: 'x', name: 'X', perStore: { a: ok(10), b: ok(30), r: { status: 'error' } } },
+      { id: 'y', name: 'Y', perStore: { a: ok(10), b: ok(20), r: ok(1) } },
+      { id: 'z', name: 'Z', perStore: { a: ok(5), b: { status: 'not_found' }, r: ok(1) } },
+    ],
+  };
+  const result = commonCart(data, ['x', 'y', 'z'], ['a', 'b', 'r']);
+  assert.deepEqual(result.items.map(i => i.id), ['x', 'y'], 'z is missing at B, so it is left out for everyone');
+  assert.equal(result.skipped, 1);
+  assert.deepEqual(result.rows.map(r => [r.store.id, r.total]), [['a', 20], ['b', 50]], 'the reference store is not part of it');
+  assert.equal(result.best.store.id, 'a');
+});

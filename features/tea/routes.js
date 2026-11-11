@@ -1,9 +1,11 @@
 const crypto = require('node:crypto');
+const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const { TeaError } = require('./service');
 const MENU = require('../../public/tea/menu');
 const { toCsv: groceryCsv } = require('./grocery-prices');
+const { commonCart, PRESETS, presetIds } = require('../../public/tea/prices-cart');
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 
@@ -44,6 +46,25 @@ function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch }
     res.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
     res.sendFile(path.join(assets, 'farm.html'));
   });
+  // Standalone price page. The link-preview tags carry today's headline, so a shared link already shows the answer.
+  const PRICE_CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'";
+  function pricePreview(req) {
+    const host = String(req.get('host') || 'locly.lol'), origin = `${/^(localhost|127\.|\[::1\])/.test(host) ? 'http' : 'https'}://${host}`;
+    const snapshot = groceryPrices?.current();
+    let description = `So giá ${snapshot?.items.length ?? 70} món thực phẩm và đồ gia dụng ở WinMart, Co.op, Kingfoodmart, LOTTE Mart. Tự cập nhật 8h sáng mỗi ngày.`;
+    if (snapshot) {
+      const result = commonCart(snapshot, presetIds(snapshot, PRESETS[0]), snapshot.stores.filter(store => !store.referenceOnly).map(store => store.id));
+      if (result.best && result.items.length >= 3) description = `Hôm nay giỏ cơ bản ${result.items.length} món rẻ nhất ở ${result.best.store.name}: ${new Intl.NumberFormat('vi-VN').format(Math.round(result.best.total))}đ. ${description}`;
+    }
+    return { origin, description };
+  }
+  router.get('/gia', (req, res) => {
+    const { origin, description } = pricePreview(req), title = 'Hôm nay mua ở đâu rẻ nhất? · Bảng giá siêu thị';
+    const tags = [['name', 'description', description], ['property', 'og:type', 'website'], ['property', 'og:title', title], ['property', 'og:description', description], ['property', 'og:url', `${origin}/gia`], ['property', 'og:image', `${origin}/assets/tea/og-prices.png`], ['property', 'og:image:width', '1200'], ['property', 'og:image:height', '630'], ['name', 'twitter:card', 'summary_large_image']]
+      .map(([kind, name, value]) => `<meta ${kind}="${name}" content="${esc(value)}">`).join('\n  ');
+    res.set({ 'Content-Security-Policy': PRICE_CSP, 'Cache-Control': 'no-cache' }).type('html').send(fs.readFileSync(path.join(assets, 'prices.html'), 'utf8').replace('<!--PREVIEW-->', tags));
+  });
+  router.get('/so-sanh-gia', (req, res) => res.redirect(302, '/gia' + (req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '')));
   router.use('/api/tea', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   // Public supermarket prices. Never waits on the supermarkets: 202 while the first snapshot is still being built.
   router.get('/api/tea/prices', (req, res) => {

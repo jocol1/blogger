@@ -25,7 +25,7 @@ Mở `http://localhost:3000/tra-da`. Không commit `.env`, thư mục `data/`, `
 Menu quán mặc định đóng trên máy tính và điện thoại, kể cả khi tải lại. Đi tới ghế và bấm **Ngồi**, sau đó bấm **Mở bàn / E** để gọi món, chat hoặc chọn trò chơi. Nút Ngồi/Đứng dùng chung vị trí ở góc phải vùng quán. Đến gần mặt trước quầy có **Xem thực đơn / E**; chỉ xem giá, muốn đặt món vẫn cần ngồi. Đóng bảng bằng × hoặc Escape; rời quầy/đứng dậy cũng đóng bảng. Menu mở cạnh vùng quán, không phủ lên nhân vật; ô chat và nút gửi giữ trong khung, thách đấu nằm trong mục gấp mở. **Về quán** từ trò chơi đóng bảng và trả lại bản đồ; có thể mở bàn để xem lại ván đang chạy, đồng hồ server vẫn tiếp tục.
 
 
-### Bảng giá siêu thị (PWA v59)
+### Bảng giá siêu thị (PWA v60)
 
 Trên tường quán, bên trái quầy trà, có tấm bảng phấn **BẢNG GIÁ**. Đi tới trước bảng (không cần ngồi) rồi bấm **Xem bảng giá / E** để mở bảng so sánh giá **71 mặt hàng** giữa **WinMart, Co.op Online, Kingfoodmart, LOTTE Mart** (tự động) và **Bách Hóa Xanh** (tham khảo), chia 6 nhóm: thịt/trứng/cá/đậu hũ/xúc xích, rau củ và trái cây, gạo/nếp/bún/đậu/mì gói, gia vị (cả tiêu, dầu hào, giấm, tương cà, mayonnaise, nước cốt dừa), sữa và đồ uống, đồ dùng gia đình (bột giặt, nước giặt, nước xả, giấy vệ sinh, kem đánh răng, nước rửa chén, nước lau sàn). Bảng có ô tìm kiếm (không cần gõ dấu), thẻ bật/tắt từng siêu thị, mỗi trang 10 sản phẩm; mỗi ô là giá trên kg/lít/quả/cuộn của gói rẻ nhất còn hàng (di chuột để xem tên, quy cách, giá gói), ô rẻ nhất tô xanh. Món nào một nơi không có hoặc hết hàng thì hiện "—".
 

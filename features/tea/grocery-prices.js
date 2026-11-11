@@ -131,8 +131,23 @@ function nextRefreshAt(nowMs, { hour = 8, offsetHours = 7 } = {}) {
   return target - offsetHours * HOUR;
 }
 
+/** Calendar day in Vietnam (UTC+7) as YYYY-MM-DD; the price "yesterday" comparison is per local day. */
+const dayKey = (ms, offsetHours = 7) => new Date(ms + offsetHours * HOUR).toISOString().slice(0, 10);
+const catalogKey = () => CATALOG.map(i => i.id).join(',');
+const unitPrices = data => Object.fromEntries(data.items.map(i => [i.id, Object.fromEntries(Object.entries(i.perStore).filter(([, c]) => c.status === 'ok' && !c.stale && Number.isFinite(c.unitPrice)).map(([id, c]) => [id, c.unitPrice]))]));
+
+/** Keeps the latest snapshot in Firestore (one document, as a JSON string so undefined fields are never an issue),
+ *  so a restarted server answers at once instead of rebuilding for minutes. */
+function firestorePriceStore(db, { collection = 'tea_prices', id = 'latest' } = {}) {
+  const ref = () => db.collection(collection).doc(id);
+  return {
+    async load() { const snap = await ref().get(); if (!snap.exists) return null; const saved = JSON.parse(snap.data().json); return Array.isArray(saved?.items) && Array.isArray(saved?.stores) && saved.checkedAt ? saved : null; },
+    async save(data) { await ref().set({ json: JSON.stringify(data), savedAt: data.checkedAt }); },
+  };
+}
+
 const DEFAULT_FETCHERS = { winmart: fetchWinmart, coop: fetchCoop, kingfood: fetchKingfood, lotte: fetchLotte };
-function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300 } = {}) {
+function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers === DEFAULT_FETCHERS ? readBhxSnapshot : null, now = () => Date.now(), dailyAt = { hour: 8, offsetHours: 7 }, setTimer = setTimeout, retryMs = 5 * 60_000, delayMs = 300, store = null, log = console } = {}) {
   let cache = null, inflight = null, timer = null;
 
   // One store at a time is polite to that store; the two stores run side by side.
@@ -180,29 +195,42 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
       id: item.id, group: item.group, name: item.name, unit: item.unit, unitLabel: item.unitLabel || UNIT_LABEL[item.unit],
       perStore: Object.fromEntries(stores.map((store, i) => [store.id, cellsByStore[i][item.id]])),
     }));
-    const stamp = new Date(now()).toISOString();
+    const stamp = new Date(now()).toISOString(), today = dayKey(now());
+    // Yesterday's prices: the previous snapshot if it is from an earlier day, else the baseline already carried today.
+    const baseline = previous?.baseline?.day === today ? previous.baseline
+      : { day: today, prices: previous?.checkedAt && dayKey(Date.parse(previous.checkedAt)) !== today ? unitPrices(previous) : null };
+    for (const item of items) for (const [storeId, cell] of Object.entries(item.perStore)) {
+      const before = baseline.prices?.[item.id]?.[storeId];
+      if (cell.status === 'ok' && !cell.stale && !stores.find(x => x.id === storeId)?.snapshot && Number.isFinite(before)) cell.change = cell.unitPrice - before;
+    }
     for (const store of stores) if (!store.snapshot) store.checkedAt = store.errors < CATALOG.length ? stamp : (previous?.stores.find(s => s.id === store.id)?.checkedAt ?? null);
     const compared = stores.filter(s => !s.referenceOnly);
     const both = items.filter(i => compared.every(s => i.perStore[s.id].status === 'ok' && !i.perStore[s.id].stale));
     const totals = Object.fromEntries(compared.map(s => [s.id, both.reduce((sum, i) => sum + i.perStore[s.id].unitPrice, 0)]));
     return {
-      checkedAt: stamp, stores: stores.map(({ errors, ...s }) => ({ ...s, failed: errors > 0 || !!s.unavailable })), groups: GROUPS, items,
+      checkedAt: stamp, catalogKey: catalogKey(), baseline, stores: stores.map(({ errors, ...s }) => ({ ...s, failed: errors > 0 || !!s.unavailable })), groups: GROUPS, items,
       basket: { count: both.length, totals, storeIds: compared.map(s => s.id) },
       hasErrors: stores.some(s => s.errors > 0),
     };
   }
 
+  /** When a snapshot taken at `at` is due for a refresh: the next 08:00 (or soon, after errors), or when a dated BHX capture ages out. */
+  function expiryOf(data, at) {
+    let expiresAt = data.hasErrors ? at + retryMs : nextRefreshAt(at, dailyAt);
+    for (const store of data.stores.filter(s => s.snapshot && s.checkedAt)) {
+      for (const age of [86400_000, 7 * 86400_000]) {
+        const boundary = Date.parse(store.checkedAt) + age;
+        if (boundary > now()) expiresAt = Math.min(expiresAt, boundary);
+      }
+    }
+    return expiresAt;
+  }
   function refresh() {
     if (!inflight) {
       inflight = build(cache?.data).then(data => {
-        let expiresAt = data.hasErrors ? now() + retryMs : nextRefreshAt(now(), dailyAt);
-        for (const store of data.stores.filter(s => s.snapshot && s.checkedAt)) {
-          for (const age of [86400_000, 7 * 86400_000]) {
-            const boundary = Date.parse(store.checkedAt) + age;
-            if (boundary > now()) expiresAt = Math.min(expiresAt, boundary);
-          }
-        }
-        cache = { data, expiresAt }; return data;
+        cache = { data, expiresAt: expiryOf(data, now()) };
+        if (store) Promise.resolve().then(() => store.save(data)).catch(error => log.warn?.('Price snapshot was not saved:', error.message));
+        return data;
       }).finally(() => { inflight = null; });
       inflight.catch(() => {});
     }
@@ -220,12 +248,17 @@ function createGroceryPrices({ fetchers = DEFAULT_FETCHERS, bhxLoader = fetchers
   }
   /** Fetches now, then again every day at the scheduled hour. If the host slept through 08:00, the first visit afterwards refreshes via current(). */
   function start() {
-    refresh();
     const arm = () => {
       timer = setTimer(() => { refresh(); arm(); }, Math.max(1000, nextRefreshAt(now(), dailyAt) - now()));
       timer?.unref?.();
     };
     arm();
+    // A saved snapshot is served at once; if it is older than the last 08:00 (or the catalog changed) a refresh runs behind it.
+    const loaded = store ? Promise.resolve().then(() => store.load()).catch(error => { log.warn?.('Saved price snapshot unreadable:', error.message); return null; }) : Promise.resolve(null);
+    return loaded.then(saved => {
+      if (saved && !cache) cache = { data: saved, expiresAt: saved.catalogKey === catalogKey() ? expiryOf(saved, Date.parse(saved.checkedAt)) : 0 };
+      if (!cache || now() >= cache.expiresAt) refresh();
+    });
   }
   function stop() { clearTimeout(timer); timer = null; }
   return { getPrices, current, start, stop };
@@ -244,4 +277,4 @@ function toCsv(snapshot) {
   return '﻿' + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n';
 }
 
-module.exports = { CATALOG, STORES, parseSize, pickBest, fetchWinmart, fetchCoop, fetchKingfood, fetchLotte, createGroceryPrices, nextRefreshAt, toCsv };
+module.exports = { CATALOG, STORES, firestorePriceStore, dayKey, parseSize, pickBest, fetchWinmart, fetchCoop, fetchKingfood, fetchLotte, createGroceryPrices, nextRefreshAt, toCsv };

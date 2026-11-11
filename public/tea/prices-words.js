@@ -1,4 +1,8 @@
+window.TeaGameWords=window.TeaGameWords||{en:{},vi:{}}; // also loaded on /gia, outside the café
 Object.assign(window.TeaGameWords.en,{
+ prBasketNone:'No comparable prices yet.',prHeroTitle:'Where is it cheapest today?',prHeroLine:'A basic basket of {count} items is cheapest at',prHeroSave:'{amount} ({percent}%) cheaper than {other}',prHeroTry:'See this basket',
+ prPresets:'Pick a ready-made basket — one tap',prPresetBasic:'Basic basket',prPresetFamily:'Family dinner',prPresetBreakfast:'Breakfast',prPresetHotpot:'Hotpot night',prPresetHome:'Household',
+ prDeals:'Today’s deals',prDrops:'Cheaper than yesterday',prAllGroups:'All',prBarCart:'{count} items',prBarView:'View cart',prShare:'Share',prShared:'Cart link copied',prShareText:'My {count}-item basket is cheapest at {store}: {total}',prEnterCafe:'Enter the café →',prUp:'up since yesterday',prDown:'down since yesterday',
  prSmall:'SUPERMARKET PRICE BOARD',prTitle:'Where is it cheaper today?',prClose:'Close',prItem:'Product',prBest:'Cheapest',
  prAuto:'Updates itself every morning at 8:00 · last update {time}',
  prNotFound:'Not found',prNotCollected:'No matching product collected yet',prOut:'Out of stock',prError:'Price unavailable',prStale:'old',
@@ -13,6 +17,9 @@ Object.assign(window.TeaGameWords.en,{
  prCsv:'Download CSV',prLoading:'Fetching prices from the supermarkets… this takes a few minutes the first time.',prRetry:'Try again',prLoadErr:'Could not load the price board.'
 });
 Object.assign(window.TeaGameWords.vi,{
+ prBasketNone:'Chưa có giá so sánh được.',prHeroTitle:'Hôm nay mua ở đâu rẻ nhất?',prHeroLine:'Giỏ cơ bản {count} món rẻ nhất ở',prHeroSave:'Rẻ hơn {other} {amount} ({percent}%)',prHeroTry:'Xem giỏ này',
+ prPresets:'Chọn giỏ mẫu — chạm một lần',prPresetBasic:'Giỏ cơ bản',prPresetFamily:'Bữa cơm gia đình',prPresetBreakfast:'Đồ ăn sáng',prPresetHotpot:'Tiệc lẩu',prPresetHome:'Đồ dùng nhà cửa',
+ prDeals:'Giảm giá hôm nay',prDrops:'Rẻ hơn hôm qua',prAllGroups:'Tất cả',prBarCart:'{count} món',prBarView:'Xem giỏ',prShare:'Chia sẻ',prShared:'Đã chép link giỏ hàng',prShareText:'Giỏ {count} món của mình rẻ nhất ở {store}: {total}',prEnterCafe:'Vào quán trà đá →',prUp:'tăng so với hôm qua',prDown:'giảm so với hôm qua',
  prSmall:'BẢNG GIÁ SIÊU THỊ',prTitle:'Hôm nay mua ở đâu rẻ?',prClose:'Đóng',prItem:'Sản phẩm',prBest:'Rẻ nhất',
  prAuto:'Tự cập nhật lúc 8:00 sáng mỗi ngày · lần gần nhất {time}',
  prNotFound:'Không tìm thấy',prNotCollected:'Chưa thu thập mặt hàng phù hợp',prOut:'Hết hàng',prError:'Chưa lấy được giá',prStale:'cũ',
