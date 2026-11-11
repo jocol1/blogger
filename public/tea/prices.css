@@ -115,7 +115,7 @@ body.prices-page .prices-view.active{height:auto!important;min-height:100dvh;ove
 .pr-hero{margin:4px 0 16px;padding:16px 18px;border:3px solid var(--pr-green-edge);background:#f1f5dc;box-shadow:4px 4px 0 var(--pr-green-shadow)}
 .pr-hero h2{margin:0 0 6px;font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--pr-green-ink)}
 .pr-hero-line{margin:0;font-size:19px;line-height:1.35;font-weight:700}
-.pr-hero-total{font-size:28px;color:var(--pr-green-ink);white-space:nowrap}
+.pr-hero-total{margin:2px 0 0;font-size:30px;font-weight:800;line-height:1.1;color:var(--pr-green-ink);white-space:nowrap}
 .pr-hero-save{margin:4px 0 0;font-weight:800;color:var(--pr-green-ink)}
 .pr-bars{list-style:none;margin:12px 0 14px;padding:0;display:grid;gap:8px}
 .pr-bar-row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;align-items:center;gap:10px}

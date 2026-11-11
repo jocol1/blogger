@@ -49,8 +49,8 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
   if(!result.best||!rows.length||result.items.length<3){box.append(el('p','pr-muted',t('prBasketNone')));return box}
   const full=rows.filter(r=>r.have===result.items.length),worst=full.length>1?full[full.length-1]:null,max=Math.max(...rows.map(r=>r.total));
   const line=el('p','pr-hero-line');
-  line.append(t('prHeroLine',{count:result.items.length})+' ',el('b','',result.best.store.name),' · ',el('b','pr-hero-total',money(result.best.total)));
-  box.append(line);
+  line.append(t('prHeroLine',{count:result.items.length})+' ',el('b','',result.best.store.name));
+  box.append(line,el('p','pr-hero-total',money(result.best.total)));
   if(worst&&worst.total>result.best.total){const diff=worst.total-result.best.total,pct=(diff/worst.total*100).toFixed(1).replace('.',locale()==='vi'?',':'.');box.append(el('p','pr-hero-save',t('prHeroSave',{other:worst.store.name,amount:money(diff),percent:pct})))}
   const bars=el('ol','pr-bars');
   for(const row of rows){
@@ -222,7 +222,7 @@ window.TeaPricesUI=function({t,locale,close,standalone=false,search=''}){
    name.append(badge(row.store),el('b','',row.store.name));if(row.reference)name.append(el('small','pr-chip-note',t('prReference')));
    const info=el('span','pr-cart-info',row.have===result.items.length?t('prAllItems'):t('prSomeItems',{have:row.have,count:result.items.length}));
    if(row.missing.length)info.title=`${t('prMissing')}: ${row.missing.join(', ')}`;
-   const amount=el('span','pr-cart-amount');amount.append(el('strong','',money(row.total)));
+   const amount=el('span','pr-cart-amount');amount.append(el('strong','',row.have?money(row.total):'—'));
    if(row===result.best)amount.append(el('span','pr-pill',t('prCheapest')));
    else if(result.best&&!row.reference&&row.have===result.best.have)amount.append(el('small','pr-diff','+'+money(row.total-result.best.total)));
    li.append(name,info,amount);
