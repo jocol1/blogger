@@ -7,6 +7,7 @@
   const PALETTE_NAMES = { green: 'Xanh lá', pink: 'Hồng', purple: 'Tím', blue: 'Xanh dương', yellow: 'Vàng', mono: 'Trắng đen', custom: 'Tự chọn' };
   let config = {
     price: 29,
+    hardshipPrice: 19,
     palettes: {
       green: { bg: '#e3f5e8', card: '#fffdf6', accent: '#2e9e6e', ink: '#1f3d2e' }, pink: { bg: '#ffe9f0', card: '#fffafb', accent: '#d9487a', ink: '#4a2333' },
       purple: { bg: '#efe8ff', card: '#fdfbff', accent: '#7656dd', ink: '#2e2450' }, blue: { bg: '#e3f1ff', card: '#fbfdff', accent: '#2a78c8', ink: '#1d3350' },
@@ -285,6 +286,7 @@
   async function start() {
     try { const remote = await api('/api/thiep/config'); config = { ...config, ...remote }; } catch (_) { /* fall back to built-in palettes */ }
     $('price-label').textContent = money(config.price);
+    $('hardship-label').textContent = money(config.hardshipPrice);
     renderIcons();
     const hash = new URLSearchParams(location.hash.slice(1));
     const code = hash.get('c'), token = hash.get('k');

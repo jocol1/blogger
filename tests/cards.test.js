@@ -9,7 +9,7 @@ const session = require('express-session');
 const sharp = require('sharp');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
 const { normalizeCard, PALETTES, contrast, textOn, CardError } = require('../features/cards/validate');
-const { createCardService, CARD_PRICE, DRAFT_TTL_MS } = require('../features/cards/service');
+const { createCardService, CARD_PRICE, HARDSHIP_PRICE, DRAFT_TTL_MS } = require('../features/cards/service');
 const { createCardsRouter } = require('../features/cards/routes');
 
 const hash = v => crypto.createHash('sha256').update(v).digest('hex');
@@ -185,6 +185,72 @@ test('unpaid drafts and their photos are swept after two weeks, published cards 
   assert.equal((await service.getPublic(kept.card.code)).status, 'published');
 });
 
+test('a card costs 29 xu, or 19 xu once the owner explains a hard situation', async () => {
+  assert.equal(CARD_PRICE, 29);
+  assert.equal(HARDSHIP_PRICE, 19);
+  const db = new MemoryFirestore();
+  const service = createCardService({ db, mailer: fakeMailer() });
+  const { card, ownerToken } = await service.create(input());
+  assert.equal(card.price, 29);
+  assert.equal(card.hardship, null);
+  await assert.rejects(service.requestHardship(card.code, ownerToken, 'nghèo'), err => err.status === 400 && /ít nhất/.test(err.message));
+  await assert.rejects(service.requestHardship(card.code, 'f'.repeat(64), 'Mình là sinh viên tự túc, vừa học vừa làm.'), err => err.status === 403);
+  const reduced = await service.requestHardship(card.code, ownerToken, '  Mình là sinh viên tự túc, vừa học vừa làm thêm.  ');
+  assert.equal(reduced.price, 19);
+  assert.equal(reduced.hardship.reason, 'Mình là sinh viên tự túc, vừa học vừa làm thêm.');
+  assert.equal((await service.getForOwner(card.code, ownerToken)).price, 19);
+
+  const wallet = await fundWallet(db, HARDSHIP_PRICE);
+  const published = await service.publish(card.code, ownerToken, wallet.token, { requestId: reqId(21) });
+  assert.equal(published.status, 'published');
+  assert.equal((await wallet.read()).balance, 0);
+  assert.equal((await wallet.read()).history.at(-1).amount, -HARDSHIP_PRICE);
+  const stored = (await service.adminList()).find(c => c.code === card.code);
+  assert.equal(stored.purchase.xu, HARDSHIP_PRICE);
+  assert.equal(stored.purchase.hardship, true);
+  await assert.rejects(service.requestHardship(card.code, ownerToken, 'Mình là sinh viên tự túc, vừa học vừa làm thêm.'), err => err.status === 409);
+
+  const full = await service.create(input());
+  const short = await fundWallet(db, HARDSHIP_PRICE);
+  await assert.rejects(service.publish(full.card.code, full.ownerToken, short.token, { requestId: reqId(22) }), err => err.status === 409 && /29 xu/.test(err.message));
+});
+
+test('the owner links a bank transfer to the card, and the admin can confirm it by hand', async () => {
+  const db = new MemoryFirestore();
+  const service = createCardService({ db, mailer: fakeMailer() });
+  const { card, ownerToken } = await service.create(input());
+  const wallet = await fundWallet(db, 0);
+  const stranger = await fundWallet(db, 0);
+  await db.collection('donation_requests').doc('DH1234567').set({ walletId: wallet.walletId, amount: 29000, status: 'pending', paidAmount: 0 });
+  await assert.rejects(service.recordTransfer(card.code, ownerToken, wallet.token, { code: 'nope' }), err => err.status === 400);
+  await assert.rejects(service.recordTransfer(card.code, ownerToken, wallet.token, { code: 'DH7654321' }), err => err.status === 404);
+  await assert.rejects(service.recordTransfer(card.code, ownerToken, stranger.token, { code: 'DH1234567' }), err => err.status === 403);
+  await assert.rejects(service.recordTransfer(card.code, 'f'.repeat(64), wallet.token, { code: 'DH1234567' }), err => err.status === 403);
+
+  const started = await service.recordTransfer(card.code, ownerToken, wallet.token, { code: 'dh1234567', amount: 1 });
+  assert.deepEqual(started.transfer, { code: 'DH1234567', amount: 29000, claimedMs: null });
+  const claimed = await service.recordTransfer(card.code, ownerToken, wallet.token, { code: 'DH1234567', claimed: true });
+  assert.ok(claimed.transfer.claimedMs);
+
+  let [row] = await service.adminList();
+  assert.deepEqual(row.transferState, { status: 'pending', paidAmount: 0 });
+  await db.collection('donation_requests').doc('DH1234567').set({ status: 'paid', paidAmount: 29000 }, { merge: true });
+  [row] = await service.adminList();
+  assert.equal(row.transferState.status, 'paid');
+
+  await service.adminConfirm(card.code);
+  const published = await service.getForOwner(card.code, ownerToken);
+  assert.equal(published.status, 'published');
+  [row] = await service.adminList();
+  assert.deepEqual({ kind: row.purchase.kind, xu: row.purchase.xu, transferCode: row.purchase.transferCode }, { kind: 'manual', xu: CARD_PRICE, transferCode: 'DH1234567' });
+  assert.equal((await wallet.read()).balance, 0, 'confirming by hand never touches the wallet');
+
+  const poorer = await service.create(input());
+  await service.requestHardship(poorer.card.code, poorer.ownerToken, 'Mình là sinh viên tự túc, vừa học vừa làm thêm.');
+  await service.adminConfirm(poorer.card.code);
+  assert.equal((await service.adminList()).find(c => c.code === poorer.card.code).purchase.xu, HARDSHIP_PRICE);
+});
+
 test('admin can refund a paid card once, which also takes it down', async () => {
   const db = new MemoryFirestore();
   const service = createCardService({ db, mailer: fakeMailer() });
@@ -312,17 +378,50 @@ test('guests send wishes to a published card, bots and floods are stopped', asyn
 test('admin pages need the password and every action needs the CSRF token', async () => {
   const t = await start();
   try {
-    const { card } = await t.service.create(input());
+    const { card, ownerToken } = await t.service.create(input());
+    const asked = await t.json(`/api/thiep/cards/${card.code}/hardship`, 'POST', { reason: 'Nhà mình khó khăn <script>alert(1)</script>, mình tự lo học phí.' }, { 'X-Card-Token': ownerToken });
+    assert.equal((await asked.json()).card.price, 19);
+    assert.equal((await t.json(`/api/thiep/cards/${card.code}/hardship`, 'POST', { reason: 'ngắn' }, { 'X-Card-Token': ownerToken })).status, 400);
     assert.equal((await t.call('/thiep/admin')).headers.get('location'), '/thiep/admin/login');
     assert.equal((await t.form(`/thiep/admin/cards/${card.code}/comp`, {})).status, 302);
     assert.equal((await t.form('/thiep/admin/login', { password: 'open-sesame' })).headers.get('location'), '/thiep/admin');
     const html = await (await t.call('/thiep/admin')).text();
     assert.match(html, new RegExp(card.code));
+    assert.ok(html.includes('Hoàn cảnh khó khăn'));
+    assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));
+    assert.ok(!html.includes('<script>alert(1)'));
     assert.equal((await t.form(`/thiep/admin/cards/${card.code}/comp`, { csrf: 'wrong' })).status, 403);
     const csrf = html.match(/name="csrf" value="([0-9a-f]+)"/)[1];
     assert.equal((await t.form(`/thiep/admin/cards/${card.code}/comp`, { csrf })).headers.get('location'), '/thiep/admin');
     assert.equal((await t.service.getPublic(card.code)).status, 'published');
     await t.form(`/thiep/admin/cards/${card.code}/disable`, { csrf });
     assert.equal((await t.call(`/thiep/${card.code}`)).status, 404);
+  } finally { t.close(); }
+});
+
+test('the admin page shows who is waiting on a transfer and confirms it with one button', async () => {
+  const t = await start();
+  try {
+    const config = await (await t.json('/api/thiep/config', 'GET')).json();
+    assert.equal(config.supportUrl, 'https://www.facebook.com/loc.ly.336717');
+    const { card, ownerToken } = await t.service.create(input({ content: { nickname: 'Đang chờ' } }));
+    await t.service.create(input({ content: { nickname: 'Đang thiết kế' } }));
+    const wallet = await fundWallet(t.db, 0);
+    await t.db.collection('donation_requests').doc('DH5550001').set({ walletId: wallet.walletId, amount: 29000, status: 'pending', paidAmount: 0 });
+    const linked = await t.json(`/api/thiep/cards/${card.code}/transfer`, 'POST', { code: 'DH5550001', claimed: true }, { 'X-Card-Token': ownerToken, 'X-Wallet-Token': wallet.token });
+    assert.equal(linked.status, 200);
+
+    await t.form('/thiep/admin/login', { password: 'open-sesame' });
+    const html = await (await t.call('/thiep/admin')).text();
+    const waiting = html.slice(html.indexOf('Cần xác nhận'), html.indexOf('Đang tạo thiệp</h2>'));
+    assert.ok(waiting.includes('Đang chờ') && waiting.includes('DH5550001') && waiting.includes('Chưa nhận tiền') && waiting.includes('Khách báo đã chuyển'));
+    assert.ok(!waiting.includes('Đang thiết kế'));
+    assert.ok(html.slice(html.indexOf('Đang tạo thiệp</h2>')).includes('Đang thiết kế'));
+    assert.ok(html.includes('/assets/thiep/admin.js'));
+
+    const csrf = html.match(/name="csrf" value="([0-9a-f]+)"/)[1];
+    assert.equal((await t.form(`/thiep/admin/cards/${card.code}/confirm`, {})).status, 403);
+    assert.equal((await t.form(`/thiep/admin/cards/${card.code}/confirm`, { csrf })).headers.get('location'), '/thiep/admin');
+    assert.equal((await t.service.getPublic(card.code)).status, 'published');
   } finally { t.close(); }
 });

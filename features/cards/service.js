@@ -6,6 +6,13 @@ const { clean, ATTENDING, createWishStore, createMailer, escapeHtml, vnTime, wis
 const { CardError, normalizeCard, email: cleanEmail } = require('./validate');
 
 const CARD_PRICE = 29;
+// Owners who explain a hard situation pay less. It is taken on trust; admin sees every reason.
+const HARDSHIP_PRICE = 19;
+const HARDSHIP_MIN = 20;
+const HARDSHIP_MAX = 500;
+const priceOf = card => (card.hardship ? HARDSHIP_PRICE : CARD_PRICE);
+// Where owners ask for help when a transfer is not picked up automatically.
+const DEFAULT_SUPPORT_URL = 'https://www.facebook.com/loc.ly.336717';
 const DRAFT_TTL_MS = 14 * 24 * 3600 * 1000;
 const NEVER = Number.MAX_SAFE_INTEGER;
 const MAX_IMAGES_PER_CARD = 12;
@@ -119,10 +126,13 @@ function ownerCard(card) {
     updatedMs: card.updatedMs,
     purgeAtMs: card.status === 'draft' ? card.purgeAtMs : null,
     paid: Boolean(card.purchase),
+    price: priceOf(card),
+    hardship: card.hardship ? { reason: card.hardship.reason, atMs: card.hardship.atMs } : null,
+    transfer: card.transfer ? { code: card.transfer.code, amount: card.transfer.amount, claimedMs: card.transfer.claimedMs || null } : null,
   };
 }
 
-function createCardService({ db = null, dir, mailer = createMailer(), publicUrl = '', now = Date.now, id = () => crypto.randomUUID() } = {}) {
+function createCardService({ db = null, dir, mailer = createMailer(), publicUrl = '', supportUrl = DEFAULT_SUPPORT_URL, now = Date.now, id = () => crypto.randomUUID() } = {}) {
   const store = createCardStore({ db, dir });
   const base = publicUrl.replace(/\/$/, '');
   const manageUrl = (code, token) => `${base}/thiep/${code}/quanly#k=${token}`;
@@ -171,6 +181,8 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
 
   return {
     price: CARD_PRICE,
+    hardshipPrice: HARDSHIP_PRICE,
+    supportUrl,
     paymentsReady: Boolean(db),
     mailConfigured: mailer.configured,
 
@@ -190,6 +202,17 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
     },
 
     async getForOwner(code, token) { return ownerCard(await owned(code, token)); },
+
+    // The owner explains their situation and the draft drops to the reduced price.
+    async requestHardship(code, token, value) {
+      const card = await owned(code, token);
+      if (card.status !== 'draft') throw new CardError('Thiệp đã xuất bản nên không đổi giá được nữa.', 409);
+      const reason = clean(value, HARDSHIP_MAX);
+      if (reason.length < HARDSHIP_MIN) throw new CardError(`Bạn kể ngắn gọn hoàn cảnh của mình nhé (ít nhất ${HARDSHIP_MIN} ký tự).`);
+      const hardship = { reason, atMs: now() };
+      await store.patchCard(card.code, { hardship, updatedMs: hardship.atMs });
+      return ownerCard({ ...card, hardship });
+    },
 
     // What a visitor may see: only published cards.
     async getPublic(code) {
@@ -260,12 +283,13 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
         const current = cardSnap.data();
         if (current.status === 'disabled') throw new CardError('Thiệp này đã bị gỡ.', 403);
         if (previous.exists || current.status === 'published') return current;
-        if (!walletSnap.exists || walletSnap.data().balance < CARD_PRICE) throw new CardError(`Ví cần đủ ${CARD_PRICE} xu để xuất bản.`, 409);
+        const price = priceOf(current);
+        if (!walletSnap.exists || walletSnap.data().balance < price) throw new CardError(`Ví cần đủ ${price} xu để xuất bản.`, 409);
         const wallet = walletSnap.data();
-        const balance = wallet.balance - CARD_PRICE;
+        const balance = wallet.balance - price;
         const purchaseId = hash(`${walletId}:${requestId}`).slice(0, 32);
-        const updated = { ...current, status: 'published', publishedMs: at, updatedMs: at, purgeAtMs: NEVER, purchase: { kind: 'paid', walletId, purchaseId, xu: CARD_PRICE, atMs: at } };
-        tx.update(walletRef, { balance, updatedAt: iso(at), history: appendHistory(wallet, { id: `card-purchase-${purchaseId}`, type: 'card_cost', amount: -CARD_PRICE, balance, createdAt: iso(at) }) });
+        const updated = { ...current, status: 'published', publishedMs: at, updatedMs: at, purgeAtMs: NEVER, purchase: { kind: 'paid', walletId, purchaseId, xu: price, hardship: Boolean(current.hardship), atMs: at } };
+        tx.update(walletRef, { balance, updatedAt: iso(at), history: appendHistory(wallet, { id: `card-purchase-${purchaseId}`, type: 'card_cost', amount: -price, balance, createdAt: iso(at) }) });
         tx.set(cardRef, updated);
         tx.create(attemptRef, { walletId, code: card.code, purchaseId, createdAt: at });
         return updated;
@@ -299,8 +323,52 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
       await store.wishes(card.code).remove(String(wishId));
     },
 
+    // The owner tells us which bank transfer pays for this card, and later that they sent it.
+    // The amount comes from the donation request on the server, never from the browser.
+    async recordTransfer(code, token, walletToken, input) {
+      requireDb();
+      const card = await owned(code, token);
+      if (card.status !== 'draft') return ownerCard(card);
+      const transferCode = String(input?.code || '').toUpperCase();
+      if (!/^DH\d{7}$/.test(transferCode)) throw new CardError('Mã chuyển khoản không hợp lệ.');
+      const walletId = await walletIdFor(walletToken);
+      const snap = await store.db.collection('donation_requests').doc(transferCode).get();
+      if (!snap.exists) throw new CardError('Không tìm thấy lần chuyển khoản này.', 404);
+      const request = snap.data();
+      if (request.walletId !== walletId) throw new CardError('Lần chuyển khoản này không thuộc ví của bạn.', 403);
+      const at = now();
+      const same = card.transfer?.code === transferCode;
+      const transfer = {
+        code: transferCode,
+        amount: request.amount,
+        startedMs: same ? card.transfer.startedMs : at,
+        claimedMs: input?.claimed ? (same && card.transfer.claimedMs) || at : (same ? card.transfer.claimedMs || null : null),
+      };
+      await store.patchCard(card.code, { transfer, updatedMs: at });
+      return ownerCard({ ...card, transfer });
+    },
+
     // Admin.
-    async adminList() { return store.listCards(); },
+    // Each card comes with the state of its bank transfer, read from the donation request.
+    async adminList() {
+      const cards = await store.listCards();
+      if (!store.db) return cards;
+      return Promise.all(cards.map(async card => {
+        if (!card.transfer?.code) return card;
+        const snap = await store.db.collection('donation_requests').doc(card.transfer.code).get();
+        const request = snap.exists ? snap.data() : null;
+        return { ...card, transferState: request ? { status: request.status, paidAmount: request.paidAmount || 0 } : null };
+      }));
+    },
+    // For when the money reached the bank but SePay never told the server: the admin checks the
+    // bank and publishes by hand. The wallet is not touched.
+    async adminConfirm(code) {
+      const card = await load(code);
+      if (card.status === 'published') return;
+      if (card.status === 'disabled') throw new CardError('Thiệp đang bị khoá, mở lại trước đã.', 409);
+      const at = now();
+      await store.patchCard(card.code, { status: 'published', publishedMs: at, updatedMs: at, purgeAtMs: NEVER, purchase: { kind: 'manual', xu: priceOf(card), hardship: Boolean(card.hardship), transferCode: card.transfer?.code || null, atMs: at } });
+    },
     async adminSetStatus(code, status) {
       const card = await load(code);
       if (status === 'disabled') await store.patchCard(card.code, { status: 'disabled', disabledFrom: card.status, updatedMs: now() });
@@ -349,4 +417,4 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
   };
 }
 
-module.exports = { createCardService, createCardStore, encodeImage, CARD_PRICE, DRAFT_TTL_MS, MAX_UPLOAD_BYTES, CardError };
+module.exports = { createCardService, createCardStore, encodeImage, CARD_PRICE, HARDSHIP_PRICE, HARDSHIP_MIN, DRAFT_TTL_MS, MAX_UPLOAD_BYTES, CardError };

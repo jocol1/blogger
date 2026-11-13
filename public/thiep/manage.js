@@ -6,7 +6,7 @@
   const ATTEND = { yes: 'Sẽ đến', no: 'Không đến được', maybe: 'Chưa chắc' };
   const code = (location.pathname.match(/\/thiep\/([A-Za-z2-9]{8})\/quanly/) || [])[1]?.toUpperCase();
   const token = new URLSearchParams(location.hash.slice(1)).get('k');
-  let card = null, config = { price: 29, paymentsReady: false }, wallet = null, walletToken = null, polling = 0, publishing = false;
+  let card = null, config = { price: 29, hardshipPrice: 19, paymentsReady: false }, wallet = null, walletToken = null, polling = 0, publishing = false;
 
   const readJson = key => { try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (_) { return null; } };
   const writeJson = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* private mode */ } };
@@ -54,8 +54,13 @@
     $('native-share').hidden = !navigator.share;
     $('manage-url').value = `${location.origin}/thiep/${code}/quanly#k=${token}`;
     $('owner-email').value = card.ownerEmail || '';
-    $('price').textContent = money(config.price * 1000);
-    $('publish').textContent = `Xuất bản · ${money(config.price * 1000)}`;
+    const price = card.price || config.price;
+    $('price').textContent = money(price * 1000);
+    $('hardship-price').textContent = money((config.hardshipPrice || 19) * 1000);
+    if (config.supportUrl) $('support-link').href = config.supportUrl;
+    $('hardship').hidden = Boolean(card.hardship) || card.status !== 'draft';
+    $('price-note').hidden = !card.hardship;
+    $('price-note').textContent = card.hardship ? `Đã áp dụng giá hỗ trợ cho hoàn cảnh khó khăn (giá gốc ${money(config.price * 1000)}).` : '';
     if (card.status === 'disabled') { $('load-error').hidden = false; $('load-error').textContent = 'Thiệp này đã bị gỡ vì vi phạm điều khoản. Nếu bạn nghĩ có nhầm lẫn, hãy liên hệ quản trị.'; }
     pushPreview();
   }
@@ -66,8 +71,8 @@
   }
 
   /* ---------- wallet and publishing ---------- */
+  const TOPUP_KEY = `locly-card-topup-${code}`;
   async function loadWallet() {
-    if (!config.paymentsReady) { $('wallet-balance').textContent = 'chưa bật'; return null; }
     if (walletToken) {
       try { wallet = await withWallet('/api/game/wallet'); } catch (_) { wallet = null; walletToken = null; }
     }
@@ -76,65 +81,126 @@
       walletToken = created.token; wallet = created;
       try { localStorage.setItem(WALLET_KEY, walletToken); } catch (_) { /* private mode */ }
     }
+    $('wallet-line').hidden = false;
     $('wallet-balance').textContent = `${wallet.balance} xu`;
     return wallet;
   }
-  async function publish() {
-    if (publishing) return;
-    publishing = true; $('publish').disabled = true;
+  async function reportTransfer(transferCode, claimed) {
     try {
-      if (!config.paymentsReady) throw new Error('Thanh toán chưa được bật trên máy chủ này.');
+      const body = await api(`/api/thiep/cards/${code}/transfer`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: transferCode, claimed }) }, { 'X-Card-Token': token, 'X-Wallet-Token': walletToken });
+      card = body.card;
+    } catch (_) { /* the payment itself still works; the admin just sees less */ }
+  }
+  function showQr(saved) {
+    $('qr').hidden = false; $('pay-wallet').hidden = true;
+    $('qr-img').src = saved.qrUrl; $('qr-bank').textContent = saved.bank; $('qr-account').textContent = saved.account;
+    $('qr-name').textContent = saved.accountName; $('qr-amount').textContent = money(saved.amount); $('qr-code').textContent = saved.code;
+    $('support-card').textContent = code; $('support-transfer').textContent = saved.code;
+    if (card?.transfer?.code !== saved.code) reportTransfer(saved.code, false);
+  }
+
+  // Money only comes up once the owner asks to publish.
+  async function openPay() {
+    if (!config.paymentsReady) return say('pub-status', 'Thanh toán chưa được bật trên máy chủ này.', true);
+    $('publish').hidden = true; $('pay').hidden = false;
+    say('pub-status', 'Đang kiểm tra ví…');
+    try {
       await loadWallet();
-      if (wallet.balance < config.price) return startTopup();
+      if (wallet.balance >= card.price) {
+        $('qr').hidden = true; $('pay-wallet').hidden = false;
+        $('pay-wallet').textContent = `Dùng ${card.price} xu trong ví để xuất bản`;
+        say('pub-status', '');
+      } else await startTopup();
+    } catch (error) { say('pub-status', error.message, true); }
+  }
+
+  async function chargeAndPublish() {
+    if (publishing) return;
+    publishing = true; $('pay-wallet').disabled = true;
+    try {
       say('pub-status', 'Đang xuất bản…');
       const key = `locly-card-publish-${code}`;
       let attempt; try { attempt = localStorage.getItem(key); } catch (_) { attempt = null; }
       if (!attempt) { attempt = requestId(); try { localStorage.setItem(key, attempt); } catch (_) { /* private mode */ } }
       const body = await api(`/api/thiep/cards/${code}/publish`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: attempt }) }, { 'X-Card-Token': token, 'X-Wallet-Token': walletToken });
-      try { localStorage.removeItem(key); localStorage.removeItem(`locly-card-topup-${code}`); } catch (_) { /* private mode */ }
-      card = body.card; stopPolling(); $('qr').hidden = true;
+      try { localStorage.removeItem(key); localStorage.removeItem(TOPUP_KEY); } catch (_) { /* private mode */ }
+      card = body.card; stopPolling();
       say('pub-status', '');
       render();
       $('share-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (error) {
-      if (error.status === 409 && /xu/.test(error.message)) return startTopup();
+      if (error.status === 409 && /xu/.test(error.message)) { publishing = false; return startTopup(); }
       say('pub-status', error.message, true);
-    } finally { publishing = false; $('publish').disabled = false; }
+    } finally { publishing = false; $('pay-wallet').disabled = false; }
   }
+
   async function startTopup() {
     try {
       const donationConfig = await api('/api/donations/config').catch(() => ({ ready: false }));
       if (!donationConfig.ready) throw new Error('Chuyển khoản đang tạm dừng, bạn thử lại sau nhé.');
-      const missingXu = Math.max(1, config.price - (wallet?.balance || 0));
+      const missingXu = Math.max(1, card.price - (wallet?.balance || 0));
       const amount = Math.max(1000, missingXu * 1000 - (wallet?.remainder || 0));
-      const key = `locly-card-topup-${code}`;
-      let saved = readJson(key);
+      let saved = readJson(TOPUP_KEY);
       if (!saved || saved.amount !== amount) {
-        const created = await withWallet('/api/donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: card.content.nickname.slice(0, 40), amount, requestId: requestId() }) });
-        saved = created; writeJson(key, saved);
+        saved = await withWallet('/api/donations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: card.content.nickname.slice(0, 40), amount, requestId: requestId() }) });
+        writeJson(TOPUP_KEY, saved);
       }
-      $('qr').hidden = false;
-      $('qr-img').src = saved.qrUrl; $('qr-bank').textContent = saved.bank; $('qr-account').textContent = saved.account;
-      $('qr-name').textContent = saved.accountName; $('qr-amount').textContent = money(saved.amount); $('qr-code').textContent = saved.code;
-      say('pub-status', `Ví còn thiếu ${missingXu} xu. Chuyển khoản ${money(saved.amount)} theo mã bên dưới, tiền về là thiệp tự xuất bản.`);
-      startPolling(saved.token);
+      showQr(saved);
+      say('pub-status', `Chuyển khoản ${money(saved.amount)} theo mã trên rồi bấm "Tôi đã chuyển khoản". Tiền về là thiệp tự xuất bản.`);
+      startPolling();
     } catch (error) { say('pub-status', error.message, true); }
   }
-  function stopPolling() { clearInterval(polling); polling = 0; }
-  function startPolling(donationToken) {
-    stopPolling();
-    polling = setInterval(async () => {
-      try {
-        const status = await withWallet('/api/donations/status', { headers: { 'X-Donation-Token': donationToken } });
-        if (status.status === 'paid') {
+
+  // Asks the server whether the transfer has landed. Runs every few seconds, when the owner
+  // comes back from the bank app, and when they press "Tôi đã chuyển khoản".
+  let checking = false, ticks = 0;
+  async function checkPayment(manual) {
+    if (checking || publishing) return;
+    const saved = readJson(TOPUP_KEY);
+    checking = true;
+    if (manual) { $('paid').disabled = true; $('paid').textContent = 'Đang kiểm tra…'; }
+    try {
+      if (manual && saved?.code && !card?.transfer?.claimedMs) await reportTransfer(saved.code, true);
+      if (manual || ++ticks % 5 === 0) {
+        ({ card } = await own(`/api/thiep/cards/${code}`));
+        if (card.status === 'published') {
           stopPolling();
-          try { localStorage.removeItem(`locly-card-topup-${code}`); } catch (_) { /* private mode */ }
-          say('pub-status', 'Đã nhận tiền! Đang xuất bản…');
-          wallet = null; await loadWallet(); publish();
+          try { localStorage.removeItem(TOPUP_KEY); } catch (_) { /* private mode */ }
+          render();
+          $('share-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
         }
-      } catch (_) { /* keep waiting through short network blips */ }
-    }, 3000);
+      }
+      if (saved?.token) {
+        const status = await withWallet('/api/donations/status', { headers: { 'X-Donation-Token': saved.token } });
+        if (status.status !== 'paid') {
+          if (manual) { say('pub-status', 'Chưa thấy tiền về. Ngân hàng có thể chậm 1–3 phút, trang vẫn tự kiểm tra và xuất bản ngay khi tiền tới. Quá 10 phút vẫn chưa được thì nhắn hỗ trợ qua Facebook bên dưới nhé.', true); $('support').classList.add('is-urgent'); }
+          return;
+        }
+      }
+      wallet = null; await loadWallet();
+      if (wallet.balance >= card.price) {
+        try { localStorage.removeItem(TOPUP_KEY); } catch (_) { /* private mode */ }
+        say('pub-status', 'Đã nhận tiền! Đang xuất bản…');
+        checking = false;
+        return chargeAndPublish();
+      }
+      // A smaller transfer landed: ask for what is still missing.
+      try { localStorage.removeItem(TOPUP_KEY); } catch (_) { /* private mode */ }
+      say('pub-status', `Đã nhận tiền nhưng ví còn thiếu ${card.price - wallet.balance} xu. Bạn chuyển thêm theo mã mới nhé.`, true);
+      checking = false;
+      return startTopup();
+    } catch (error) {
+      if (manual) say('pub-status', error.message === 'Failed to fetch' ? 'Mất kết nối, bạn thử lại nhé.' : error.message, true);
+    } finally {
+      checking = false;
+      if (manual) { $('paid').disabled = false; $('paid').textContent = 'Tôi đã chuyển khoản'; }
+    }
   }
+  function stopPolling() { clearInterval(polling); polling = 0; }
+  function startPolling() { stopPolling(); polling = setInterval(() => checkPayment(false), 3000); }
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && polling) checkPayment(false); });
+  window.addEventListener('focus', () => { if (polling) checkPayment(false); });
 
   /* ---------- wishes ---------- */
   async function loadWishes() {
@@ -172,7 +238,24 @@
   }
 
   /* ---------- start ---------- */
-  $('publish').addEventListener('click', publish);
+  $('publish').addEventListener('click', openPay);
+  $('pay-wallet').addEventListener('click', chargeAndPublish);
+  $('paid').addEventListener('click', () => checkPayment(true));
+  $('hardship-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    $('hardship-send').disabled = true;
+    try {
+      ({ card } = await own(`/api/thiep/cards/${code}/hardship`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason: $('hardship-text').value }) }));
+      render();
+      // The amount changed, so work out again whether the wallet covers it or a new transfer is needed.
+      if (!$('pay').hidden) {
+        stopPolling();
+        if (wallet && wallet.balance >= card.price) { $('qr').hidden = true; $('pay-wallet').hidden = false; $('pay-wallet').textContent = `Dùng ${card.price} xu trong ví để xuất bản`; say('pub-status', ''); }
+        else await startTopup();
+      }
+    } catch (error) { say('hardship-status', error.message, true); }
+    finally { $('hardship-send').disabled = false; }
+  });
   $('copy-share').addEventListener('click', e => copy($('share-url').value, e.currentTarget));
   $('copy-manage').addEventListener('click', e => copy($('manage-url').value, e.currentTarget));
   $('native-share').addEventListener('click', () => navigator.share?.({ title: `${card.content.headline} · ${card.content.nickname}`, url: $('share-url').value }).catch(() => {}));
@@ -195,15 +278,16 @@
       ({ card } = await own(`/api/thiep/cards/${code}`));
       remember(); render(); loadWishes();
       if (card.status === 'draft') {
-        loadWallet().catch(() => { $('wallet-balance').textContent = '—'; });
-        const pending = readJson(`locly-card-topup-${code}`);
+        // A transfer started earlier: go straight back to waiting for it.
+        const pending = readJson(TOPUP_KEY);
         if (pending?.token && config.paymentsReady) {
-          $('qr').hidden = false; $('qr-img').src = pending.qrUrl; $('qr-bank').textContent = pending.bank; $('qr-account').textContent = pending.account;
-          $('qr-name').textContent = pending.accountName; $('qr-amount').textContent = money(pending.amount); $('qr-code').textContent = pending.code;
-          say('pub-status', 'Đang chờ tiền về cho lần chuyển khoản trước…');
-          startPolling(pending.token);
+          $('publish').hidden = true; $('pay').hidden = false;
+          showQr(pending);
+          loadWallet().catch(() => {});
+          say('pub-status', 'Đang chờ tiền về cho lần chuyển khoản trước. Chuyển xong thì bấm "Tôi đã chuyển khoản".');
+          startPolling();
+          checkPayment(false);
         }
-        if (!config.paymentsReady) say('pub-status', 'Thanh toán chưa được bật trên máy chủ này.', true);
       }
     } catch (error) {
       $('load-error').hidden = false; $('load-error').textContent = error.message;

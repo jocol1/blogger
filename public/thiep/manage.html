@@ -32,25 +32,39 @@
 
       <section class="panel" id="publish-panel" hidden aria-labelledby="pub-title">
         <h3 id="pub-title">Xuất bản thiệp</h3>
-        <p>Thiệp đang là <b>bản nháp</b>: chỉ bạn xem được. Xuất bản để có link gửi bạn bè và nhận lời chúc.</p>
-        <p class="big-price" id="price">29.000đ</p>
-        <p class="hint">Trả một lần, sửa thiệp miễn phí sau đó.</p>
-        <div class="wallet-line"><span>Số xu trong ví của bạn</span><b id="wallet-balance">…</b></div>
-        <button class="btn" type="button" id="publish">Xuất bản ngay</button>
-        <p class="status-line" id="pub-status" role="status"></p>
-        <div class="qr" id="qr" hidden>
-          <img id="qr-img" alt="Mã QR chuyển khoản" width="240" height="300">
-          <div>
-            <p><b>Quét mã bằng app ngân hàng</b>, giữ nguyên số tiền và nội dung. Tiền về là thiệp tự xuất bản.</p>
-            <dl>
-              <div><dt>Ngân hàng</dt><dd id="qr-bank"></dd></div>
-              <div><dt>Số tài khoản</dt><dd id="qr-account"></dd></div>
-              <div><dt>Chủ tài khoản</dt><dd id="qr-name"></dd></div>
-              <div><dt>Số tiền</dt><dd id="qr-amount"></dd></div>
-              <div><dt>Nội dung chuyển khoản</dt><dd id="qr-code"></dd></div>
-            </dl>
+        <p>Thiệp đang là <b>bản nháp</b>: chỉ bạn xem được. Xem trước bên cạnh, sửa thoải mái, ưng rồi bấm Xuất bản để có link gửi bạn bè và nhận lời chúc.</p>
+        <button class="btn mt" type="button" id="publish">Xuất bản thiệp</button>
+        <div class="pay" id="pay" hidden>
+          <p class="big-price" id="price">19.000đ</p>
+          <p class="hint">Trả một lần để xuất bản, sửa thiệp miễn phí sau đó.</p>
+          <p class="price-note" id="price-note" hidden></p>
+          <details class="hardship" id="hardship">
+            <summary>Bạn đang gặp hoàn cảnh khó khăn? Trình bày để chỉ trả <b id="hardship-price">19.000đ</b></summary>
+            <form id="hardship-form" novalidate>
+              <label class="field"><span>Kể ngắn gọn hoàn cảnh của bạn</span><textarea id="hardship-text" maxlength="500" placeholder="Ví dụ: Mình là sinh viên tự túc, vừa học vừa làm thêm để trang trải học phí…"></textarea></label>
+              <button class="btn btn-sm" type="submit" id="hardship-send">Gửi và áp dụng giá hỗ trợ</button>
+              <p class="status-line" id="hardship-status" role="status"></p>
+            </form>
+          </details>
+          <div class="wallet-line" id="wallet-line" hidden><span>Ví xu của bạn đang có</span><b id="wallet-balance"></b></div>
+          <button class="btn" type="button" id="pay-wallet" hidden>Dùng xu trong ví để xuất bản</button>
+          <div class="qr" id="qr" hidden>
+            <img id="qr-img" alt="Mã QR chuyển khoản" width="240" height="300">
+            <div>
+              <p><b>Quét mã bằng app ngân hàng</b>, giữ nguyên số tiền và nội dung chuyển khoản.</p>
+              <dl>
+                <div><dt>Ngân hàng</dt><dd id="qr-bank"></dd></div>
+                <div><dt>Số tài khoản</dt><dd id="qr-account"></dd></div>
+                <div><dt>Chủ tài khoản</dt><dd id="qr-name"></dd></div>
+                <div><dt>Số tiền</dt><dd id="qr-amount"></dd></div>
+                <div><dt>Nội dung chuyển khoản</dt><dd id="qr-code"></dd></div>
+              </dl>
+              <button class="btn btn-wide mt" type="button" id="paid">Tôi đã chuyển khoản</button>
+              <p class="support" id="support">Chuyển rồi mà mãi chưa xuất bản? <a id="support-link" href="https://www.facebook.com/loc.ly.336717" target="_blank" rel="noopener noreferrer">Nhắn hỗ trợ qua Facebook</a>, gửi kèm mã thiệp <b id="support-card"></b> và nội dung chuyển khoản <b id="support-transfer"></b>.</p>
+            </div>
           </div>
         </div>
+        <p class="status-line" id="pub-status" role="status"></p>
       </section>
 
       <section class="panel" id="share-panel" hidden aria-labelledby="share-title">

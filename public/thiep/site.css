@@ -76,7 +76,17 @@ a { color: var(--brand-deep); }
 .icon-opt input:focus-visible + span { outline: 3px solid var(--brand); outline-offset: 2px; }
 .upload { display: inline-flex; }
 .upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
-.upload-row.mt, .row.mt { margin-top: 12px; }
+.upload-row.mt, .row.mt, .btn.mt { margin-top: 12px; }
+.btn-wide { width: 100%; }
+.price-note { margin-top: 8px; padding: 8px 12px; border-radius: 12px; background: var(--soft); color: var(--brand-deep); font-size: .92rem; }
+.hardship { margin-top: 12px; padding: 12px 14px; border-radius: 16px; background: var(--warn-bg); }
+.hardship summary { cursor: pointer; color: var(--warn); font-weight: 700; }
+.hardship form { display: grid; gap: 10px; margin-top: 12px; }
+.hardship .field textarea { background: #fff; }
+.support { margin-top: 12px; font-size: .9rem; color: var(--muted); }
+.support a { font-weight: 800; }
+.support.is-urgent { padding: 10px 12px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); }
+.pay { margin-top: 18px; padding-top: 18px; border-top: 2px dashed var(--line); }
 .mine-panel { width: min(720px, calc(100% - 32px)); margin: 0 auto 120px; }
 .upload-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
