@@ -91,6 +91,9 @@ const editorialCss = `body{background:#f7f7f5;color:#181818}.editorial-header{he
 
 // The donation router has its own bounded JSON parsers and never uses the blog's JSON store.
 app.set('trust proxy', 1);
+// Cheap liveness check for uptime pings that keep the free Render instance awake. Runs before
+// sessions so a ping never creates one.
+app.get('/healthz', (req, res) => res.set('Cache-Control', 'no-store').type('text/plain').send('ok'));
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
 const donationConfig = readConfig();
 const teaService = createTeaService({ db: firestore, config: donationConfig });

@@ -1,0 +1,27 @@
+# Render's free plan puts the server to sleep after ~15 minutes without visitors, and the next
+# visitor waits 30-60 s for it to boot. This pings /healthz every 10 minutes to keep it awake.
+# GitHub may run scheduled jobs a few minutes late; an external uptime monitor is a good backup.
+# Set the repository variable KEEPALIVE_URL to override the address.
+name: Keep server awake
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping /healthz
+        env:
+          BASE_URL: ${{ vars.KEEPALIVE_URL || 'https://locly.lol' }}
+        run: |
+          for attempt in 1 2 3; do
+            if curl -fsS --max-time 90 "$BASE_URL/healthz"; then echo; echo "awake"; exit 0; fi
+            echo "attempt $attempt failed, retrying"; sleep 20
+          done
+          echo "::warning::$BASE_URL/healthz did not answer"
