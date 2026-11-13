@@ -7,6 +7,7 @@ const NAME_MAX = 40;
 const MESSAGE_MAX = 240;
 const LIST_LIMIT = 1000;
 const DEFAULT_MAIL_TO = 'lytanloc10c1@gmail.com';
+const ATTENDING = { yes: 'Sẽ đến', no: 'Không đến được', maybe: 'Chưa chắc' };
 
 class WishError extends Error {
   constructor(message, status = 400) { super(message); this.status = status; }
@@ -91,15 +92,17 @@ function wishEmail(wish, adminUrl) {
   const when = vnTime(wish.createdMs);
   const text = [
     `${wish.name} vừa gửi lời chúc mừng tốt nghiệp cho Thảo Đan:`, '', wish.message, '',
+    `Tham dự: ${ATTENDING[wish.attending] || 'Chưa cho biết'}`,
     `Gửi lúc: ${when} (giờ Việt Nam)`, ...(adminUrl ? ['', `Xem tất cả lời chúc: ${adminUrl}`] : []),
   ].join('\n');
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#e3f5e8;border-radius:20px">`
     + `<p style="margin:0 0 12px;color:#1f7a52;font-weight:700">${escapeHtml(wish.name)} vừa gửi lời chúc cho Thảo Đan</p>`
     + `<p style="margin:0 0 16px;padding:16px;background:#fff;border-radius:14px;color:#1f3d2e;white-space:pre-wrap">${escapeHtml(wish.message)}</p>`
+    + `<p style="margin:0 0 6px;color:#1f7a52;font-weight:700">Tham dự: ${escapeHtml(ATTENDING[wish.attending] || 'Chưa cho biết')}</p>`
     + `<p style="margin:0;color:#5b7d6a;font-size:13px">${escapeHtml(when)} (giờ Việt Nam)</p>`
     + (adminUrl ? `<p style="margin:12px 0 0"><a href="${escapeHtml(adminUrl)}" style="color:#1f7a52">Xem tất cả lời chúc</a></p>` : '')
     + '</div>';
-  return { subject: `Lời chúc tốt nghiệp mới từ ${wish.name}`, text, html };
+  return { subject: `Lời chúc tốt nghiệp mới từ ${wish.name}${ATTENDING[wish.attending] ? ` (${ATTENDING[wish.attending]})` : ''}`, text, html };
 }
 
 function createGraduationService({ db = null, file, mailer = createMailer(), adminUrl = '', now = Date.now, id = () => crypto.randomUUID() } = {}) {
@@ -129,7 +132,9 @@ function createGraduationService({ db = null, file, mailer = createMailer(), adm
       const message = clean(input?.message, MESSAGE_MAX);
       if (!name) throw new WishError('Bạn cho Đan biết tên bạn nhé.');
       if (!message) throw new WishError('Bạn viết vài chữ chúc Đan nhé.');
-      const wish = { id: id(), name, message, createdMs: now(), mail: 'pending' };
+      const attending = String(input?.attending ?? '');
+      if (!Object.hasOwn(ATTENDING, attending)) throw new WishError('Bạn chọn đến, không đến hay chưa chắc nhé.');
+      const wish = { id: id(), name, message, attending, createdMs: now(), mail: 'pending' };
       await store.add(wish);
       const delivery = deliver(wish).catch(error => { console.error('Graduation delivery error:', error.message); return 'failed'; });
       return { wish, delivery };
@@ -150,4 +155,4 @@ function createGraduationService({ db = null, file, mailer = createMailer(), adm
   };
 }
 
-module.exports = { createGraduationService, createMailer, createWishStore, wishEmail, WishError, NAME_MAX, MESSAGE_MAX, DEFAULT_MAIL_TO };
+module.exports = { ATTENDING, createGraduationService, createMailer, createWishStore, wishEmail, WishError, NAME_MAX, MESSAGE_MAX, DEFAULT_MAIL_TO };

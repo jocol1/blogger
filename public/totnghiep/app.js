@@ -67,6 +67,13 @@
   const sendBtn = document.getElementById('wish-send');
   const nameInput = document.getElementById('wish-name');
   const wishInput = document.getElementById('wish-text');
+  const attendInput = document.getElementById('wish-attend');
+  const thanksText = document.getElementById('wish-thanks-text');
+  const thanksBy = {
+    yes: 'Cảm ơn bạn đã chúc mừng Đan. Hẹn gặp bạn lúc 11:30 Thứ Ba 8/12 nhé!',
+    no: 'Cảm ơn bạn đã chúc mừng Đan. Tiếc là bạn không đến được, Đan vẫn rất vui vì bạn nhớ đến Đan.',
+    maybe: 'Cảm ơn bạn đã chúc mừng Đan. Khi nào chắc chắn, bạn nhắn Đan một tiếng nhé!',
+  };
   const say = (text, bad) => { status.textContent = text; status.classList.toggle('is-bad', Boolean(bad)); };
 
   form.addEventListener('submit', async event => {
@@ -75,17 +82,19 @@
     const message = wishInput.value.trim();
     if (!name) { nameInput.focus(); say('Bạn cho Đan biết tên bạn nhé!', true); return; }
     if (!message) { wishInput.focus(); say('Bạn viết vài chữ chúc Đan nhé!', true); return; }
+    if (!attendInput.value) { attendInput.focus(); say('Bạn chọn đến, không đến hay chưa chắc nhé!', true); return; }
     sendBtn.disabled = true;
     say('Đang gửi cho Đan…');
     try {
       const res = await fetch('/api/totnghiep/wishes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, message, website: document.getElementById('wish-website').value }),
+        body: JSON.stringify({ name, message, attending: attendInput.value, website: document.getElementById('wish-website').value }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Chưa gửi được lúc này, bạn thử lại nhé.');
       say('');
+      thanksText.textContent = thanksBy[attendInput.value] || thanksText.textContent;
       form.hidden = true;
       thanks.hidden = false;
       burst(thanks, 150);
@@ -97,6 +106,7 @@
   });
   document.getElementById('wish-again').addEventListener('click', () => {
     wishInput.value = '';
+    attendInput.value = '';
     document.querySelectorAll('#chips button').forEach(c => c.classList.remove('is-picked'));
     thanks.hidden = true;
     form.hidden = false;

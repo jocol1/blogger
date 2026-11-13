@@ -133,25 +133,12 @@
       </div>
     </section>
 
-    <section class="sec sec-mint" id="anh" aria-labelledby="photo-title">
-      <h2 class="sec-title" id="photo-title">Cô gái tân cử nhân</h2>
-      <div class="polaroids">
-        <figure class="polaroid" style="--r:-3deg">
-          <img src="/assets/totnghiep/img/dan-vuon.jpg" width="1000" height="1333" alt="Thảo Đan đứng dưới giàn cây xanh" loading="lazy">
-          <figcaption>Thảo Đan</figcaption>
-        </figure>
-        <figure class="polaroid" style="--r:3deg">
-          <img src="/assets/totnghiep/img/dan-no.jpg" width="900" height="1200" alt="Thảo Đan mỉm cười, ôm chiếc gối nơ đỏ" loading="lazy">
-          <figcaption>Sắp tốt nghiệp rồi</figcaption>
-        </figure>
-      </div>
-    </section>
-
     <section class="wishes" id="loi-chuc" aria-labelledby="wish-title">
       <form class="wish-card" id="wish" novalidate>
         <h2 id="wish-title">Gửi lời chúc mừng tốt nghiệp</h2>
         <p class="wish-sub">Viết vài dòng thật dễ thương, Đan sẽ vui lắm đó!</p>
         <label class="field"><span>Tên của bạn</span><input id="wish-name" name="name" autocomplete="name" maxlength="40" placeholder="Ví dụ: Minh Anh" required></label>
+        <label class="field"><span>Bạn có đến dự không?</span><select id="wish-attend" name="attending" required><option value="">Chọn một câu trả lời…</option><option value="yes">Mình sẽ đến</option><option value="no">Mình không đến được</option><option value="maybe">Chưa chắc, mình báo sau</option></select></label>
         <input class="hp" type="text" id="wish-website" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
         <div class="chips" id="chips" aria-label="Lời chúc gợi ý">
           <button type="button">Chúc mừng Đan đã tốt nghiệp, giỏi quá đi!</button>
@@ -165,7 +152,7 @@
       </form>
       <div class="wish-thanks" id="wish-thanks" hidden>
         <h2>Đã gửi cho Đan rồi!</h2>
-        <p>Cảm ơn bạn đã chúc mừng Đan. Đan sẽ đọc ngay khi nhận được.</p>
+        <p id="wish-thanks-text">Cảm ơn bạn đã chúc mừng Đan. Đan sẽ đọc ngay khi nhận được.</p>
         <button class="btn btn-soft" id="wish-again" type="button">Gửi thêm lời chúc</button>
       </div>
     </section>

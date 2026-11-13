@@ -2,7 +2,7 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
-const { createGraduationService, WishError } = require('./service');
+const { createGraduationService, WishError, ATTENDING } = require('./service');
 
 const BASE = '/totnghiep';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -73,7 +73,8 @@ main{width:min(760px,100%);margin:0 auto;padding:28px 16px 64px}h1{margin:0 0 4p
 .note.warn{background:#fff1d6;color:#8a5a00}.card{margin:0 0 12px;padding:18px 18px 14px;border-radius:20px;background:#fff}
 .head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline}.head b{font-size:1.1rem}.head time{color:#5b7d6a;font-size:.9rem}
 .msg{margin:8px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.badge{padding:3px 12px;border-radius:999px;font-size:.85rem;font-weight:700;background:#d9f1e1;color:#1f7a52}.badge.bad{background:#ffe0e0;color:#b02a2a}.badge.idle{background:#eee;color:#666}
+.badge{padding:3px 12px;border-radius:999px;font-size:.85rem;font-weight:700;background:#d9f1e1;color:#1f7a52}.badge.bad{background:#ffe0e0;color:#b02a2a}.badge.idle{background:#eee;color:#666}.badge.yes{background:#d9f1e1;color:#1f7a52}.badge.no{background:#ffe0e0;color:#b02a2a}.badge.maybe{background:#fff1d6;color:#8a5a00}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 18px}.stat{flex:1 1 120px;padding:12px 16px;border-radius:16px;background:#fff;text-align:center}.stat b{display:block;font-size:1.6rem;line-height:1.1}.stat span{color:#5b7d6a;font-size:.9rem}
 button,.btn{padding:8px 16px;border:0;border-radius:999px;background:#2e9e6e;color:#fff;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
 button.soft{background:#eaf8ef;color:#1f7a52}button.danger{background:#ffe0e0;color:#b02a2a}form{margin:0}
 input[type=password]{width:100%;padding:12px 16px;margin:12px 0;border:2px solid #c9e9d4;border-radius:999px;font:inherit}
@@ -86,6 +87,7 @@ input[type=password]{width:100%;padding:12px 16px;margin:12px 0;border:2px solid
     'not-configured': '<span class="badge idle">Chưa cấu hình mail</span>',
     pending: '<span class="badge idle">Đang gửi mail</span>',
   }[wish.mail] || '<span class="badge idle">Chưa gửi mail</span>');
+  const attendBadge = wish => ATTENDING[wish.attending] ? `<span class="badge ${esc(wish.attending)}">${esc(ATTENDING[wish.attending])}</span>` : '';
   const when = ms => new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
 
   router.use('/assets/totnghiep', express.static(assets, { index: false, maxAge: production ? '7d' : 0 }));
@@ -127,18 +129,20 @@ input[type=password]{width:100%;padding:12px 16px;margin:12px 0;border:2px solid
     const notice = service.mailConfigured
       ? `<p class="note">Mỗi lời chúc mới được gửi về <b>${esc(service.mailTo)}</b>.</p>`
       : `<p class="note warn">Chưa cấu hình gửi mail nên lời chúc chỉ được lưu ở đây. Đặt <b>SMTP_USER</b> và <b>SMTP_PASS</b> (mật khẩu ứng dụng Gmail) để thư tự gửi về <b>${esc(service.mailTo)}</b>.</p>`;
-    const cards = wishes.map(wish => `<article class="card"><div class="head"><b>${esc(wish.name)}</b><time>${esc(when(wish.createdMs))}</time></div><p class="msg">${esc(wish.message)}</p><div class="row">${mailBadge(wish)}`
+    const count = key => wishes.filter(wish => wish.attending === key).length;
+    const stats = wishes.length ? `<div class="stats">${Object.entries(ATTENDING).map(([key, label]) => `<div class="stat"><b>${count(key)}</b><span>${esc(label)}</span></div>`).join('')}</div>` : '';
+    const cards = wishes.map(wish => `<article class="card"><div class="head"><b>${esc(wish.name)}</b><time>${esc(when(wish.createdMs))}</time></div><p class="msg">${esc(wish.message)}</p><div class="row">${attendBadge(wish)}${mailBadge(wish)}`
       + (wish.mail !== 'sent' && service.mailConfigured ? `<form method="post" action="${BASE}/admin/wishes/${esc(wish.id)}/resend"><input type="hidden" name="csrf" value="${esc(csrf)}"><button class="soft">Gửi lại mail</button></form>` : '')
       + `<form method="post" action="${BASE}/admin/wishes/${esc(wish.id)}/delete" onsubmit="return confirm('Xoá lời chúc của ${esc(wish.name).replace(/'/g, '')}?')"><input type="hidden" name="csrf" value="${esc(csrf)}"><button class="danger">Xoá</button></form></div></article>`).join('');
-    res.send(shell('Lời chúc tốt nghiệp', `<div class="top"><div><h1>Lời chúc cho Thảo Đan</h1><p class="muted">${wishes.length} lời chúc</p></div><div class="row"><a class="link" href="${BASE}">Xem thiệp</a>${wishes.length ? ` <a class="link" href="${BASE}/admin/wishes.csv">Tải CSV</a>` : ''}</div></div>${notice}${cards || '<p class="empty">Chưa có lời chúc nào. Khi bạn bè gửi, lời chúc sẽ hiện ở đây.</p>'}`));
+    res.send(shell('Lời chúc tốt nghiệp', `<div class="top"><div><h1>Lời chúc cho Thảo Đan</h1><p class="muted">${wishes.length} lời chúc</p></div><div class="row"><a class="link" href="${BASE}">Xem thiệp</a>${wishes.length ? ` <a class="link" href="${BASE}/admin/wishes.csv">Tải CSV</a>` : ''}</div></div>${notice}${stats}${cards || '<p class="empty">Chưa có lời chúc nào. Khi bạn bè gửi, lời chúc sẽ hiện ở đây.</p>'}`));
   }));
 
   router.get(`${BASE}/admin/wishes.csv`, adminOnly, asyncRoute(async (req, res) => {
     // A leading = + - @ would be run as a formula by spreadsheet apps, so defuse it.
     const cell = value => `"${(/^[=+\-@\t\r]/.test(String(value)) ? `'${value}` : String(value)).replace(/"/g, '""')}"`;
-    const rows = (await service.list()).map(wish => [cell(when(wish.createdMs)), cell(wish.name), cell(wish.message), cell(wish.mail || '')].join(','));
+    const rows = (await service.list()).map(wish => [cell(when(wish.createdMs)), cell(wish.name), cell(ATTENDING[wish.attending] || ''), cell(wish.message), cell(wish.mail || '')].join(','));
     res.set({ 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="loi-chuc-tot-nghiep.csv"', 'Cache-Control': 'no-store' });
-    res.send('﻿' + ['Thời gian,Tên,Lời chúc,Mail', ...rows].join('\r\n'));
+    res.send('﻿' + ['Thời gian,Tên,Tham dự,Lời chúc,Mail', ...rows].join('\r\n'));
   }));
 
   router.post(`${BASE}/admin/wishes/:id/delete`, adminOnly, express.urlencoded({ extended: false, limit: '2kb' }), csrfOnly, asyncRoute(async (req, res) => {

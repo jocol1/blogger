@@ -19,7 +19,7 @@ const quiet = async fn => { const original = console.error; console.error = () =
 test('a wish is trimmed, saved and mailed to the owner', async () => {
   const mailer = fakeMailer();
   const service = createGraduationService({ db: new MemoryFirestore(), mailer, adminUrl: 'https://x.test/totnghiep/admin' });
-  const { wish, delivery } = await service.submit({ name: '  Minh   Anh \n', message: ' Chúc Đan thật vui!\u0000 ' });
+  const { wish, delivery } = await service.submit({ attending: 'yes', name: '  Minh   Anh \n', message: ' Chúc Đan thật vui!\u0000 ' });
   assert.equal(wish.name, 'Minh Anh');
   assert.equal(wish.message, 'Chúc Đan thật vui!');
   assert.equal(await delivery, 'sent');
@@ -33,19 +33,37 @@ test('a wish is trimmed, saved and mailed to the owner', async () => {
 
 test('empty names and messages are refused and long ones are cut', async () => {
   const service = createGraduationService({ db: new MemoryFirestore(), mailer: fakeMailer() });
-  await assert.rejects(service.submit({ name: '   ', message: 'hi' }), WishError);
-  await assert.rejects(service.submit({ name: 'A', message: '  ' }), WishError);
+  await assert.rejects(service.submit({ attending: 'yes', name: '   ', message: 'hi' }), WishError);
+  await assert.rejects(service.submit({ attending: 'yes', name: 'A', message: '  ' }), WishError);
   await assert.rejects(service.submit({}), WishError);
-  const { wish, delivery } = await service.submit({ name: 'N'.repeat(300), message: 'M'.repeat(5000) });
+  const { wish, delivery } = await service.submit({ attending: 'yes', name: 'N'.repeat(300), message: 'M'.repeat(5000) });
   await delivery;
   assert.equal(wish.name.length, NAME_MAX);
   assert.equal(wish.message.length, MESSAGE_MAX);
 });
 
+test('every wish says whether the guest comes, and the owner sees it in the mail', async () => {
+  const mailer = fakeMailer();
+  const service = createGraduationService({ db: new MemoryFirestore(), mailer });
+  for (const [attending, label] of [['yes', 'Sẽ đến'], ['no', 'Không đến được'], ['maybe', 'Chưa chắc']]) {
+    const { wish, delivery } = await service.submit({ attending, name: 'Lan', message: 'Chúc mừng' });
+    await delivery;
+    assert.equal(wish.attending, attending);
+    const mail = mailer.sent.at(-1);
+    assert.match(mail.text, new RegExp('Tham dự: ' + label));
+    assert.ok(mail.html.includes(label));
+    assert.ok(mail.subject.includes('(' + label + ')'));
+  }
+  for (const bad of [undefined, '', 'perhaps', '__proto__', 'toString']) {
+    await assert.rejects(service.submit({ attending: bad, name: 'Lan', message: 'Chúc mừng' }), /chọn đến/);
+  }
+  assert.equal((await service.list()).length, 3);
+});
+
 test('mail markup escapes what visitors type', async () => {
   const mailer = fakeMailer();
   const service = createGraduationService({ db: new MemoryFirestore(), mailer });
-  const { delivery } = await service.submit({ name: '<b>Hacker</b>', message: '<img src=x onerror=alert(1)>' });
+  const { delivery } = await service.submit({ attending: 'yes', name: '<b>Hacker</b>', message: '<img src=x onerror=alert(1)>' });
   await delivery;
   assert.ok(!mailer.sent[0].html.includes('<img'));
   assert.ok(!mailer.sent[0].html.includes('<b>Hacker'));
@@ -54,7 +72,7 @@ test('mail markup escapes what visitors type', async () => {
 
 test('a failing mail server never loses the wish and can be retried', async () => {
   const service = createGraduationService({ db: new MemoryFirestore(), mailer: fakeMailer({ fail: true }) });
-  const { wish, delivery } = await quiet(async () => { const result = await service.submit({ name: 'Lan', message: 'Chúc mừng' }); await result.delivery; return result; });
+  const { wish, delivery } = await quiet(async () => { const result = await service.submit({ attending: 'yes', name: 'Lan', message: 'Chúc mừng' }); await result.delivery; return result; });
   assert.equal(await delivery, 'failed');
   assert.equal((await service.list())[0].mail, 'failed');
   assert.equal((await service.list())[0].id, wish.id);
@@ -65,7 +83,7 @@ test('without SMTP settings wishes are kept and marked as not mailed', async () 
   assert.equal(mailer.configured, false);
   assert.equal(mailer.to, 'lytanloc10c1@gmail.com');
   const service = createGraduationService({ db: new MemoryFirestore(), mailer });
-  const { delivery } = await service.submit({ name: 'Lan', message: 'Chúc mừng' });
+  const { delivery } = await service.submit({ attending: 'yes', name: 'Lan', message: 'Chúc mừng' });
   assert.equal(await delivery, 'not-configured');
   assert.equal((await service.list()).length, 1);
 });
@@ -80,8 +98,8 @@ test('the JSON file store keeps wishes newest first and survives a restart', asy
   let at = 1_800_000_000_000;
   const make = () => createGraduationService({ file, mailer: fakeMailer(), now: () => at++ });
   const first = make();
-  await (await first.submit({ name: 'Một', message: 'a' })).delivery;
-  await (await first.submit({ name: 'Hai', message: 'b' })).delivery;
+  await (await first.submit({ attending: 'yes', name: 'Một', message: 'a' })).delivery;
+  await (await first.submit({ attending: 'yes', name: 'Hai', message: 'b' })).delivery;
   const second = make();
   assert.deepEqual((await second.list()).map(w => w.name), ['Hai', 'Một']);
   await second.remove((await second.list())[0].id);
@@ -118,7 +136,7 @@ async function start(options = {}) {
 test('visitors can send a wish and the owner is mailed', async () => {
   const t = await start();
   try {
-    const res = await t.post('/api/totnghiep/wishes', { name: 'Lan', message: 'Chúc mừng Đan!' });
+    const res = await t.post('/api/totnghiep/wishes', { attending: 'yes', name: 'Lan', message: 'Chúc mừng Đan!' });
     assert.equal(res.status, 201);
     assert.deepEqual(await res.json(), { ok: true });
     await new Promise(resolve => setTimeout(resolve, 50));
@@ -130,10 +148,10 @@ test('visitors can send a wish and the owner is mailed', async () => {
 test('bad wishes get a clear 400 and a filled honeypot stores nothing', async () => {
   const t = await start();
   try {
-    const blank = await t.post('/api/totnghiep/wishes', { name: '', message: 'x' });
+    const blank = await t.post('/api/totnghiep/wishes', { attending: 'yes', name: '', message: 'x' });
     assert.equal(blank.status, 400);
     assert.match((await blank.json()).error, /tên/);
-    const bot = await t.post('/api/totnghiep/wishes', { name: 'Bot', message: 'spam', website: 'http://spam' });
+    const bot = await t.post('/api/totnghiep/wishes', { attending: 'yes', name: 'Bot', message: 'spam', website: 'http://spam' });
     assert.equal(bot.status, 201);
     const broken = await t.call('/api/totnghiep/wishes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{nope' });
     assert.equal(broken.status, 400);
@@ -145,8 +163,8 @@ test('bad wishes get a clear 400 and a filled honeypot stores nothing', async ()
 test('one address can only send five wishes in ten minutes', async () => {
   const t = await start({ ip: '10.9.9.9' });
   try {
-    for (let i = 0; i < 5; i++) assert.equal((await t.post('/api/totnghiep/wishes', { name: `A${i}`, message: 'hi' })).status, 201);
-    const blocked = await t.post('/api/totnghiep/wishes', { name: 'A6', message: 'hi' });
+    for (let i = 0; i < 5; i++) assert.equal((await t.post('/api/totnghiep/wishes', { attending: 'yes', name: `A${i}`, message: 'hi' })).status, 201);
+    const blocked = await t.post('/api/totnghiep/wishes', { attending: 'yes', name: 'A6', message: 'hi' });
     assert.equal(blocked.status, 429);
     assert.ok(blocked.headers.get('retry-after'));
     assert.equal((await t.service.list()).length, 5);
@@ -156,7 +174,7 @@ test('one address can only send five wishes in ten minutes', async () => {
 test('the admin page needs the password and shows wishes safely', async () => {
   const t = await start();
   try {
-    await (await t.service.submit({ name: '<script>alert(1)</script>', message: 'Chúc <b>mừng</b> & vui' })).delivery;
+    await (await t.service.submit({ attending: 'yes', name: '<script>alert(1)</script>', message: 'Chúc <b>mừng</b> & vui' })).delivery;
     const anon = await t.call('/totnghiep/admin');
     assert.equal(anon.status, 302);
     assert.equal(anon.headers.get('location'), '/totnghiep/admin/login');
@@ -176,7 +194,7 @@ test('the admin page needs the password and shows wishes safely', async () => {
 test('deleting a wish needs the admin session and its CSRF token', async () => {
   const t = await start();
   try {
-    const { wish, delivery } = await t.service.submit({ name: 'Lan', message: 'Chúc mừng' });
+    const { wish, delivery } = await t.service.submit({ attending: 'yes', name: 'Lan', message: 'Chúc mừng' });
     await delivery;
     const path = `/totnghiep/admin/wishes/${wish.id}/delete`;
     assert.equal((await t.form(path, {})).status, 302);
@@ -194,7 +212,7 @@ test('a failed mail can be sent again from the admin page', async () => {
   const flaky = { configured: true, to: 'owner@example.com', sent: [], failNext: true, async send(mail) { if (this.failNext) { this.failNext = false; throw new Error('boom'); } this.sent.push(mail); } };
   const t = await start({ mailer: flaky });
   try {
-    const { wish, delivery } = await quiet(async () => { const r = await t.service.submit({ name: 'Lan', message: 'Chúc mừng' }); await r.delivery; return r; });
+    const { wish, delivery } = await quiet(async () => { const r = await t.service.submit({ attending: 'yes', name: 'Lan', message: 'Chúc mừng' }); await r.delivery; return r; });
     assert.equal(await delivery, 'failed');
     await t.login();
     const csrf = (await (await t.call('/totnghiep/admin')).text()).match(/name="csrf" value="([0-9a-f]+)"/)[1];
@@ -204,17 +222,44 @@ test('a failed mail can be sent again from the admin page', async () => {
   } finally { t.close(); }
 });
 
+test('the admin page counts who is coming and the API refuses a missing answer', async () => {
+  const t = await start();
+  try {
+    const missing = await t.post('/api/totnghiep/wishes', { name: 'Lan', message: 'Chúc mừng' });
+    assert.equal(missing.status, 400);
+    assert.match((await missing.json()).error, /chọn đến/);
+    for (const attending of ['yes', 'yes', 'no', 'maybe']) await (await t.service.submit({ attending, name: 'Khách ' + attending, message: 'Chúc mừng' })).delivery;
+    await t.login();
+    const html = await (await t.call('/totnghiep/admin')).text();
+    assert.ok(html.includes('<b>2</b><span>Sẽ đến</span>'));
+    assert.ok(html.includes('<b>1</b><span>Không đến được</span>'));
+    assert.ok(html.includes('<b>1</b><span>Chưa chắc</span>'));
+    assert.ok(html.includes('badge yes'));
+    const csv = await (await t.call('/totnghiep/admin/wishes.csv')).text();
+    assert.ok(csv.includes('"Không đến được"'));
+  } finally { t.close(); }
+});
+
+test('the invitation page has the attending select with the three answers', async () => {
+  const t = await start();
+  try {
+    const html = await (await t.call('/totnghiep')).text();
+    assert.match(html, /<select id="wish-attend" name="attending" required>/);
+    for (const value of ['yes', 'no', 'maybe']) assert.ok(html.includes('<option value="' + value + '">'));
+  } finally { t.close(); }
+});
+
 test('the CSV export defuses spreadsheet formulas', async () => {
   const t = await start();
   try {
-    await (await t.service.submit({ name: 'Lan', message: '=HYPERLINK("http://evil","click")' })).delivery;
+    await (await t.service.submit({ attending: 'yes', name: 'Lan', message: '=HYPERLINK("http://evil","click")' })).delivery;
     await t.login();
     const res = await t.call('/totnghiep/admin/wishes.csv');
     assert.match(res.headers.get('content-type'), /text\/csv/);
     const bytes = Buffer.from(await res.arrayBuffer());
     assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf], 'Excel needs the UTF-8 byte order mark to read Vietnamese');
     const csv = bytes.toString('utf8');
-    assert.ok(csv.includes('Thời gian,Tên,Lời chúc,Mail'));
+    assert.ok(csv.includes('Thời gian,Tên,Tham dự,Lời chúc,Mail'));
     assert.ok(csv.includes('"\'=HYPERLINK(""http://evil"",""click"")"'));
   } finally { t.close(); }
 });
