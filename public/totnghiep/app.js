@@ -21,7 +21,7 @@
 
   // graduation: 8 Dec 2026, Vietnam time
   const DAY_START = new Date('2026-12-08T11:30:00+07:00').getTime();
-  const DAY_END = new Date('2026-12-08T13:00:00+07:00').getTime();
+  const DAY_END = new Date('2026-12-08T13:30:00+07:00').getTime();
   const countdown = document.getElementById('countdown');
   function tick() {
     const now = Date.now();

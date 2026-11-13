@@ -2,7 +2,7 @@
   'use strict';
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const DAY_START = new Date('2026-12-08T11:30:00+07:00').getTime();
-  const DAY_END = new Date('2026-12-08T13:00:00+07:00').getTime();
+  const DAY_END = new Date('2026-12-08T13:30:00+07:00').getTime();
   const pad = n => String(n).padStart(2, '0');
 
   /* section entrances, staggered */
@@ -32,7 +32,7 @@
     if (now >= DAY_START) {
       tiles.classList.add('is-day');
       tiles.textContent = now < DAY_END ? 'Lễ tốt nghiệp đang diễn ra!' : 'Lễ tốt nghiệp đã diễn ra, cảm ơn mọi người đã chung vui!';
-      note.textContent = 'Thứ Ba, 8 tháng 12 · 11:30 – 13:00';
+      note.textContent = 'Thứ Ba, 8 tháng 12 · 11:30 – 13:30';
       return false;
     }
     const left = Math.floor((DAY_START - now) / 1000);
@@ -59,7 +59,7 @@
       'BEGIN:VEVENT',
       'UID:tot-nghiep-thao-dan-0812@locly',
       'DTSTAMP:20261029T000000Z',
-      'DTSTART:20261208T043000Z', 'DTEND:20261208T060000Z',
+      'DTSTART:20261208T043000Z', 'DTEND:20261208T063000Z',
       'SUMMARY:Lễ tốt nghiệp Thảo Đan 🎓',
       'LOCATION:Sân tòa Thiên Lý\\, Trường Đại học Nông Lâm\\, khu phố 9\\, phường Linh Xuân\\, Thủ Đức\\, TP. Hồ Chí Minh',
       'DESCRIPTION:Chung vui lễ tốt nghiệp đại học của Nguyễn Quỳnh Thảo Đan. Bãi giữ xe: 60V Linh Trung\\, Linh Xuân (Bãi giữ xe Sinh viên Nông Lâm số 1).',
