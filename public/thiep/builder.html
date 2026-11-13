@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#eef7f1">
+  <title>Tạo thiệp mời tốt nghiệp online · 29.000đ</title>
+  <meta name="description" content="Tự thiết kế thiệp mời tốt nghiệp online: chọn màu, ảnh, chữ, thêm thông tin buổi lễ, đếm ngược và hộp lời chúc. Xem trước miễn phí, xuất bản 29.000đ.">
+  <meta property="og:title" content="Tạo thiệp mời tốt nghiệp online">
+  <meta property="og:description" content="Chọn màu, ảnh, chữ. Bạn bè gửi lời chúc và cho biết có đến không. Xem trước miễn phí.">
+  <meta property="og:image" content="/assets/thiep/og.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Quicksand:wght@500;600;700&family=Playfair+Display:wght@700&family=Be+Vietnam+Pro:wght@600;700&display=swap">
+  <link rel="stylesheet" href="/assets/thiep/site.css">
+  <script src="/assets/thiep/icons.js" defer></script>
+  <script src="/assets/thiep/builder.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/taothiep"><svg viewBox="0 0 120 120" aria-hidden="true"><path fill="#1f7a52" d="M30 58v20c0 10 13 16 30 16s30-6 30-16V58L60 68z"/><path fill="#2e9e6e" d="M60 22l52 22-52 22L8 44z"/><path d="M60 44l40 6v22" fill="none" stroke="#ffc94d" stroke-width="5" stroke-linecap="round"/></svg>Thiệp tốt nghiệp</a>
+    <a class="btn btn-soft btn-sm" href="#thiep-cua-toi" id="mine-link" hidden>Thiệp của tôi</a>
+  </header>
+
+  <section class="landing">
+    <div class="landing-inner">
+      <div>
+        <h1 class="display">Thiệp mời tốt nghiệp <span>online</span>, xong trong 5 phút</h1>
+        <p class="lead">Tự chọn màu, ảnh và kiểu chữ. Bạn bè mở link là thấy giờ, địa điểm, chỉ đường, đếm ngược, gửi lời chúc và cho bạn biết có đến không.</p>
+        <div class="cta-row">
+          <a class="btn" href="#tao">Bắt đầu tạo thiệp</a>
+          <span class="price-tag">Xem trước miễn phí · xuất bản <b id="price-label">29.000đ</b></span>
+        </div>
+        <div class="perks">
+          <div class="perk"><i aria-hidden="true">🎨</i><p><b>Màu, ảnh, chữ tuỳ bạn</b><span>6 bộ màu có sẵn hoặc tự chọn, ảnh của bạn hoặc icon.</span></p></div>
+          <div class="perk"><i aria-hidden="true">📍</i><p><b>Đủ thông tin buổi lễ</b><span>Giờ, địa điểm, nút chỉ đường, bãi xe, số liên hệ.</span></p></div>
+          <div class="perk"><i aria-hidden="true">💌</i><p><b>Hộp lời chúc</b><span>Bạn bè chúc mừng và chọn đến, không đến hay chưa chắc.</span></p></div>
+          <div class="perk"><i aria-hidden="true">🎓</i><p><b>Vui mắt</b><span>Đếm ngược, thêm vào lịch, mũ tung, pháo giấy, nhạc.</span></p></div>
+        </div>
+      </div>
+      <div class="hero-phone" aria-hidden="true"><iframe id="demo-frame" title="Thiệp mẫu" src="/thiep/xem-truoc" loading="lazy" tabindex="-1"></iframe></div>
+    </div>
+  </section>
+
+  <main class="builder" id="tao">
+    <form id="builder" novalidate>
+      <section class="panel" aria-labelledby="s1">
+        <h3 id="s1"><span class="step">1</span>Người tốt nghiệp</h3>
+        <div class="grid2">
+          <label class="field"><span>Tên hiển thị trên thiệp *</span><input name="nickname" maxlength="24" placeholder="Ví dụ: Thảo Đan" required></label>
+          <label class="field"><span>Họ tên đầy đủ</span><input name="fullName" maxlength="60" placeholder="Ví dụ: Nguyễn Quỳnh Thảo Đan"></label>
+          <label class="field"><span>Trường</span><input name="school" maxlength="80" placeholder="Ví dụ: Trường Đại học Nông Lâm"></label>
+          <label class="field"><span>Ngành</span><input name="major" maxlength="80" placeholder="Ví dụ: Công nghệ thực phẩm"></label>
+        </div>
+        <p class="sub">Ảnh hoặc icon</p>
+        <div class="portrait-pick">
+          <div class="portrait-box" id="portrait-box">Chưa có ảnh</div>
+          <div>
+            <div class="upload-row">
+              <label class="upload btn btn-soft btn-sm"><input type="file" id="portrait-file" accept="image/jpeg,image/png,image/webp,image/heic">Tải ảnh của bạn</label>
+              <button class="btn btn-ghost btn-sm" type="button" id="portrait-clear" hidden>Dùng icon thay ảnh</button>
+            </div>
+            <p class="hint">Ảnh JPG, PNG hoặc WebP tối đa 5 MB. Hoặc chọn một icon:</p>
+            <div class="icons" id="icons" role="radiogroup" aria-label="Chọn icon"></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="s2">
+        <h3 id="s2"><span class="step">2</span>Buổi lễ</h3>
+        <div class="grid3">
+          <label class="field"><span>Ngày *</span><input type="date" name="date" required></label>
+          <label class="field"><span>Bắt đầu *</span><input type="time" name="start" required></label>
+          <label class="field"><span>Kết thúc</span><input type="time" name="end"></label>
+          <label class="field"><span>Dòng tiêu đề</span><input name="headline" maxlength="30" placeholder="Lễ tốt nghiệp"></label>
+          <label class="field full"><span>Lời mời <small>(để trống sẽ tự viết)</small></span><textarea name="invite" maxlength="200" placeholder="Ví dụ: Thảo Đan trân trọng kính mời bạn đến chung vui ngày tốt nghiệp đại học"></textarea></label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="s3">
+        <h3 id="s3"><span class="step">3</span>Địa điểm và liên hệ</h3>
+        <div class="grid2">
+          <label class="field"><span>Tên địa điểm</span><input name="venue.name" maxlength="80" placeholder="Ví dụ: Sân tòa Thiên Lý"></label>
+          <label class="field"><span>Địa chỉ</span><input name="venue.address" maxlength="160" placeholder="Số nhà, đường, phường, thành phố"></label>
+          <label class="field full"><span>Link Google Maps <small>(bấm Chia sẻ trong Google Maps rồi dán vào)</small></span><input name="venue.mapUrl" inputmode="url" maxlength="400" placeholder="https://maps.app.goo.gl/..."></label>
+        </div>
+        <div class="upload-row mt">
+          <label class="upload btn btn-soft btn-sm"><input type="file" id="venue-file" accept="image/jpeg,image/png,image/webp,image/heic">Tải ảnh địa điểm</label>
+          <button class="btn btn-ghost btn-sm" type="button" id="venue-clear" hidden>Bỏ ảnh địa điểm</button>
+          <span class="hint" id="venue-name"></span>
+        </div>
+        <p class="sub">Gửi xe <small class="hint">(không bắt buộc)</small></p>
+        <div class="grid2">
+          <label class="field"><span>Tên bãi xe</span><input name="parking.name" maxlength="80" placeholder="Ví dụ: Bãi giữ xe sinh viên số 1"></label>
+          <label class="field"><span>Địa chỉ bãi xe</span><input name="parking.address" maxlength="160"></label>
+          <label class="field full"><span>Link bản đồ bãi xe</span><input name="parking.mapUrl" inputmode="url" maxlength="400" placeholder="https://maps.app.goo.gl/..."></label>
+        </div>
+        <p class="sub">Người liên hệ <small class="hint">(tối đa 2)</small></p>
+        <div class="grid3">
+          <label class="field"><span>Tên</span><input name="contacts.0.name" maxlength="40" placeholder="Ví dụ: Thảo Đan"></label>
+          <label class="field"><span>Ghi chú</span><input name="contacts.0.note" maxlength="40" placeholder="Ví dụ: tân cử nhân"></label>
+          <label class="field"><span>Số điện thoại</span><input name="contacts.0.phone" inputmode="tel" maxlength="20" placeholder="0368 068 544"></label>
+          <label class="field"><span>Tên</span><input name="contacts.1.name" maxlength="40"></label>
+          <label class="field"><span>Ghi chú</span><input name="contacts.1.note" maxlength="40" placeholder="Ví dụ: bạn thân"></label>
+          <label class="field"><span>Số điện thoại</span><input name="contacts.1.phone" inputmode="tel" maxlength="20"></label>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="s4">
+        <h3 id="s4"><span class="step">4</span>Giao diện</h3>
+        <p class="sub">Bộ màu</p>
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="Bộ màu"></div>
+        <div class="colors">
+          <label class="color-field"><span>Nền trang</span><input type="color" data-color="bg"></label>
+          <label class="color-field"><span>Nền thẻ</span><input type="color" data-color="card"></label>
+          <label class="color-field"><span>Màu chính</span><input type="color" data-color="accent"></label>
+          <label class="color-field"><span>Màu chữ</span><input type="color" data-color="ink"></label>
+        </div>
+        <p class="warn" id="contrast-warn" hidden></p>
+        <p class="sub">Kiểu chữ</p>
+        <div class="fonts" role="radiogroup" aria-label="Kiểu chữ">
+          <label class="font-opt f-cute"><input type="radio" name="font" value="cute" checked><span><em>Dễ thương</em><small>Tròn trịa, vui tươi</small></span></label>
+          <label class="font-opt f-elegant"><input type="radio" name="font" value="elegant"><span><em>Thanh lịch</em><small>Có chân, sang trọng</small></span></label>
+          <label class="font-opt f-modern"><input type="radio" name="font" value="modern"><span><em>Hiện đại</em><small>Gọn gàng, rõ ràng</small></span></label>
+        </div>
+        <p class="sub">Các phần trên thiệp</p>
+        <div class="toggles">
+          <label class="toggle"><input type="checkbox" data-module="info" checked>Thông tin buổi lễ</label>
+          <label class="toggle"><input type="checkbox" data-module="countdown" checked>Đếm ngược</label>
+          <label class="toggle"><input type="checkbox" data-module="calendar" checked>Thêm vào lịch</label>
+          <label class="toggle"><input type="checkbox" data-module="wishes" checked>Hộp lời chúc</label>
+          <label class="toggle"><input type="checkbox" data-module="music" checked>Nhạc</label>
+          <label class="toggle"><input type="checkbox" data-module="cap" checked>Mũ tung</label>
+        </div>
+      </section>
+    </form>
+
+    <aside class="preview-col" id="xem-thu" aria-label="Xem trước thiệp">
+      <div class="phone"><iframe id="preview" title="Xem trước thiệp" src="/thiep/xem-truoc"></iframe></div>
+      <p class="preview-cap">Xem trước trực tiếp, thay đổi đến đâu thấy đến đó.</p>
+    </aside>
+  </main>
+
+  <p class="terms">Bằng việc xuất bản, bạn xác nhận nội dung và hình ảnh là của bạn hoặc bạn có quyền dùng, không vi phạm pháp luật hay xúc phạm người khác. Thiệp vi phạm sẽ bị gỡ.</p>
+
+  <section class="panel mine-panel" id="thiep-cua-toi" hidden>
+    <h3>Thiệp của tôi</h3>
+    <p class="hint">Các thiệp bạn đã tạo trên trình duyệt này.</p>
+    <div class="mycards" id="mycards"></div>
+  </section>
+
+  <div class="savebar">
+    <a class="btn btn-soft btn-sm mobile-preview-btn" href="#xem-thu">Xem thử</a>
+    <span class="save-status" id="save-status" role="status"></span>
+    <a class="btn btn-soft btn-sm" id="open-manage" hidden>Mở trang quản lý</a>
+    <button class="btn" type="button" id="save">Lưu và lấy link quản lý</button>
+  </div>
+</body>
+</html>

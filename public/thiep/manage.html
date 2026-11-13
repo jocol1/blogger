@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#eef7f1">
+  <title>Quản lý thiệp tốt nghiệp</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Quicksand:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="/assets/thiep/site.css">
+  <script src="/assets/thiep/manage.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/taothiep"><svg viewBox="0 0 120 120" aria-hidden="true"><path fill="#1f7a52" d="M30 58v20c0 10 13 16 30 16s30-6 30-16V58L60 68z"/><path fill="#2e9e6e" d="M60 22l52 22-52 22L8 44z"/><path d="M60 44l40 6v22" fill="none" stroke="#ffc94d" stroke-width="5" stroke-linecap="round"/></svg>Thiệp tốt nghiệp</a>
+    <a class="btn btn-soft btn-sm" id="edit-link" href="/taothiep">Sửa thiệp</a>
+  </header>
+
+  <main class="manage">
+    <div class="manage-head">
+      <div>
+        <p class="hint">Trang quản lý thiệp</p>
+        <h1 class="display" id="title">Đang tải…</h1>
+      </div>
+      <span class="pill" id="status-pill"></span>
+    </div>
+
+    <div>
+      <p class="panel status-line is-bad" id="load-error" hidden></p>
+
+      <section class="panel" id="publish-panel" hidden aria-labelledby="pub-title">
+        <h3 id="pub-title">Xuất bản thiệp</h3>
+        <p>Thiệp đang là <b>bản nháp</b>: chỉ bạn xem được. Xuất bản để có link gửi bạn bè và nhận lời chúc.</p>
+        <p class="big-price" id="price">29.000đ</p>
+        <p class="hint">Trả một lần, sửa thiệp miễn phí sau đó.</p>
+        <div class="wallet-line"><span>Số xu trong ví của bạn</span><b id="wallet-balance">…</b></div>
+        <button class="btn" type="button" id="publish">Xuất bản ngay</button>
+        <p class="status-line" id="pub-status" role="status"></p>
+        <div class="qr" id="qr" hidden>
+          <img id="qr-img" alt="Mã QR chuyển khoản" width="240" height="300">
+          <div>
+            <p><b>Quét mã bằng app ngân hàng</b>, giữ nguyên số tiền và nội dung. Tiền về là thiệp tự xuất bản.</p>
+            <dl>
+              <div><dt>Ngân hàng</dt><dd id="qr-bank"></dd></div>
+              <div><dt>Số tài khoản</dt><dd id="qr-account"></dd></div>
+              <div><dt>Chủ tài khoản</dt><dd id="qr-name"></dd></div>
+              <div><dt>Số tiền</dt><dd id="qr-amount"></dd></div>
+              <div><dt>Nội dung chuyển khoản</dt><dd id="qr-code"></dd></div>
+            </dl>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel" id="share-panel" hidden aria-labelledby="share-title">
+        <h3 id="share-title">Thiệp đã xuất bản 🎉</h3>
+        <p>Gửi link này cho bạn bè qua Zalo, Messenger hay Facebook.</p>
+        <div class="share">
+          <label class="sr-only" for="share-url">Link thiệp</label>
+          <input id="share-url" readonly>
+          <button class="btn btn-sm" type="button" id="copy-share">Sao chép</button>
+        </div>
+        <div class="row mt" id="share-actions">
+          <a class="btn btn-soft btn-sm" id="open-card" target="_blank" rel="noopener">Mở thiệp</a>
+          <button class="btn btn-soft btn-sm" type="button" id="native-share" hidden>Chia sẻ…</button>
+        </div>
+      </section>
+
+      <section class="panel" aria-labelledby="wish-title">
+        <h3 id="wish-title">Lời chúc</h3>
+        <div class="stats">
+          <div class="stat"><b id="n-yes">0</b><span>Sẽ đến</span></div>
+          <div class="stat"><b id="n-no">0</b><span>Không đến được</span></div>
+          <div class="stat"><b id="n-maybe">0</b><span>Chưa chắc</span></div>
+        </div>
+        <div class="row"><button class="btn btn-soft btn-sm" type="button" id="refresh-wishes">Tải lại</button><button class="btn btn-soft btn-sm" type="button" id="csv">Tải CSV</button></div>
+        <div id="wishes"></div>
+      </section>
+
+      <section class="panel" aria-labelledby="mail-title">
+        <h3 id="mail-title">Giữ link quản lý</h3>
+        <p>Link của trang này là chìa khoá để sửa thiệp và xem lời chúc. Ai có link đều vào được, nên đừng gửi cho người khác.</p>
+        <div class="share">
+          <label class="sr-only" for="manage-url">Link quản lý</label>
+          <input id="manage-url" readonly>
+          <button class="btn btn-soft btn-sm" type="button" id="copy-manage">Sao chép</button>
+        </div>
+        <form class="share" id="email-form" novalidate>
+          <label class="sr-only" for="owner-email">Email của bạn</label>
+          <input id="owner-email" type="email" autocomplete="email" maxlength="120" placeholder="Email để nhận link và lời chúc">
+          <button class="btn btn-sm" type="submit">Lưu email</button>
+        </form>
+        <p class="status-line" id="email-status" role="status"></p>
+      </section>
+    </div>
+
+    <aside class="preview-col" aria-label="Xem trước thiệp">
+      <div class="phone"><iframe id="preview" title="Xem trước thiệp" src="/thiep/xem-truoc"></iframe></div>
+    </aside>
+  </main>
+</body>
+</html>

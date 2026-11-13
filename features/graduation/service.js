@@ -22,9 +22,9 @@ const clean = (value, max) => String(value ?? '')
   .slice(0, max);
 
 // Wishes live in Firestore when the app has it, otherwise in a private JSON file.
-function createWishStore({ db, file }) {
+function createWishStore({ db, file, collection = COLLECTION }) {
   if (db) {
-    const col = () => db.collection(COLLECTION);
+    const col = () => db.collection(collection);
     return {
       async add(wish) { await col().doc(wish.id).set(wish); },
       async get(id) { const snap = await col().doc(id).get(); return snap.exists ? snap.data() : null; },
@@ -75,10 +75,10 @@ function createMailer(env = process.env) {
   };
   return {
     configured: true, to,
-    async send({ subject, text, html }) {
+    async send({ subject, text, html, to: target }) {
       transport ||= make();
       await transport.sendMail({
-        from: env.SMTP_FROM || `Thư mời tốt nghiệp <${user}>`, to,
+        from: env.SMTP_FROM || `Thư mời tốt nghiệp <${user}>`, to: target || to,
         subject: String(subject).replace(/[\r\n]+/g, ' ').slice(0, 150), text, html,
       });
     },
@@ -88,15 +88,15 @@ function createMailer(env = process.env) {
 const escapeHtml = value => String(value).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const vnTime = ms => new Date(ms).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });
 
-function wishEmail(wish, adminUrl) {
+function wishEmail(wish, adminUrl, honoree = 'Thảo Đan') {
   const when = vnTime(wish.createdMs);
   const text = [
-    `${wish.name} vừa gửi lời chúc mừng tốt nghiệp cho Thảo Đan:`, '', wish.message, '',
+    `${wish.name} vừa gửi lời chúc mừng tốt nghiệp cho ${honoree}:`, '', wish.message, '',
     `Tham dự: ${ATTENDING[wish.attending] || 'Chưa cho biết'}`,
     `Gửi lúc: ${when} (giờ Việt Nam)`, ...(adminUrl ? ['', `Xem tất cả lời chúc: ${adminUrl}`] : []),
   ].join('\n');
   const html = `<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;padding:24px;background:#e3f5e8;border-radius:20px">`
-    + `<p style="margin:0 0 12px;color:#1f7a52;font-weight:700">${escapeHtml(wish.name)} vừa gửi lời chúc cho Thảo Đan</p>`
+    + `<p style="margin:0 0 12px;color:#1f7a52;font-weight:700">${escapeHtml(wish.name)} vừa gửi lời chúc cho ${escapeHtml(honoree)}</p>`
     + `<p style="margin:0 0 16px;padding:16px;background:#fff;border-radius:14px;color:#1f3d2e;white-space:pre-wrap">${escapeHtml(wish.message)}</p>`
     + `<p style="margin:0 0 6px;color:#1f7a52;font-weight:700">Tham dự: ${escapeHtml(ATTENDING[wish.attending] || 'Chưa cho biết')}</p>`
     + `<p style="margin:0;color:#5b7d6a;font-size:13px">${escapeHtml(when)} (giờ Việt Nam)</p>`
@@ -155,4 +155,4 @@ function createGraduationService({ db = null, file, mailer = createMailer(), adm
   };
 }
 
-module.exports = { ATTENDING, createGraduationService, createMailer, createWishStore, wishEmail, WishError, NAME_MAX, MESSAGE_MAX, DEFAULT_MAIL_TO };
+module.exports = { ATTENDING, clean, escapeHtml, vnTime, createGraduationService, createMailer, createWishStore, wishEmail, WishError, NAME_MAX, MESSAGE_MAX, DEFAULT_MAIL_TO };

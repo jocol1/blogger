@@ -16,6 +16,7 @@ const { readConfig } = require('./features/donations/service');
 const { createChatRouter } = require('./features/chat/routes');
 const { createPartyRouter } = require('./features/party/routes');
 const { createGraduationRouter } = require('./features/graduation/routes');
+const { createCardsRouter } = require('./features/cards/routes');
 const { createTeaService } = require('./features/tea/service');
 const { createGroceryPrices, firestorePriceStore } = require('./features/tea/grocery-prices');
 const { createBhxCollector } = require('./features/tea/bhx-collector');
@@ -101,6 +102,7 @@ app.use(createDonationRouter({ db: firestore, config: donationConfig, teaService
 app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createGraduationRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+app.use(createCardsRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 // Keep the former blog in place while exposing the current public product routes mounted above.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {

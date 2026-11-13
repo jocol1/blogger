@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="{{ROBOTS}}">
+  <meta name="theme-color" content="{{THEME}}">
+  <title>{{TITLE}}</title>
+  <meta name="description" content="{{DESC}}">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="{{TITLE}}">
+  <meta property="og:description" content="{{DESC}}">
+  <meta property="og:image" content="{{IMAGE}}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="/assets/thiep/card.css">
+  <script type="application/json" id="card-data">{{DATA}}</script>
+  <script src="/assets/thiep/icons.js" defer></script>
+  <script src="/assets/thiep/fx.js" defer></script>
+  <script src="/assets/thiep/card.js" defer></script>
+</head>
+<body>
+  <noscript><p class="noscript">Bạn bật JavaScript để xem thiệp nhé.</p></noscript>
+  <div id="app" hidden>
+    <header class="hero">
+      <div class="deco" id="deco" aria-hidden="true"></div>
+      <article class="card">
+        <div class="photo">
+          <div class="photo-img" id="portrait"></div>
+          <button class="cap" id="cap" type="button" aria-label="Tung mũ tốt nghiệp lên">
+            <svg viewBox="0 20 240 160" aria-hidden="true"><g class="hat">
+              <path class="c-deep" d="M58 96v42c0 20 28 32 62 32s62-12 62-32V96L120 114z"/>
+              <path class="c-board" d="M120 30L228 74 120 118 12 74z"/>
+              <path class="c-light" d="M120 30L228 74 120 74z"/>
+              <circle class="c-gold" cx="120" cy="74" r="7"/>
+              <path class="c-gold-line" d="M120 74L206 84v42" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+              <rect class="c-gold" x="199" y="124" width="14" height="22" rx="5"/>
+            </g></svg>
+          </button>
+        </div>
+        <h1 class="title"><span class="script" data-text="headline"></span><span class="name" id="name" data-text="nickname"></span></h1>
+        <p class="school" data-text="school"></p>
+        <p class="major" data-text="major"></p>
+        <p class="invite" id="invite"></p>
+        <p class="date" id="date-label"></p>
+        <p class="time" id="time-label"></p>
+        <p class="countdown" id="countdown"></p>
+        <p class="hint" id="hint" role="status">Chạm vào chiếc mũ để tung lên nhé</p>
+        <a class="btn" href="#thong-tin" id="hero-btn">Xem thông tin buổi lễ</a>
+      </article>
+    </header>
+
+    <main>
+      <section class="sec sec-a" id="thong-tin" aria-labelledby="info-title">
+        <h2 class="sec-title" id="info-title">Thông tin buổi lễ</h2>
+        <div class="info">
+          <article class="info-card info-wide" id="venue-card">
+            <div class="wide-text">
+              <span class="info-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><circle cx="12" cy="9.5" r="2.6" fill="currentColor"/></svg></span>
+              <h3>Địa điểm</h3>
+              <p class="big" data-text="venue.name"></p>
+              <p data-text="venue.address"></p>
+              <a class="btn btn-sm" id="venue-map" target="_blank" rel="noopener noreferrer nofollow">Chỉ đường</a>
+            </div>
+            <img class="venue-photo" id="venue-photo" alt="" width="800" height="600" hidden>
+          </article>
+          <article class="info-card">
+            <span class="info-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M12 7v5.5l3.5 2" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <h3>Thời gian</h3>
+            <p class="big" id="info-time"></p>
+            <p id="info-date"></p>
+          </article>
+          <article class="info-card" id="parking-card">
+            <span class="info-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M10 16.5V7.5h3a2.8 2.8 0 0 1 0 5.6h-3" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+            <h3>Gửi xe</h3>
+            <p class="big" data-text="parking.name"></p>
+            <p data-text="parking.address"></p>
+            <a class="btn btn-sm" id="parking-map" target="_blank" rel="noopener noreferrer nofollow">Chỉ đường</a>
+          </article>
+          <article class="info-card" id="contact-card">
+            <span class="info-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M6.6 3.5h3l1.4 4-2 1.3a11 11 0 0 0 5.2 5.2l1.3-2 4 1.4v3A2.6 2.6 0 0 1 17 18.9C10.4 18.4 5.6 13.6 5.1 7A2.6 2.6 0 0 1 6.6 3.5z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></svg></span>
+            <h3>Liên hệ</h3>
+            <div id="contacts"></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="sec sec-b" id="dem-nguoc" aria-labelledby="cd-title">
+        <h2 class="sec-title" id="cd-title">Đếm ngược đến buổi lễ</h2>
+        <div class="tiles" id="tiles">
+          <div class="tile"><b data-u="d">0</b><span>ngày</span></div>
+          <div class="tile"><b data-u="h">00</b><span>giờ</span></div>
+          <div class="tile"><b data-u="m">00</b><span>phút</span></div>
+          <div class="tile"><b data-u="s">00</b><span>giây</span></div>
+        </div>
+        <p class="sec-sub" id="tiles-note"></p>
+      </section>
+
+      <section class="sec sec-a" id="lich" aria-labelledby="cal-title">
+        <div class="cal-wrap">
+          <div class="cal" role="img" id="cal">
+            <div class="cal-head"><i></i><i></i><span id="cal-month"></span></div>
+            <div class="cal-grid" id="cal-grid"></div>
+          </div>
+          <div class="cal-text">
+            <h2 class="sec-title" id="cal-title"></h2>
+            <p id="cal-text"></p>
+            <button class="btn" id="add-cal" type="button">Thêm vào lịch</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="wishes" id="loi-chuc" aria-labelledby="wish-title">
+        <form class="wish-card" id="wish" novalidate>
+          <h2 id="wish-title">Gửi lời chúc mừng tốt nghiệp</h2>
+          <p class="wish-sub" id="wish-sub"></p>
+          <label class="field"><span>Tên của bạn</span><input id="wish-name" maxlength="40" autocomplete="name" placeholder="Ví dụ: Minh Anh"></label>
+          <label class="field"><span>Bạn có đến dự không?</span><select id="wish-attend"><option value="">Chọn một câu trả lời…</option><option value="yes">Mình sẽ đến</option><option value="no">Mình không đến được</option><option value="maybe">Chưa chắc, mình báo sau</option></select></label>
+          <input class="hp" type="text" id="wish-website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <div class="chips" id="chips" aria-label="Lời chúc gợi ý"></div>
+          <label class="field"><span>Lời chúc</span><textarea id="wish-text" rows="3" maxlength="240" placeholder="Chúc mừng bạn tốt nghiệp thật rực rỡ…"></textarea></label>
+          <button class="btn btn-wide" type="submit" id="wish-send">Gửi lời chúc</button>
+          <p class="wish-status" id="wish-status" role="status"></p>
+        </form>
+        <div class="wish-thanks" id="wish-thanks" hidden>
+          <h2 id="thanks-title">Đã gửi rồi!</h2>
+          <p id="thanks-text"></p>
+          <button class="btn btn-soft" id="wish-again" type="button">Gửi thêm lời chúc</button>
+        </div>
+      </section>
+    </main>
+
+    <button class="music" id="music" type="button" aria-pressed="false"><span class="music-note" aria-hidden="true">♪</span><span class="music-label">Bật nhạc</span></button>
+
+    <footer class="foot">
+      <p id="foot-line"></p>
+      <p class="foot-contact" id="foot-contact"></p>
+      <p class="foot-brand"><a href="/taothiep">Tạo thiệp tốt nghiệp của bạn</a></p>
+    </footer>
+  </div>
+</body>
+</html>
