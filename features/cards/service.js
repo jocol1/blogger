@@ -4,6 +4,7 @@ const path = require('node:path');
 const sharp = require('sharp');
 const { clean, ATTENDING, createWishStore, createMailer, escapeHtml, vnTime, wishEmail } = require('../graduation/service');
 const { CardError, normalizeCard, email: cleanEmail } = require('./validate');
+const { createLru } = require('./cache');
 
 const CARD_PRICE = 29;
 // Owners who explain a hard situation pay less. It is taken on trust; admin sees every reason.
@@ -133,7 +134,36 @@ function ownerCard(card) {
 }
 
 function createCardService({ db = null, dir, mailer = createMailer(), publicUrl = '', supportUrl = DEFAULT_SUPPORT_URL, now = Date.now, id = () => crypto.randomUUID() } = {}) {
-  const store = createCardStore({ db, dir });
+  // Every card view and every photo used to cost Firestore reads. Shared links bring the same
+  // card again and again, so keep recent cards for a minute and photos for an hour. All writes
+  // in this process go through here and drop the cached copy first.
+  const raw = createCardStore({ db, dir });
+  const cardCache = createLru({ maxEntries: 2000, ttlMs: 60_000 });
+  const imageCache = createLru({ maxEntries: 600, maxBytes: 48 * 1024 * 1024, ttlMs: 3600_000, sizeOf: v => v.data.length });
+  const jpegCache = createLru({ maxEntries: 200, maxBytes: 16 * 1024 * 1024, ttlMs: 3600_000, sizeOf: v => v.length });
+  const store = {
+    ...raw,
+    async getCard(code) {
+      let card = cardCache.get(code);
+      if (card === undefined) { card = await raw.getCard(code); cardCache.set(code, card); }
+      return card ? structuredClone(card) : null;
+    },
+    async putCard(card) { cardCache.delete(card.code); await raw.putCard(card); cardCache.delete(card.code); },
+    async patchCard(code, patch) { cardCache.delete(code); await raw.patchCard(code, patch); cardCache.delete(code); },
+    async deleteCard(code) { cardCache.delete(code); await raw.deleteCard(code); },
+    async getImage(imageId) {
+      let image = imageCache.get(imageId);
+      if (!image) {
+        const found = await raw.getImage(imageId);
+        if (!found) return null;
+        image = { ...found, data: Buffer.from(found.data) };
+        imageCache.set(imageId, image);
+      }
+      return image;
+    },
+    async deleteImage(imageId) { imageCache.delete(imageId); jpegCache.delete(imageId); await raw.deleteImage(imageId); },
+    forget(code) { cardCache.delete(code); },
+  };
   const base = publicUrl.replace(/\/$/, '');
   const manageUrl = (code, token) => `${base}/thiep/${code}/quanly#k=${token}`;
 
@@ -260,7 +290,19 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
       if (!image) return null;
       const card = await store.getCard(image.cardCode);
       if (!card || card.status === 'disabled') return null;
-      return { data: Buffer.from(image.data), mime: image.mime || 'image/webp' };
+      return { data: image.data, mime: image.mime || 'image/webp' };
+    },
+
+    // Zalo and some Facebook crawlers still prefer JPEG for link previews.
+    async getShareImage(imageId) {
+      const image = await this.getImage(imageId);
+      if (!image) return null;
+      let jpeg = jpegCache.get(imageId);
+      if (!jpeg) {
+        jpeg = await sharp(image.data).resize({ width: 1200, height: 1200, fit: 'inside', withoutEnlargement: true }).flatten({ background: '#ffffff' }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+        jpegCache.set(imageId, jpeg);
+      }
+      return { data: jpeg, mime: 'image/jpeg' };
     },
 
     // Debit the visitor's xu wallet and publish, in one transaction. Same pattern as the party
@@ -294,6 +336,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
         tx.create(attemptRef, { walletId, code: card.code, purchaseId, createdAt: at });
         return updated;
       });
+      store.forget(card.code);
       if (next.ownerEmail) mailOwner(next, linkMail(next, token)).catch(() => {});
       return ownerCard(next);
     },
@@ -398,6 +441,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
         tx.update(walletRef, { balance, updatedAt: iso(at), history: appendHistory(wallet, { id: `card-refund-${current.purchase.purchaseId}`, type: 'card_refund', amount: current.purchase.xu, balance, createdAt: iso(at) }) });
         tx.set(cardRef, { ...current, status: 'disabled', disabledFrom: 'published', updatedMs: at, purchase: { ...current.purchase, refunded: true, refundedMs: at } });
       });
+      store.forget(card.code);
     },
 
     // Drafts nobody paid for are removed after two weeks, together with their photos.

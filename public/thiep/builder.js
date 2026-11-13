@@ -287,6 +287,9 @@
     try { const remote = await api('/api/thiep/config'); config = { ...config, ...remote }; } catch (_) { /* fall back to built-in palettes */ }
     $('price-label').textContent = money(config.price);
     $('hardship-label').textContent = money(config.hardshipPrice);
+    $('plan-price').textContent = money(config.price);
+    $('plan-hardship').textContent = money(config.hardshipPrice);
+    if (config.supportUrl) document.querySelectorAll('.support-link').forEach(a => { a.href = config.supportUrl; });
     renderIcons();
     const hash = new URLSearchParams(location.hash.slice(1));
     const code = hash.get('c'), token = hash.get('k');

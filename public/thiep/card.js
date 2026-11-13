@@ -37,7 +37,7 @@
     for (const [key, value] of Object.entries(tokens)) root.setProperty(key, value);
     const font = FONTS[look.font] || FONTS.cute;
     root.setProperty('--f-display', font.display); root.setProperty('--f-body', font.body); root.setProperty('--f-script', font.script);
-    if (!fontsLoaded.has(font.href)) {
+    if (!fontsLoaded.has(font.href) && !document.querySelector(`link[data-font="${look.font}"]`)) {
       fontsLoaded.add(font.href);
       const link = document.createElement('link');
       link.rel = 'stylesheet';
@@ -100,7 +100,7 @@
     const portrait = $('portrait');
     if (card.look.portrait.type === 'photo') {
       portrait.classList.remove('is-icon');
-      const img = el('img'); img.src = `/thiep/anh/${card.look.portrait.photoId}.webp`; img.alt = `Ảnh của ${c.nickname}`;
+      const img = el('img'); img.src = `/thiep/anh/${card.look.portrait.photoId}.webp`; img.alt = `Ảnh của ${c.nickname}`; img.fetchPriority = 'high'; img.decoding = 'async';
       portrait.replaceChildren(img);
     } else {
       portrait.classList.add('is-icon');
@@ -119,7 +119,7 @@
     const map = $('venue-map');
     show(map, Boolean(c.venue.mapUrl)); if (c.venue.mapUrl) map.href = c.venue.mapUrl;
     const vPhoto = $('venue-photo');
-    if (c.venue.photoId) { vPhoto.src = `/thiep/anh/${c.venue.photoId}.webp`; vPhoto.alt = c.venue.name || 'Ảnh địa điểm'; }
+    if (c.venue.photoId) { vPhoto.loading = 'lazy'; vPhoto.decoding = 'async'; vPhoto.src = `/thiep/anh/${c.venue.photoId}.webp`; vPhoto.alt = c.venue.name || 'Ảnh địa điểm'; }
     show(vPhoto, Boolean(c.venue.photoId));
     $('venue-card').classList.toggle('no-photo', !c.venue.photoId);
     $('info-time').textContent = timeRange(c);

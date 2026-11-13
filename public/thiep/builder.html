@@ -47,6 +47,15 @@
     </div>
   </section>
 
+  <section class="steps" aria-labelledby="steps-title">
+    <h2 class="display" id="steps-title">Chỉ 3 bước là có thiệp</h2>
+    <ol class="step-list">
+      <li><b>Điền thông tin</b><span>Tên, trường, ngày giờ, địa điểm, số liên hệ. Thiếu gì để trống cũng được.</span></li>
+      <li><b>Chọn giao diện</b><span>Màu, kiểu chữ, ảnh của bạn hoặc icon. Xem trước ngay bên cạnh.</span></li>
+      <li><b>Xuất bản và gửi link</b><span>Trả một lần, nhận link gửi Zalo, Messenger. Lời chúc về trang của bạn.</span></li>
+    </ol>
+  </section>
+
   <main class="builder" id="tao">
     <form id="builder" novalidate>
       <section class="panel" aria-labelledby="s1">
@@ -144,7 +153,46 @@
       <div class="phone"><iframe id="preview" title="Xem trước thiệp" src="/thiep/xem-truoc"></iframe></div>
       <p class="preview-cap">Xem trước trực tiếp, thay đổi đến đâu thấy đến đó.</p>
     </aside>
+
+  <div class="savebar">
+      <a class="btn btn-soft btn-sm mobile-preview-btn" href="#xem-thu">Xem thử</a>
+      <span class="save-status" id="save-status" role="status"></span>
+      <a class="btn btn-soft btn-sm" id="open-manage" hidden>Mở trang quản lý</a>
+      <button class="btn" type="button" id="save">Lưu và lấy link quản lý</button>
+    </div>
   </main>
+
+  <section class="pricing" id="gia" aria-labelledby="price-title">
+    <h2 class="display" id="price-title">Giá rõ ràng, trả một lần</h2>
+    <div class="plans">
+      <article class="plan plan-main">
+        <h3>Thiệp tốt nghiệp</h3>
+        <p class="plan-price"><b id="plan-price">29.000đ</b><span>/ thiệp</span></p>
+        <ul>
+          <li>Thiết kế và xem trước miễn phí</li>
+          <li>Link riêng gửi bạn bè, không quảng cáo</li>
+          <li>Hộp lời chúc, thống kê ai đến ai không</li>
+          <li>Sửa thiệp miễn phí sau khi xuất bản</li>
+        </ul>
+        <a class="btn btn-wide" href="#tao">Bắt đầu tạo thiệp</a>
+      </article>
+      <article class="plan">
+        <h3>Hoàn cảnh khó khăn</h3>
+        <p class="plan-price"><b id="plan-hardship">19.000đ</b><span>/ thiệp</span></p>
+        <p>Đầy đủ tính năng như trên. Khi bấm Xuất bản, bạn kể ngắn gọn hoàn cảnh của mình là được áp dụng giá này.</p>
+        <p class="hint">Chuyển khoản qua mã QR, tiền về là thiệp tự xuất bản.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="faq" aria-labelledby="faq-title">
+    <h2 class="display" id="faq-title">Câu hỏi thường gặp</h2>
+    <details><summary>Thanh toán như thế nào?</summary><p>Bấm Xuất bản ở trang quản lý thiệp, quét mã QR bằng app ngân hàng và giữ nguyên nội dung chuyển khoản. Tiền về là thiệp tự xuất bản, thường trong vòng một phút.</p></details>
+    <details><summary>Chuyển khoản rồi mà thiệp chưa xuất bản?</summary><p>Bấm "Tôi đã chuyển khoản" để kiểm tra lại. Quá 10 phút vẫn chưa được thì <a class="support-link" href="https://www.facebook.com/loc.ly.336717" target="_blank" rel="noopener noreferrer">nhắn hỗ trợ qua Facebook</a>, gửi kèm mã thiệp và nội dung chuyển khoản.</p></details>
+    <details><summary>Xuất bản rồi có sửa được không?</summary><p>Được, miễn phí. Mở lại trang quản lý, bấm "Sửa thiệp", lưu là bạn bè thấy ngay bản mới.</p></details>
+    <details><summary>Không có tài khoản thì quản lý thiệp bằng gì?</summary><p>Bằng link quản lý bí mật nhận được khi lưu thiệp. Bạn nên sao chép lưu lại hoặc nhập email để nhận link. Trên cùng trình duyệt, mục "Thiệp của tôi" cũng có sẵn link.</p></details>
+    <details><summary>Thiệp được giữ bao lâu?</summary><p>Thiệp đã xuất bản được giữ lại để bạn và bạn bè mở lại bất cứ lúc nào. Bản nháp chưa xuất bản tự xoá sau 14 ngày.</p></details>
+  </section>
 
   <p class="terms">Bằng việc xuất bản, bạn xác nhận nội dung và hình ảnh là của bạn hoặc bạn có quyền dùng, không vi phạm pháp luật hay xúc phạm người khác. Thiệp vi phạm sẽ bị gỡ.</p>
 
@@ -154,11 +202,9 @@
     <div class="mycards" id="mycards"></div>
   </section>
 
-  <div class="savebar">
-    <a class="btn btn-soft btn-sm mobile-preview-btn" href="#xem-thu">Xem thử</a>
-    <span class="save-status" id="save-status" role="status"></span>
-    <a class="btn btn-soft btn-sm" id="open-manage" hidden>Mở trang quản lý</a>
-    <button class="btn" type="button" id="save">Lưu và lấy link quản lý</button>
-  </div>
+  <footer class="site-foot">
+    <p>Thiệp tốt nghiệp · <a class="support-link" href="https://www.facebook.com/loc.ly.336717" target="_blank" rel="noopener noreferrer">Hỗ trợ qua Facebook</a></p>
+  </footer>
+
 </body>
 </html>

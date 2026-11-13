@@ -341,6 +341,34 @@ test('a published card page cannot be broken out of by what the owner typed', as
   } finally { t.close(); }
 });
 
+test('a shared card shows edits at once and gives link previews absolute addresses and a JPEG', async () => {
+  const t = await start();
+  try {
+    const { card, ownerToken } = await t.service.create(input({ content: { nickname: 'Trước' } }));
+    const image = await t.service.uploadImage(card.code, ownerToken, { buffer: await pngBuffer(800, 600) });
+    await t.service.update(card.code, ownerToken, input({ content: { nickname: 'Trước' }, look: { portrait: { type: 'photo', photoId: image.id }, font: 'elegant' } }));
+    await t.service.adminComp(card.code);
+    const first = await (await t.call(`/thiep/${card.code}`)).text();
+    assert.match(first, /<meta property="og:image" content="http:\/\/127\.0\.0\.1:\d+\/thiep\/anh\/[0-9a-f-]{36}\.jpg">/);
+    assert.match(first, /<meta property="og:url" content="http:\/\/127\.0\.0\.1:\d+\/thiep\/[A-Z2-9]{8}">/);
+    assert.match(first, /<link rel="stylesheet" data-font="elegant" href="https:\/\/fonts\.googleapis\.com\/css2\?family=Playfair/);
+    assert.match(first, /<link rel="preload" as="image" href="\/thiep\/anh\/[0-9a-f-]{36}\.webp" fetchpriority="high">/);
+
+    // The page is served from memory now; an edit must still show up on the next view.
+    await t.service.update(card.code, ownerToken, input({ content: { nickname: 'Sau' }, look: { portrait: { type: 'photo', photoId: image.id } } }));
+    assert.match(await (await t.call(`/thiep/${card.code}`)).text(), /Lễ tốt nghiệp · Sau/);
+    await t.service.adminSetStatus(card.code, 'disabled');
+    assert.equal((await t.call(`/thiep/${card.code}`)).status, 404);
+    assert.equal((await t.call(`/thiep/anh/${image.id}.webp`)).status, 404);
+    await t.service.adminSetStatus(card.code, 'enabled');
+
+    const jpg = await t.call(`/thiep/anh/${image.id}.jpg`);
+    assert.equal(jpg.status, 200);
+    assert.equal(jpg.headers.get('content-type'), 'image/jpeg');
+    assert.equal((await sharp(Buffer.from(await jpg.arrayBuffer())).metadata()).format, 'jpeg');
+  } finally { t.close(); }
+});
+
 test('photos upload over HTTP and are served as images with safe headers', async () => {
   const t = await start();
   try {

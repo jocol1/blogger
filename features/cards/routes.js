@@ -47,17 +47,33 @@ function createCardsRouter(options = {}) {
     res.status(status).set({ 'Cache-Control': 'no-cache', 'Content-Security-Policy': CSP, 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' }).type('html').send(html);
   };
   const imageUrl = imageId => (imageId ? `/thiep/anh/${imageId}.webp` : '');
-  const renderCard = (card, mode) => {
+  // Same font sets as card.js; sending the right one with the page saves a round trip.
+  const FONT_CSS = {
+    cute: 'family=Baloo+2:wght@600;700;800&family=Pacifico&family=Quicksand:wght@500;600;700',
+    elegant: 'family=Playfair+Display:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&family=Dancing+Script:wght@600;700',
+    modern: 'family=Be+Vietnam+Pro:wght@400;500;600;700;800',
+  };
+  // Link previews in Zalo and Facebook need absolute addresses.
+  const originOf = req => (options.publicUrl ? options.publicUrl.replace(/\/$/, '') : `${req.protocol}://${req.get('host')}`);
+  const renderCard = (card, mode, origin = '') => {
     const c = card?.content;
     const title = c ? `${c.headline} · ${c.nickname}` : 'Thiệp tốt nghiệp';
     const when = c ? `${c.start}${c.end ? ` – ${c.end}` : ''} · ${c.date.split('-').reverse().join('/')}` : '';
     const desc = c ? `${c.fullName || c.nickname} trân trọng mời bạn đến chung vui ngày tốt nghiệp. ${when}${c.venue.name ? ` · ${c.venue.name}` : ''}` : 'Tạo thiệp mời tốt nghiệp online của riêng bạn.';
-    const image = card?.look?.portrait?.type === 'photo' ? imageUrl(card.look.portrait.photoId) : '/assets/thiep/og.png';
+    const photoId = card?.look?.portrait?.type === 'photo' ? card.look.portrait.photoId : null;
+    const image = photoId ? `${origin}/thiep/anh/${photoId}.jpg` : `${origin}/assets/thiep/og.png`;
+    const font = FONT_CSS[card?.look?.font] || FONT_CSS.cute;
+    const head = card ? [
+      `<link rel="stylesheet" data-font="${esc(card.look.font || 'cute')}" href="https://fonts.googleapis.com/css2?${font}&amp;display=swap">`,
+      photoId ? `<link rel="preload" as="image" href="${esc(imageUrl(photoId))}" fetchpriority="high">` : '',
+    ].filter(Boolean).join('\n  ') : '';
     return template('card.html')
       .replace('{{ROBOTS}}', mode === 'live' ? 'index' : 'noindex')
       .replaceAll('{{TITLE}}', esc(title))
       .replaceAll('{{DESC}}', esc(desc))
-      .replace('{{IMAGE}}', esc(image))
+      .replaceAll('{{IMAGE}}', esc(image))
+      .replace('{{URL}}', esc(card ? `${origin}/thiep/${card.code}` : `${origin}/taothiep`))
+      .replace('{{HEAD}}', head)
       .replace('{{THEME}}', esc(card?.look?.colors?.bg || '#e3f5e8'))
       .replace('{{DATA}}', safeJson({ mode, card }));
   };
@@ -91,9 +107,15 @@ function createCardsRouter(options = {}) {
   /* ---------- pages ---------- */
   router.use('/assets/thiep', express.static(assets, { index: false, maxAge: production ? '7d' : 0 }));
   router.get('/taothiep', (req, res) => sendPage(res, template('builder.html')));
-  router.get('/thiep/xem-truoc', (req, res) => sendPage(res, renderCard(null, 'preview')));
+  router.get('/thiep/xem-truoc', (req, res) => sendPage(res, renderCard(null, 'preview', originOf(req))));
   router.get('/thiep/anh/:id.webp', asyncRoute(async (req, res) => {
     const image = await service.getImage(req.params.id);
+    if (!image) return res.status(404).type('text/plain').send('Không tìm thấy ảnh.');
+    res.set({ 'Content-Type': image.mime, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' });
+    res.send(image.data);
+  }));
+  router.get('/thiep/anh/:id.jpg', asyncRoute(async (req, res) => {
+    const image = await service.getShareImage(req.params.id);
     if (!image) return res.status(404).type('text/plain').send('Không tìm thấy ảnh.');
     res.set({ 'Content-Type': image.mime, 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' });
     res.send(image.data);
@@ -102,7 +124,7 @@ function createCardsRouter(options = {}) {
     try {
       const card = await service.getPublic(req.params.code);
       if (req.params.code !== card.code) return res.redirect(301, `/thiep/${card.code}`);
-      sendPage(res, renderCard(card, 'live'));
+      sendPage(res, renderCard(card, 'live', originOf(req)));
     } catch (error) {
       if (!(error instanceof CardError)) throw error;
       const draft = error.status === 409;
