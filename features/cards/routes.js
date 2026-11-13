@@ -157,7 +157,7 @@ function createCardsRouter(options = {}) {
     if (!expected.length || expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return res.status(403).send('Phiên quản trị không hợp lệ.');
     next();
   };
-  const shell = (title, body) => `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)}</title><style>
+  const shell = (title, body) => `<!doctype html><html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><link rel="icon" href="/assets/thiep/icon.svg" type="image/svg+xml"><link rel="icon" href="/assets/thiep/icon-48.png" sizes="48x48" type="image/png"><title>${esc(title)}</title><style>
 *{box-sizing:border-box}body{margin:0;background:#eef3f0;color:#1f2d27;font:15px/1.5 'Segoe UI',system-ui,sans-serif}main{width:min(1200px,100%);margin:0 auto;padding:24px 16px 64px}
 h1{margin:0 0 4px;font-size:1.5rem}.muted{color:#5f7068;margin:0}.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:16px}
 .stats{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 16px}.stat{flex:1 1 140px;padding:12px 16px;border-radius:14px;background:#fff}.stat b{display:block;font-size:1.5rem}.stat span{color:#5f7068;font-size:.9rem}
