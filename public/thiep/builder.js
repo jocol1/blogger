@@ -14,7 +14,7 @@
       yellow: { bg: '#fff4d6', card: '#fffdf5', accent: '#c47f00', ink: '#3f2f0c' }, mono: { bg: '#efefef', card: '#ffffff', accent: '#222222', ink: '#151515' },
     },
   };
-  const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'music', 'cap'];
+  const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'ticket', 'music', 'cap'];
   const ALBUM_MAX = 6;
   let album = [];
   let look = { palette: 'green', colors: { ...config.palettes.green }, font: 'cute', portrait: { type: 'icon', icon: 'cap' }, modules: Object.fromEntries(MODULES.map(m => [m, true])) };

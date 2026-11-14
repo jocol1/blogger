@@ -152,6 +152,7 @@
     $('guest-note-text').textContent = note;
     $('guest-note-from').textContent = `— ${c.nickname}`;
     renderAlbum(c, m);
+    renderTicket(c, m);
     show($('dem-nguoc'), m.countdown);
     $('tiles-note').textContent = `Tính đến ${c.start} ngày ${d} tháng ${mo}`;
     show($('lich'), m.calendar);
@@ -321,10 +322,160 @@
       const img = el('img'); img.loading = 'lazy'; img.decoding = 'async'; img.alt = `Ảnh kỷ niệm ${i + 1} của ${c.nickname}`;
       img.src = `/thiep/anh/${photoId}.webp`;
       button.append(img);
-      button.addEventListener('click', () => openPhoto(img.src, img.alt));
+      button.dataset.i = String(i);
+      button.addEventListener('click', () => { if (!stackMoved) openPhoto(img.src, img.alt); });
       return button;
     }));
+    layoutStack();
   }
+  /* ---------- album as a swipeable stack on phones ---------- */
+  const stackQuery = matchMedia('(max-width: 600px)');
+  const TILTS = [-2, 5, -6, 3, -4, 6];
+  let stackMoved = false;
+  function layoutStack() {
+    const grid = $('album-grid');
+    const items = [...grid.children];
+    const on = stackQuery.matches && items.length > 1;
+    grid.classList.toggle('is-stack', on);
+    $('album-nav').hidden = !on;
+    items.forEach((item, depth) => {
+      item.style.setProperty('--depth', on ? depth : 0);
+      item.style.setProperty('--tilt', `${on ? TILTS[depth % TILTS.length] : 0}deg`);
+      item.style.zIndex = on ? String(items.length - depth) : '';
+      item.tabIndex = on && depth > 0 ? -1 : 0;
+    });
+    if (on) $('album-count').textContent = `${Number(items[0].dataset.i) + 1} / ${items.length}`;
+  }
+  function nextPhoto(direction = 1) {
+    const grid = $('album-grid');
+    const top = grid.firstElementChild;
+    if (!top || !grid.classList.contains('is-stack') || top.classList.contains('is-fling')) return;
+    const settle = () => { top.classList.remove('is-fling'); top.style.removeProperty('transform'); top.style.removeProperty('--fling'); grid.append(top); layoutStack(); };
+    if (reduce) { settle(); return; }
+    top.style.setProperty('--fling', direction);
+    top.classList.add('is-fling');
+    setTimeout(settle, 320);
+  }
+  function wireStack() {
+    const grid = $('album-grid');
+    let start = null;
+    grid.addEventListener('pointerdown', e => {
+      const top = grid.firstElementChild;
+      if (!grid.classList.contains('is-stack') || !top?.contains(e.target)) return;
+      start = { x: e.clientX, y: e.clientY, top, id: e.pointerId };
+      stackMoved = false;
+    });
+    grid.addEventListener('pointermove', e => {
+      if (!start || e.pointerId !== start.id) return;
+      const dx = e.clientX - start.x;
+      if (!stackMoved && Math.abs(dx) < 8) return;
+      if (!stackMoved && Math.abs(e.clientY - start.y) > Math.abs(dx)) { start = null; return; }
+      stackMoved = true;
+      start.top.setPointerCapture?.(e.pointerId);
+      start.top.classList.add('is-drag');
+      start.top.style.transform = `translateX(${dx}px) rotate(${dx / 14}deg)`;
+    });
+    const end = e => {
+      if (!start || e.pointerId !== start.id) return;
+      const { top } = start;
+      const dx = e.clientX - start.x;
+      start = null;
+      top.classList.remove('is-drag');
+      if (stackMoved && Math.abs(dx) > 70) nextPhoto(Math.sign(dx));
+      else top.style.removeProperty('transform');
+      setTimeout(() => { stackMoved = false; }, 0);
+    };
+    grid.addEventListener('pointerup', end);
+    grid.addEventListener('pointercancel', end);
+    $('album-next').addEventListener('click', () => nextPhoto(1));
+    stackQuery.addEventListener?.('change', layoutStack);
+  }
+
+  /* ---------- ticket ---------- */
+  const ticketNo = (code, name) => {
+    let h = 7;
+    for (const ch of `${code}|${name}`) h = (h * 31 + ch.codePointAt(0)) % 9973;
+    return `Số ${String(h).padStart(4, '0')}`;
+  };
+  function renderTicket(c, m) {
+    show($('ve-moi'), m.ticket !== false);
+    const [y, mo, d] = parts(c.date);
+    $('t-kicker').textContent = `Vé mời · ${c.headline}`;
+    $('t-name').textContent = c.nickname;
+    $('t-school').textContent = c.school || '';
+    $('t-date').textContent = `${weekday(c.date)}, ${d}/${mo}/${y}`;
+    $('t-time').textContent = c.end ? `${c.start} – ${c.end}` : c.start;
+    $('t-venue').textContent = c.venue?.name || 'Sẽ báo sau';
+    if (!$('ticket-guest').value && guest) $('ticket-guest').value = guest;
+    $('t-no').textContent = ticketNo(card.code || 'XEMTRUOC', $('ticket-guest').value.trim());
+  }
+  async function saveTicket() {
+    const button = $('ticket-save');
+    const c = card.content;
+    const name = $('ticket-guest').value.replace(/\s+/g, ' ').trim();
+    if (!name) { $('ticket-guest').focus(); $('ticket-status').textContent = 'Gõ tên bạn lên vé trước đã nhé.'; return; }
+    button.disabled = true;
+    $('ticket-status').textContent = 'Đang làm vé…';
+    try {
+      const css = getComputedStyle(document.documentElement);
+      const v = key => css.getPropertyValue(key).trim();
+      const font = FONTS[card.look.font] || FONTS.cute;
+      await Promise.all([`800 80px ${font.display}`, `700 40px ${font.body}`, `64px ${font.script}`].map(f => document.fonts?.load(f).catch(() => null)));
+      const W = 1080, H = 1920, cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      const x = cv.getContext('2d');
+      const fit = (text, weight, size, family, max) => { let s = size; do { x.font = `${weight} ${s}px ${family}`; s -= 4; } while (x.measureText(text).width > max && s > 24); };
+      const clip = (text, max) => { if (x.measureText(text).width <= max) return text; let t = text; while (t.length > 1 && x.measureText(`${t}…`).width > max) t = t.slice(0, -1); return `${t}…`; };
+      // Page with the card's dotted background.
+      x.fillStyle = v('--bg'); x.fillRect(0, 0, W, H);
+      x.fillStyle = v('--bg-dot');
+      for (let py = 20; py < H; py += 46) for (let px = 20; px < W; px += 46) { x.beginPath(); x.arc(px, py, 4, 0, 7); x.fill(); }
+      x.textAlign = 'center'; x.fillStyle = v('--accent-deep');
+      x.font = `700 44px ${font.body}`; x.fillText('Mình được mời dự', W / 2, 270);
+      // Ticket body with notches cut at the tear line.
+      const tx = 90, ty = 360, tw = 900, th = 1200, tear = ty + 900;
+      x.save(); x.shadowColor = v('--shadow'); x.shadowBlur = 60; x.shadowOffsetY = 24;
+      x.fillStyle = v('--card'); x.beginPath(); x.roundRect(tx, ty, tw, th, 48); x.fill(); x.restore();
+      x.fillStyle = v('--accent'); x.beginPath(); x.roundRect(tx, ty, tw, 26, [48, 48, 0, 0]); x.fill();
+      x.fillStyle = v('--bg'); for (const cx of [tx, tx + tw]) { x.beginPath(); x.arc(cx, tear, 34, 0, 7); x.fill(); }
+      x.strokeStyle = v('--line'); x.lineWidth = 5; x.setLineDash([18, 16]); x.beginPath(); x.moveTo(tx + 60, tear); x.lineTo(tx + tw - 60, tear); x.stroke(); x.setLineDash([]);
+      // Main part.
+      x.fillStyle = v('--accent'); x.font = `800 34px ${font.body}`; x.fillText(`VÉ MỜI · ${c.headline.toUpperCase()}`.split('').join(String.fromCharCode(8202)), W / 2, ty + 120);
+      x.fillStyle = v('--ink'); fit(c.nickname, 800, 120, font.display, tw - 120); x.fillText(c.nickname, W / 2, ty + 260);
+      x.fillStyle = v('--muted'); x.font = `700 38px ${font.body}`; x.fillText(clip(c.school || '', tw - 120), W / 2, ty + 330);
+      x.fillStyle = v('--accent-soft'); x.beginPath(); x.roundRect(tx + 70, ty + 390, tw - 140, 200, 32); x.fill();
+      x.fillStyle = v('--muted'); x.font = `700 34px ${font.body}`; x.fillText('Dành cho', W / 2, ty + 450);
+      x.fillStyle = v('--accent-deep'); fit(name, 400, 84, font.script, tw - 200); x.fillText(name, W / 2, ty + 545);
+      const [yy, mo, d] = parts(c.date);
+      const rows = [['Ngày', `${weekday(c.date)}, ${d}/${mo}/${yy}`], ['Giờ', c.end ? `${c.start} – ${c.end}` : c.start], ['Địa điểm', c.venue?.name || 'Sẽ báo sau']];
+      rows.forEach(([label, value], i) => {
+        const ry = ty + 680 + i * 72;
+        x.textAlign = 'left'; x.fillStyle = v('--muted'); x.font = `700 34px ${font.body}`; x.fillText(label, tx + 90, ry);
+        x.textAlign = 'right'; x.fillStyle = v('--ink'); x.font = `800 38px ${font.body}`; x.fillText(clip(value, tw - 400), tx + tw - 90, ry);
+      });
+      // Stub.
+      x.textAlign = 'center';
+      x.save(); x.translate(W / 2 - 60, tear + 50); x.scale(1, 1); x.fillStyle = v('--accent'); x.fill(new Path2D('M30 58v20c0 10 13 16 30 16s30-6 30-16V58L60 68zM60 22l52 22-52 22L8 44z')); x.restore();
+      x.fillStyle = v('--ink'); x.font = `800 52px ${font.display}`; x.fillText(ticketNo(card.code || 'XEMTRUOC', name), W / 2, tear + 230);
+      x.fillStyle = v('--muted'); x.font = `700 32px ${font.body}`; x.fillText('KHÁCH MỜI', W / 2, tear + 278);
+      x.fillStyle = v('--accent-deep'); x.font = `700 34px ${font.body}`;
+      x.fillText(card.code ? `${location.host}/thiep/${card.code}` : 'Thiệp tốt nghiệp', W / 2, ty + th + 120);
+      const blob = await new Promise(resolve => cv.toBlob(resolve, 'image/png'));
+      const file = new File([blob], `ve-moi-${c.nickname}.png`.replace(/\s+/g, '-'), { type: 'image/png' });
+      if (navigator.canShare?.({ files: [file] })) {
+        try { await navigator.share({ files: [file], title: `Vé mời · ${c.nickname}` }); $('ticket-status').textContent = 'Xong rồi!'; return; } catch (error) { if (error.name === 'AbortError') { $('ticket-status').textContent = ''; return; } }
+      }
+      const url = URL.createObjectURL(blob);
+      const a = Object.assign(document.createElement('a'), { href: url, download: file.name });
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      $('ticket-status').textContent = 'Đã lưu vé về máy. Mở thư viện ảnh để đăng story nhé!';
+      if (!reduce) burst(button, 80);
+    } catch (_) {
+      $('ticket-status').textContent = 'Máy bạn chưa lưu được vé, thử chụp màn hình phần vé nhé.';
+    } finally { button.disabled = false; }
+  }
+
   function openPhoto(src, alt) {
     const box = $('lightbox');
     $('lightbox-img').src = src; $('lightbox-img').alt = alt;
@@ -404,6 +555,9 @@
     $('add-cal').addEventListener('click', downloadIcs);
     $('music').addEventListener('click', () => (playing ? stopMusic() : playMusic()));
     $('lightbox-close').addEventListener('click', () => $('lightbox').close());
+    wireStack();
+    $('ticket-save').addEventListener('click', saveTicket);
+    $('ticket-guest').addEventListener('input', () => { if (card) $('t-no').textContent = ticketNo(card.code || 'XEMTRUOC', $('ticket-guest').value.trim()); });
     $('lightbox').addEventListener('click', e => { if (e.target === $('lightbox')) $('lightbox').close(); });
     if (guest) $('wish-name').value = guest;
     wireWishes();

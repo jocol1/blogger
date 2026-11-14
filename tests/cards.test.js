@@ -546,3 +546,17 @@ test('a personal invite shows one guest their name and private note, and only th
     assert.doesNotMatch(await (await t.call(`/thiep/${card.code}?moi=${invite.id}`)).text(), /em mong cô/);
   } finally { await t.close(); }
 });
+
+test('the guest ticket is on by default and the owner can turn it off', async () => {
+  const t = await start();
+  try {
+    const { card, ownerToken } = await t.service.create(input());
+    assert.equal(card.look.modules.ticket, true);
+    const off = await t.service.update(card.code, ownerToken, input({ look: { modules: { ticket: false } } }));
+    assert.equal(off.look.modules.ticket, false);
+    await t.service.adminComp(card.code);
+    const page = await (await t.call(`/thiep/${card.code}`)).text();
+    assert.match(page, /id="ve-moi"/);
+    assert.match(page, /id="ticket-save"/);
+  } finally { await t.close(); }
+});

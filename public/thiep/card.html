@@ -120,6 +120,10 @@
       <section class="sec sec-b" id="album" aria-labelledby="album-title">
         <h2 class="sec-title" id="album-title">Kỷ niệm</h2>
         <div class="album" id="album-grid"></div>
+        <div class="album-nav" id="album-nav" hidden>
+          <span class="album-count" id="album-count"></span>
+          <button class="btn btn-soft" id="album-next" type="button">Ảnh tiếp theo</button>
+        </div>
       </section>
 
       <section class="sec sec-a" id="dem-nguoc" aria-labelledby="cd-title">
@@ -168,6 +172,31 @@
           <p id="thanks-text"></p>
           <button class="btn btn-soft" id="wish-again" type="button">Gửi thêm lời chúc</button>
         </div>
+      </section>
+
+      <section class="sec sec-b" id="ve-moi" aria-labelledby="ticket-title">
+        <h2 class="sec-title" id="ticket-title">Vé mời của bạn</h2>
+        <p class="sec-sub">Lưu vé về máy để khỏi quên ngày, hoặc đăng story khoe với bạn bè nhé.</p>
+        <div class="ticket" id="ticket">
+          <div class="ticket-main">
+            <p class="ticket-kicker" id="t-kicker"></p>
+            <p class="ticket-name" id="t-name"></p>
+            <p class="ticket-school" id="t-school"></p>
+            <label class="ticket-for"><span>Dành cho</span><input id="ticket-guest" maxlength="40" placeholder="Gõ tên bạn vào đây" autocomplete="name"></label>
+            <dl class="ticket-rows">
+              <div><dt>Ngày</dt><dd id="t-date"></dd></div>
+              <div><dt>Giờ</dt><dd id="t-time"></dd></div>
+              <div class="ticket-venue"><dt>Địa điểm</dt><dd id="t-venue"></dd></div>
+            </dl>
+          </div>
+          <div class="ticket-stub">
+            <svg viewBox="0 0 120 120" aria-hidden="true"><path fill="currentColor" d="M30 58v20c0 10 13 16 30 16s30-6 30-16V58L60 68zM60 22l52 22-52 22L8 44z"/></svg>
+            <b id="t-no"></b>
+            <span>Khách mời</span>
+          </div>
+        </div>
+        <button class="btn" id="ticket-save" type="button">Lưu vé về máy</button>
+        <p class="sec-sub ticket-status" id="ticket-status" role="status"></p>
       </section>
     </main>
 

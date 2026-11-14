@@ -200,6 +200,38 @@ h1, h2, h3, p { margin: 0; }
 .polaroid:nth-child(even) { rotate: 2.5deg; }
 .polaroid:hover, .polaroid:focus-visible { rotate: 0deg; scale: 1.03; }
 .polaroid img { display: block; width: 100%; aspect-ratio: 4 / 5; object-fit: cover; border-radius: 14px; background: var(--accent-soft); }
+.album-nav { display: flex; align-items: center; gap: 14px; }
+.album-count { font-family: var(--f-display); font-weight: 800; color: var(--accent-deep); }
+.album.is-stack { display: block; position: relative; width: min(290px, 76vw); aspect-ratio: 4 / 5.45; margin: 14px auto 6px; touch-action: pan-y; }
+.album.is-stack .polaroid { position: absolute; inset: 0 0 auto; width: 100%; rotate: var(--tilt); translate: 0 calc(var(--depth) * 7px); scale: calc(1 - var(--depth) * .035); transition: rotate .45s var(--spring), translate .45s var(--spring), scale .45s var(--spring), opacity .3s, transform .3s var(--ease); }
+.album.is-stack .polaroid:nth-child(n + 4) { opacity: 0; }
+.album.is-stack .polaroid:hover, .album.is-stack .polaroid:focus-visible { rotate: var(--tilt); scale: calc(1 - var(--depth) * .035); }
+.album.is-stack .polaroid.is-drag { transition: none; cursor: grabbing; }
+.album.is-stack .polaroid.is-fling { transform: translateX(calc(var(--fling) * 135%)) rotate(calc(var(--fling) * 24deg)); opacity: 0; transition: transform .32s var(--ease), opacity .32s; }
+
+/* ticket */
+.ticket { display: grid; grid-template-columns: minmax(0, 1fr) 150px; width: min(640px, 100%); text-align: left; filter: drop-shadow(0 18px 30px var(--shadow)); }
+.ticket-main, .ticket-stub { position: relative; background: var(--card); }
+.ticket-main { display: grid; gap: 4px; padding: 30px 30px 26px; border-radius: 28px 0 0 28px; border-top: 10px solid var(--accent); }
+.ticket-stub { display: grid; place-content: center; justify-items: center; gap: 6px; padding: 24px 14px; border-radius: 0 28px 28px 0; border-top: 10px solid var(--accent); border-left: 4px dashed var(--line); text-align: center; color: var(--accent); }
+.ticket-stub::before, .ticket-stub::after { content: ''; position: absolute; left: -18px; width: 32px; height: 32px; border-radius: 50%; background: var(--bg); }
+.ticket-stub::before { top: -26px; }
+.ticket-stub::after { bottom: -16px; }
+.ticket-stub svg { width: 64px; height: 64px; }
+.ticket-stub b { font-family: var(--f-display); font-size: 1.35rem; color: var(--ink); }
+.ticket-stub span { font-size: .78rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.ticket-kicker { font-size: .78rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); }
+.ticket-name { font-family: var(--f-display); font-weight: 800; font-size: clamp(1.9rem, 1.4rem + 2vw, 2.6rem); line-height: 1.1; color: var(--ink); overflow-wrap: anywhere; }
+.ticket-school { color: var(--muted); font-weight: 600; }
+.ticket-for { display: grid; gap: 2px; margin: 12px 0 8px; padding: 12px 16px; border-radius: 18px; background: var(--accent-soft); }
+.ticket-for span { font-size: .85rem; font-weight: 700; color: var(--muted); }
+.ticket-for input { width: 100%; min-width: 0; padding: 2px 0; border: 0; border-bottom: 2px dashed var(--line); background: transparent; color: var(--accent-deep); font: 400 1.5rem/1.3 var(--f-script); outline: none; }
+.ticket-for input:focus { border-bottom-color: var(--accent); }
+.ticket-rows { display: grid; gap: 6px; margin: 4px 0 0; }
+.ticket-rows div { display: flex; justify-content: space-between; gap: 12px; }
+.ticket-rows dt { color: var(--muted); font-weight: 600; }
+.ticket-rows dd { margin: 0; font-weight: 800; color: var(--ink); text-align: right; overflow-wrap: anywhere; }
+.ticket-status { min-height: 1.5em; }
 .lightbox { width: min(92vw, 900px); max-height: 92vh; padding: 0; border: 0; border-radius: 22px; background: transparent; overflow: visible; }
 .lightbox::backdrop { background: rgba(10, 15, 12, .82); }
 .lightbox img { display: block; width: 100%; max-height: 88vh; object-fit: contain; border-radius: 22px; }
@@ -231,6 +263,14 @@ h1, h2, h3, p { margin: 0; }
   .cap { width: 96px; top: -22px; }
   .cal-wrap { flex-direction: column; gap: 32px; }
   .cal-text { justify-items: center; text-align: center; }
+}
+@media (max-width: 560px) {
+  .ticket { grid-template-columns: 1fr; }
+  .ticket-main { border-radius: 28px 28px 0 0; }
+  .ticket-stub { grid-template-columns: auto auto; grid-template-rows: auto auto; align-items: center; justify-content: center; gap: 2px 14px; border-radius: 0 0 28px 28px; border-top: 4px dashed var(--line); border-left: 0; padding: 18px; }
+  .ticket-stub svg { grid-row: span 2; width: 52px; height: 52px; }
+  .ticket-stub::before { top: -18px; left: -16px; }
+  .ticket-stub::after { top: -18px; bottom: auto; left: auto; right: -16px; }
 }
 @media (max-width: 420px) {
   .tiles { gap: 8px; }

@@ -15,7 +15,7 @@ const PALETTES = {
 };
 const FONTS = ['cute', 'elegant', 'modern'];
 const ICONS = ['cap', 'diploma', 'bouquet', 'book', 'star', 'rice', 'heart', 'laptop'];
-const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'music', 'cap'];
+const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'ticket', 'music', 'cap'];
 const ALBUM_MAX = 6;
 
 const HEX = /^#[0-9a-f]{6}$/;
