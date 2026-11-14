@@ -101,7 +101,7 @@ async function encodeImage(file) {
   if (file.buffer.length > MAX_UPLOAD_BYTES) throw new CardError('Ảnh tối đa 5 MB.', 413);
   let meta;
   try { meta = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 40_000_000 }).metadata(); } catch (_) { throw new CardError('Tệp này không phải ảnh.'); }
-  if (!['jpeg', 'png', 'webp', 'heif'].includes(meta.format)) throw new CardError('Chỉ nhận ảnh JPG, PNG, WebP hoặc HEIC.');
+  if (!['jpeg', 'png', 'webp'].includes(meta.format)) throw new CardError('Chỉ nhận ảnh JPG, PNG hoặc WebP. Ảnh iPhone (HEIC) bạn chọn lại từ thư viện ảnh, máy sẽ tự đổi sang JPG.');
   let side = IMAGE_MAX_SIDE, quality = 82;
   for (let attempt = 0; attempt < 7; attempt++) {
     const data = await sharp(file.buffer, { failOn: 'error', limitInputPixels: 40_000_000 })
@@ -120,9 +120,16 @@ function publicCard(card) {
   return { code: card.code, status: card.status, content: card.content, look: card.look, publishedMs: card.publishedMs || null };
 }
 
+const INVITE_MAX = 200;
+const INVITE_ALPHABET = 'abcdefghijkmnpqrstuvwxyz23456789';
+const inviteCode = () => Array.from(crypto.randomBytes(6), b => INVITE_ALPHABET[b % INVITE_ALPHABET.length]).join('');
+const cleanInviteId = value => (/^[a-z2-9]{6}$/.test(String(value || '')) ? String(value) : null);
+const ownInvites = card => (Array.isArray(card.invites) ? card.invites : []);
+
 function ownerCard(card) {
   return {
     ...publicCard(card),
+    invites: ownInvites(card).map(({ id, name, message, createdMs }) => ({ id, name, message, createdMs })),
     ownerEmail: card.ownerEmail || '',
     createdMs: card.createdMs,
     updatedMs: card.updatedMs,
@@ -247,11 +254,36 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
     },
 
     // What a visitor may see: only published cards.
-    async getPublic(code) {
+    // inviteId picks one guest's personal link: their name and the owner's private note to them.
+    async getPublic(code, inviteId) {
       const card = await load(code);
       if (card.status === 'disabled') throw new CardError('Thiệp này đã bị gỡ.', 404);
       if (card.status !== 'published') throw new CardError('Thiệp chưa được xuất bản.', 409);
-      return publicCard(card);
+      const wanted = cleanInviteId(inviteId);
+      const found = wanted && ownInvites(card).find(invite => invite.id === wanted);
+      return found ? { ...publicCard(card), invite: { name: found.name, message: found.message } } : publicCard(card);
+    },
+
+    async createInvite(code, token, input) {
+      const card = await owned(code, token);
+      if (card.status === 'disabled') throw new CardError('Thiệp này đã bị gỡ.', 403);
+      const name = clean(input?.name, 40).replace(/\n/g, ' ').trim();
+      const message = clean(input?.message, 200);
+      if (!name) throw new CardError('Bạn gõ tên khách nhé.');
+      const invites = ownInvites(card);
+      if (invites.length >= INVITE_MAX) throw new CardError(`Mỗi thiệp tạo được tối đa ${INVITE_MAX} link mời riêng.`);
+      let inviteId = inviteCode();
+      while (invites.some(invite => invite.id === inviteId)) inviteId = inviteCode();
+      const invite = { id: inviteId, name, message, createdMs: now() };
+      await store.patchCard(card.code, { invites: [...invites, invite] });
+      return invite;
+    },
+
+    async removeInvite(code, token, inviteId) {
+      const card = await owned(code, token);
+      const invites = ownInvites(card).filter(invite => invite.id !== inviteId);
+      await store.patchCard(card.code, { invites });
+      return invites;
     },
 
     async update(code, token, input) {

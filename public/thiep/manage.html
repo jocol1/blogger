@@ -86,17 +86,15 @@
 
         <div class="extra">
           <h4>Link mời riêng từng người</h4>
-          <p class="hint">Gõ tên khách, thiệp sẽ mở bằng phong bì "Gửi …" đúng tên người đó và điền sẵn tên khi họ gửi lời chúc.</p>
-          <form class="share" id="guest-form" novalidate>
+          <p class="hint">Thiệp sẽ mở bằng phong bì "Gửi …" đúng tên khách. Lời nhắn riêng chỉ người cầm link đó đọc được, hiện ngay khi họ mở thiệp.</p>
+          <form class="guest-form" id="guest-form" novalidate>
             <label class="sr-only" for="guest-name">Tên khách</label>
-            <input id="guest-name" maxlength="40" placeholder="Ví dụ: Minh Anh" autocomplete="off">
-            <button class="btn btn-sm" type="submit">Tạo link</button>
+            <input id="guest-name" maxlength="40" placeholder="Tên khách, ví dụ: Cô Hạnh" autocomplete="off">
+            <label class="sr-only" for="guest-msg">Lời nhắn riêng</label>
+            <textarea id="guest-msg" maxlength="200" rows="2" placeholder="Lời nhắn riêng (không bắt buộc), ví dụ: Cô ơi, em mong cô đến lắm ạ!"></textarea>
+            <div class="row"><button class="btn btn-sm" type="submit" id="guest-add">Tạo link mời</button><span class="hint" id="guest-status" role="status"></span></div>
           </form>
-          <div class="share" id="guest-out" hidden>
-            <label class="sr-only" for="guest-url">Link mời riêng</label>
-            <input id="guest-url" readonly>
-            <button class="btn btn-soft btn-sm" type="button" id="guest-copy">Sao chép</button>
-          </div>
+          <ul class="invite-list" id="invite-list"></ul>
         </div>
 
         <div class="extra qr-share">

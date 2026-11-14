@@ -176,6 +176,15 @@ a { color: var(--brand-deep); }
 .extra { margin-top: 18px; padding-top: 18px; border-top: 2px dashed var(--line); }
 .extra h4 { margin: 0 0 4px; font: 800 1.05rem/1.2 'Baloo 2', system-ui, sans-serif; }
 .extra .share { margin-top: 10px; }
+.guest-form { display: grid; gap: 8px; margin-top: 10px; }
+.guest-form input, .guest-form textarea { width: 100%; padding: 12px 14px; font: inherit; border: 2px solid var(--line); border-radius: 14px; background: var(--softer); color: var(--ink); resize: vertical; }
+.invite-list { list-style: none; display: grid; gap: 8px; margin: 12px 0 0; padding: 0; }
+.invite-list:empty { display: none; }
+.invite { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 12px; padding: 12px 14px; border-radius: 16px; background: var(--softer); border: 2px solid var(--line); }
+.invite.is-new { border-color: var(--brand); background: var(--soft); }
+.invite > div:first-child { flex: 1 1 200px; min-width: 0; }
+.invite p { margin-top: 2px; color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
+.link-btn { padding: 6px 8px; border: 0; background: none; color: var(--bad); font: inherit; font-weight: 700; cursor: pointer; }
 .qr-share { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; align-items: center; }
 .qr-share img { width: 150px; height: 150px; border-radius: 16px; background: #fff; padding: 8px; box-shadow: 0 4px 0 var(--line); }
 .big-price { font: 800 2rem/1 'Baloo 2', system-ui, sans-serif; color: var(--brand-deep); }

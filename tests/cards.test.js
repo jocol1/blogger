@@ -507,3 +507,42 @@ test('the admin page shows who is waiting on a transfer and confirms it with one
     assert.equal((await t.service.getPublic(card.code)).status, 'published');
   } finally { t.close(); }
 });
+
+test('a personal invite shows one guest their name and private note, and only that link does', async () => {
+  const t = await start();
+  try {
+    const { card, ownerToken } = await t.service.create(input());
+    const owner = { 'X-Card-Token': ownerToken };
+    assert.equal((await t.json(`/api/thiep/cards/${card.code}/invites`, 'POST', { name: 'Cô Hạnh' }, { 'X-Card-Token': 'f'.repeat(64) })).status, 403);
+    assert.equal((await t.json(`/api/thiep/cards/${card.code}/invites`, 'POST', { name: '  ' }, owner)).status, 400);
+    const res = await t.json(`/api/thiep/cards/${card.code}/invites`, 'POST', { name: 'Cô  Hạnh', message: 'Cô ơi, em mong cô đến lắm ạ! </script><b>x</b>' }, owner);
+    assert.equal(res.status, 201);
+    const { invite } = await res.json();
+    assert.match(invite.id, /^[a-z2-9]{6}$/);
+    assert.equal(invite.name, 'Cô Hạnh');
+    const other = (await (await t.json(`/api/thiep/cards/${card.code}/invites`, 'POST', { name: 'Lan' }, owner)).json()).invite;
+    assert.deepEqual((await t.service.getForOwner(card.code, ownerToken)).invites.map(i => i.name), ['Cô Hạnh', 'Lan']);
+
+    // Drafts stay private even through an invite link.
+    assert.equal((await t.call(`/thiep/${card.code}?moi=${invite.id}`)).status, 200);
+    assert.doesNotMatch(await (await t.call(`/thiep/${card.code}?moi=${invite.id}`)).text(), /em mong cô/);
+    await t.service.adminComp(card.code);
+
+    const page = await (await t.call(`/thiep/${card.code}?moi=${invite.id}`)).text();
+    const data = JSON.parse(page.match(/<script type="application\/json" id="card-data">([\s\S]*?)<\/script>/)[1]);
+    assert.deepEqual(data.card.invite, { name: 'Cô Hạnh', message: 'Cô ơi, em mong cô đến lắm ạ! </script><b>x</b>' });
+    assert.doesNotMatch(page, /<\/script><b>/);
+    assert.equal(data.card.invites, undefined);
+
+    for (const url of [`/thiep/${card.code}`, `/thiep/${card.code}?moi=zzzzzz`, `/thiep/${card.code}?moi=${other.id}`]) {
+      assert.doesNotMatch(await (await t.call(url)).text(), /em mong cô/, url);
+    }
+    const lower = await t.call(`/thiep/${card.code.toLowerCase()}?moi=${invite.id}`);
+    assert.equal(lower.headers.get('location'), `/thiep/${card.code}?moi=${invite.id}`);
+
+    const removed = await (await t.call(`/api/thiep/cards/${card.code}/invites/${invite.id}`, { method: 'DELETE', headers: owner })).json();
+    assert.deepEqual(removed.invites.map(i => i.name), ['Lan']);
+    t.service.forget?.(card.code);
+    assert.doesNotMatch(await (await t.call(`/thiep/${card.code}?moi=${invite.id}`)).text(), /em mong cô/);
+  } finally { await t.close(); }
+});

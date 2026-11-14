@@ -38,6 +38,33 @@
   try { if (frame.contentDocument?.readyState === 'complete' && frame.contentWindow.location.pathname === '/thiep/xem-truoc') previewReady = true; } catch (_) { /* not loaded yet */ }
   window.addEventListener('message', e => { if (e.origin === location.origin && e.data?.type === 'card-preview-ready' && e.source === $('preview').contentWindow) { previewReady = true; pushPreview(); } });
 
+  /* ---------- personal invites ---------- */
+  const inviteUrl = invite => `${location.origin}/thiep/${code}?moi=${invite.id}`;
+  function renderInvites(fresh) {
+    const list = card.invites || [];
+    $('invite-list').replaceChildren(...list.slice().reverse().map(invite => {
+      const item = document.createElement('li'); item.className = 'invite' + (invite.id === fresh ? ' is-new' : '');
+      const text = document.createElement('div');
+      const name = document.createElement('b'); name.textContent = invite.name;
+      text.append(name);
+      if (invite.message) { const note = document.createElement('p'); note.textContent = invite.message; text.append(note); }
+      const actions = document.createElement('div'); actions.className = 'row';
+      const copyBtn = document.createElement('button'); copyBtn.type = 'button'; copyBtn.className = 'btn btn-soft btn-sm'; copyBtn.textContent = 'Sao chép link';
+      copyBtn.addEventListener('click', () => copy(inviteUrl(invite), copyBtn));
+      const open = document.createElement('a'); open.className = 'btn btn-soft btn-sm'; open.textContent = 'Xem'; open.href = inviteUrl(invite); open.target = '_blank'; open.rel = 'noopener';
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'link-btn'; remove.textContent = 'Xoá';
+      remove.setAttribute('aria-label', `Xoá link mời của ${invite.name}`);
+      remove.addEventListener('click', async () => {
+        if (!confirm(`Xoá link mời của ${invite.name}? Link cũ sẽ mở như thiệp thường.`)) return;
+        try { card.invites = (await own(`/api/thiep/cards/${code}/invites/${invite.id}`, { method: 'DELETE' })).invites; renderInvites(); }
+        catch (error) { say('guest-status', error.message, true); }
+      });
+      actions.append(copyBtn, open, remove);
+      item.append(text, actions);
+      return item;
+    }));
+  }
+
   /* ---------- card ---------- */
   function render() {
     const name = card.content.nickname;
@@ -57,6 +84,7 @@
       $('qr-svg').href = `/thiep/${code}/qr.svg?tai=1`;
     }
     $('native-share').hidden = !navigator.share;
+    renderInvites();
     $('manage-url').value = `${location.origin}/thiep/${code}/quanly#k=${token}`;
     $('owner-email').value = card.ownerEmail || '';
     const price = card.price || config.price;
@@ -262,15 +290,20 @@
     finally { $('hardship-send').disabled = false; }
   });
   $('copy-share').addEventListener('click', e => copy($('share-url').value, e.currentTarget));
-  $('guest-form').addEventListener('submit', e => {
+  $('guest-form').addEventListener('submit', async e => {
     e.preventDefault();
     const name = $('guest-name').value.replace(/\s+/g, ' ').trim().slice(0, 40);
-    if (!name) { $('guest-name').focus(); return; }
-    $('guest-url').value = `${location.origin}/thiep/${code}?to=${encodeURIComponent(name)}`;
-    $('guest-out').hidden = false;
-    $('guest-url').select();
+    if (!name) { $('guest-name').focus(); say('guest-status', 'Bạn gõ tên khách nhé.', true); return; }
+    $('guest-add').disabled = true;
+    try {
+      const { invite } = await own(`/api/thiep/cards/${code}/invites`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, message: $('guest-msg').value }) });
+      card.invites = [...(card.invites || []), invite];
+      $('guest-name').value = ''; $('guest-msg').value = '';
+      renderInvites(invite.id);
+      say('guest-status', `Đã tạo link cho ${invite.name}. Bấm Sao chép rồi gửi riêng cho người đó nhé.`);
+    } catch (error) { say('guest-status', error.message, true); }
+    finally { $('guest-add').disabled = false; }
   });
-  $('guest-copy').addEventListener('click', e => copy($('guest-url').value, e.currentTarget));
   $('copy-manage').addEventListener('click', e => copy($('manage-url').value, e.currentTarget));
   $('native-share').addEventListener('click', () => navigator.share?.({ title: `${card.content.headline} · ${card.content.nickname}`, url: $('share-url').value }).catch(() => {}));
   $('refresh-wishes').addEventListener('click', loadWishes);

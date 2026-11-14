@@ -124,8 +124,8 @@ function createCardsRouter(options = {}) {
   }));
   router.get('/thiep/:code([A-Za-z2-9]{8})', asyncRoute(async (req, res) => {
     try {
-      const card = await service.getPublic(req.params.code);
-      if (req.params.code !== card.code) return res.redirect(301, `/thiep/${card.code}`);
+      const card = await service.getPublic(req.params.code, req.query.moi);
+      if (req.params.code !== card.code) return res.redirect(301, `/thiep/${card.code}${card.invite ? `?moi=${encodeURIComponent(req.query.moi)}` : ''}`);
       sendPage(res, renderCard(card, 'live', originOf(req)));
     } catch (error) {
       if (!(error instanceof CardError)) throw error;
@@ -158,6 +158,8 @@ function createCardsRouter(options = {}) {
   router.put('/api/thiep/cards/:code', editLimiter, express.json({ limit: '16kb' }), asyncRoute(async (req, res) => res.json({ card: await service.update(req.params.code, cardToken(req), req.body) })));
   router.post('/api/thiep/cards/:code/hardship', editLimiter, express.json({ limit: '4kb' }), asyncRoute(async (req, res) => res.json({ card: await service.requestHardship(req.params.code, cardToken(req), req.body?.reason) })));
   router.post('/api/thiep/cards/:code/transfer', publishLimiter, express.json({ limit: '2kb' }), asyncRoute(async (req, res) => res.json({ card: await service.recordTransfer(req.params.code, cardToken(req), req.get('X-Wallet-Token'), req.body) })));
+  router.post('/api/thiep/cards/:code/invites', editLimiter, express.json({ limit: '2kb' }), asyncRoute(async (req, res) => res.status(201).json({ invite: await service.createInvite(req.params.code, cardToken(req), req.body) })));
+  router.delete('/api/thiep/cards/:code/invites/:id', editLimiter, asyncRoute(async (req, res) => res.json({ invites: await service.removeInvite(req.params.code, cardToken(req), req.params.id) })));
   router.post('/api/thiep/cards/:code/email', editLimiter, express.json({ limit: '2kb' }), asyncRoute(async (req, res) => res.json(await service.setEmail(req.params.code, cardToken(req), req.body?.email))));
   router.post('/api/thiep/cards/:code/images', uploadLimiter, upload.single('image'), asyncRoute(async (req, res) => {
     const image = await service.uploadImage(req.params.code, cardToken(req), req.file);

@@ -6,7 +6,7 @@
   const preview = boot.mode === 'preview';
   let card = boot.card || null;
   // A personal link (?to=Minh%20Anh) greets one guest by name.
-  const guest = (new URLSearchParams(location.search).get('to') || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const guest = boot.card?.invite?.name || (new URLSearchParams(location.search).get('to') || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
   const NOTE_COLORS = ['#fff6c8', '#ffe1ea', '#dff3e6', '#e3ecff', '#f1e6ff', '#ffe9d6'];
 
   const FONTS = {
@@ -147,6 +147,10 @@
     const forGuest = $('for-guest');
     forGuest.textContent = guest ? `Thân gửi ${guest}` : '';
     show(forGuest, Boolean(guest));
+    const note = card.invite?.message || '';
+    show($('guest-note'), Boolean(note));
+    $('guest-note-text').textContent = note;
+    $('guest-note-from').textContent = `— ${c.nickname}`;
     renderAlbum(c, m);
     show($('dem-nguoc'), m.countdown);
     $('tiles-note').textContent = `Tính đến ${c.start} ngày ${d} tháng ${mo}`;
@@ -369,12 +373,16 @@
     $('env-title').textContent = `${c.headline} · ${c.nickname}`;
     $('env-date').textContent = `${weekday(c.date)}, ${d}/${mo}`;
     stage.hidden = false;
+    // Seal pops with confetti, flap opens, the letter slides out, then flies at the guest while
+    // the card rises behind it. The tap counts as a gesture, so the music may start right away.
     const open = () => {
       if (stage.classList.contains('is-opening')) return;
       stage.classList.add('is-opening');
+      if (card.look.modules.music !== false) playMusic();
+      if (!reduce) burst($('env-open'), 70);
       try { sessionStorage.setItem(`thiep-mo-${card.code}`, '1'); } catch (_) { /* private mode */ }
-      setTimeout(() => { stage.classList.add('is-done'); onOpen(); }, reduce ? 150 : 1300);
-      setTimeout(() => { stage.hidden = true; }, reduce ? 300 : 2000);
+      setTimeout(() => { stage.classList.add('is-zoom', 'is-done'); onOpen(); }, reduce ? 150 : 1250);
+      setTimeout(() => { stage.hidden = true; }, reduce ? 300 : 2200);
     };
     $('env-open').addEventListener('click', open);
     $('envelope-box').addEventListener('click', e => { if (e.target.closest('.env-letter, .env-front, .env-flap')) open(); });
@@ -426,7 +434,7 @@
     const reveal = () => {
       $('app').hidden = false;
       if (!reduce) document.body.classList.add('anim');
-      setTimeout(() => burst($('cap'), 120), reduce ? 0 : 500);
+      setTimeout(() => burst($('cap'), 140), reduce ? 0 : 700);
     };
     let opened = false;
     try { opened = sessionStorage.getItem(`thiep-mo-${card.code}`) === '1'; } catch (_) { opened = false; }
