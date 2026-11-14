@@ -5,6 +5,9 @@
   const boot = JSON.parse($('card-data').textContent || '{}');
   const preview = boot.mode === 'preview';
   let card = boot.card || null;
+  // A personal link (?to=Minh%20Anh) greets one guest by name.
+  const guest = (new URLSearchParams(location.search).get('to') || '').replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40);
+  const NOTE_COLORS = ['#fff6c8', '#ffe1ea', '#dff3e6', '#e3ecff', '#f1e6ff', '#ffe9d6'];
 
   const FONTS = {
     cute: { href: 'family=Baloo+2:wght@600;700;800&family=Pacifico&family=Quicksand:wght@500;600;700', display: "'Baloo 2', system-ui, sans-serif", body: "'Quicksand', 'Segoe UI', sans-serif", script: "'Pacifico', cursive" },
@@ -141,6 +144,10 @@
     document.querySelector('.info').dataset.cols = String(small);
 
     // Countdown, calendar, wishes, music.
+    const forGuest = $('for-guest');
+    forGuest.textContent = guest ? `Thân gửi ${guest}` : '';
+    show(forGuest, Boolean(guest));
+    renderAlbum(c, m);
     show($('dem-nguoc'), m.countdown);
     $('tiles-note').textContent = `Tính đến ${c.start} ngày ${d} tháng ${mo}`;
     show($('lich'), m.calendar);
@@ -158,6 +165,7 @@
     grid.replaceChildren(...heads, ...cells);
 
     show($('loi-chuc'), m.wishes);
+    loadWall();
     $('wish-sub').textContent = `Viết vài dòng thật dễ thương, ${c.nickname} sẽ vui lắm đó!`;
     const chips = [`Chúc mừng ${c.nickname} đã tốt nghiệp, giỏi quá đi!`, `Chúc ${c.nickname} bước vào đời thật rực rỡ và thành công!`, `Chúc ${c.nickname} luôn tự tin, mở ra thật nhiều điều mới!`, `Tự hào về ${c.nickname} lắm!`];
     $('chips').replaceChildren(...chips.map(text => { const b = el('button', null, text); b.type = 'button'; return b; }));
@@ -286,6 +294,7 @@
           maybe: `Cảm ơn bạn đã chúc mừng ${c.nickname}. Khi nào chắc chắn, bạn nhắn ${c.nickname} một tiếng nhé!`,
         }[attending];
         say(''); form.hidden = true; $('wish-thanks').hidden = false; burst($('wish-thanks'), 150);
+        wallStamp = 0; loadWall();
       } catch (error) {
         say(error.message === 'Failed to fetch' ? 'Mất kết nối rồi, bạn thử lại nhé.' : error.message, true);
       } finally { send.disabled = false; }
@@ -294,6 +303,82 @@
       $('wish-text').value = ''; $('wish-attend').value = '';
       $('wish-thanks').hidden = true; form.hidden = false; $('wish-text').focus();
     });
+  }
+
+  /* ---------- album ---------- */
+  function renderAlbum(c, m) {
+    const photos = Array.isArray(c.album) ? c.album : [];
+    show($('album'), m.album !== false && photos.length > 0);
+    const grid = $('album-grid');
+    grid.dataset.count = String(photos.length);
+    grid.replaceChildren(...photos.map((photoId, i) => {
+      const button = el('button', 'polaroid'); button.type = 'button';
+      button.setAttribute('aria-label', `Xem ảnh ${i + 1}`);
+      const img = el('img'); img.loading = 'lazy'; img.decoding = 'async'; img.alt = `Ảnh kỷ niệm ${i + 1} của ${c.nickname}`;
+      img.src = `/thiep/anh/${photoId}.webp`;
+      button.append(img);
+      button.addEventListener('click', () => openPhoto(img.src, img.alt));
+      return button;
+    }));
+  }
+  function openPhoto(src, alt) {
+    const box = $('lightbox');
+    $('lightbox-img').src = src; $('lightbox-img').alt = alt;
+    if (box.showModal) box.showModal(); else window.open(src, '_blank', 'noopener');
+  }
+
+  /* ---------- wish wall ---------- */
+  let wallStamp = 0;
+  const SAMPLE_WALL = [
+    { name: 'Minh Anh', message: 'Chúc mừng tân cử nhân! Bao năm cố gắng đã đơm hoa rồi nè.' },
+    { name: 'Lan', message: 'Tự hào về bạn lắm. Hẹn gặp ở buổi lễ nha!' },
+    { name: 'Hùng', message: 'Chúc bạn bước vào đời thật vững vàng và rực rỡ.' },
+  ];
+  async function loadWall() {
+    const wall = $('wall');
+    if (!card || card.look.modules.wall === false || card.look.modules.wishes === false) { show(wall, false); return; }
+    if (Date.now() - wallStamp < 15_000) return;
+    wallStamp = Date.now();
+    let wishes = SAMPLE_WALL;
+    if (!preview) {
+      try {
+        const res = await fetch(`/api/thiep/cards/${encodeURIComponent(card.code)}/wall`);
+        wishes = res.ok ? (await res.json()).wishes || [] : [];
+      } catch (_) { wishes = []; }
+    }
+    show(wall, wishes.length > 0);
+    $('notes').replaceChildren(...wishes.map((w, i) => {
+      const note = el('article', 'note');
+      note.style.setProperty('--note', NOTE_COLORS[i % NOTE_COLORS.length]);
+      note.style.setProperty('--tilt', `${((i * 37) % 5) - 2}deg`);
+      note.style.setProperty('--i', i);
+      note.append(el('p', null, w.message), el('b', null, w.name));
+      if (w.createdMs) note.append(el('small', null, new Date(w.createdMs).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })));
+      return note;
+    }));
+  }
+
+  /* ---------- envelope ---------- */
+  function showEnvelope(onOpen) {
+    const stage = $('envelope');
+    const c = card.content;
+    const [, mo, d] = parts(c.date);
+    $('env-to').textContent = guest ? `Gửi ${guest}` : 'Bạn có một thiệp mời';
+    $('env-guest').textContent = `Gửi ${guest}`;
+    $('env-guest').hidden = !guest;
+    $('env-title').textContent = `${c.headline} · ${c.nickname}`;
+    $('env-date').textContent = `${weekday(c.date)}, ${d}/${mo}`;
+    stage.hidden = false;
+    const open = () => {
+      if (stage.classList.contains('is-opening')) return;
+      stage.classList.add('is-opening');
+      try { sessionStorage.setItem(`thiep-mo-${card.code}`, '1'); } catch (_) { /* private mode */ }
+      setTimeout(() => { stage.classList.add('is-done'); onOpen(); }, reduce ? 150 : 1300);
+      setTimeout(() => { stage.hidden = true; }, reduce ? 300 : 2000);
+    };
+    $('env-open').addEventListener('click', open);
+    $('envelope-box').addEventListener('click', e => { if (e.target.closest('.env-letter, .env-front, .env-flap')) open(); });
+    $('env-open').focus({ preventScroll: true });
   }
 
   /* ---------- boot ---------- */
@@ -310,6 +395,9 @@
     });
     $('add-cal').addEventListener('click', downloadIcs);
     $('music').addEventListener('click', () => (playing ? stopMusic() : playMusic()));
+    $('lightbox-close').addEventListener('click', () => $('lightbox').close());
+    $('lightbox').addEventListener('click', e => { if (e.target === $('lightbox')) $('lightbox').close(); });
+    if (guest) $('wish-name').value = guest;
     wireWishes();
     setInterval(tick, 1000);
     if ('IntersectionObserver' in window && !reduce) {
@@ -335,8 +423,15 @@
     }
     if (!card) return;
     render();
-    $('app').hidden = false;
-    if (!reduce) document.body.classList.add('anim');
+    const reveal = () => {
+      $('app').hidden = false;
+      if (!reduce) document.body.classList.add('anim');
+      setTimeout(() => burst($('cap'), 120), reduce ? 0 : 500);
+    };
+    let opened = false;
+    try { opened = sessionStorage.getItem(`thiep-mo-${card.code}`) === '1'; } catch (_) { opened = false; }
+    if (card.look.modules.envelope !== false && !opened) showEnvelope(reveal);
+    else { $('app').hidden = false; if (!reduce) document.body.classList.add('anim'); }
     if (Date.now() >= startMs() && Date.now() < endMs()) setTimeout(() => burst($('cap'), 160), 1800);
   }
   start();

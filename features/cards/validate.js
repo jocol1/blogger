@@ -15,7 +15,8 @@ const PALETTES = {
 };
 const FONTS = ['cute', 'elegant', 'modern'];
 const ICONS = ['cap', 'diploma', 'bouquet', 'book', 'star', 'rice', 'heart', 'laptop'];
-const MODULES = ['info', 'countdown', 'calendar', 'wishes', 'music', 'cap'];
+const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'music', 'cap'];
+const ALBUM_MAX = 6;
 
 const HEX = /^#[0-9a-f]{6}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -111,6 +112,7 @@ function content(input) {
     venue: place(value.venue, true),
     parking: place(value.parking, false),
     contacts,
+    album: (Array.isArray(value.album) ? value.album : []).map(photoId).filter(Boolean).filter((id, i, all) => all.indexOf(id) === i).slice(0, ALBUM_MAX),
   };
 }
 
@@ -139,4 +141,4 @@ function normalizeCard(input) {
   return { content: content(input?.content), look: look(input?.look) };
 }
 
-module.exports = { CardError, PALETTES, FONTS, ICONS, MODULES, normalizeCard, contrast, textOn, httpsUrl, phone, email, photoId };
+module.exports = { CardError, PALETTES, FONTS, ICONS, MODULES, ALBUM_MAX, normalizeCard, contrast, textOn, httpsUrl, phone, email, photoId };

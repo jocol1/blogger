@@ -51,6 +51,11 @@
     $('share-panel').hidden = card.status !== 'published';
     const share = `${location.origin}/thiep/${code}`;
     $('share-url').value = share; $('open-card').href = share;
+    if (card.status === 'published') {
+      $('qr-card').src = `/thiep/${code}/qr.svg`;
+      $('qr-png').href = `/thiep/${code}/qr.png?tai=1`;
+      $('qr-svg').href = `/thiep/${code}/qr.svg?tai=1`;
+    }
     $('native-share').hidden = !navigator.share;
     $('manage-url').value = `${location.origin}/thiep/${code}/quanly#k=${token}`;
     $('owner-email').value = card.ownerEmail || '';
@@ -257,6 +262,15 @@
     finally { $('hardship-send').disabled = false; }
   });
   $('copy-share').addEventListener('click', e => copy($('share-url').value, e.currentTarget));
+  $('guest-form').addEventListener('submit', e => {
+    e.preventDefault();
+    const name = $('guest-name').value.replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!name) { $('guest-name').focus(); return; }
+    $('guest-url').value = `${location.origin}/thiep/${code}?to=${encodeURIComponent(name)}`;
+    $('guest-out').hidden = false;
+    $('guest-url').select();
+  });
+  $('guest-copy').addEventListener('click', e => copy($('guest-url').value, e.currentTarget));
   $('copy-manage').addEventListener('click', e => copy($('manage-url').value, e.currentTarget));
   $('native-share').addEventListener('click', () => navigator.share?.({ title: `${card.content.headline} · ${card.content.nickname}`, url: $('share-url').value }).catch(() => {}));
   $('refresh-wishes').addEventListener('click', loadWishes);

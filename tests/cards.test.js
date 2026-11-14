@@ -369,6 +369,60 @@ test('a shared card shows edits at once and gives link previews absolute address
   } finally { t.close(); }
 });
 
+test('the album keeps up to six of the card\'s own photos', async () => {
+  const service = createCardService({ db: new MemoryFirestore(), mailer: fakeMailer() });
+  const { card, ownerToken } = await service.create(input());
+  const ids = [];
+  for (let i = 0; i < 7; i++) ids.push((await service.uploadImage(card.code, ownerToken, { buffer: await pngBuffer(300, 300) })).id);
+  const other = await service.create(input());
+  const foreign = (await service.uploadImage(other.card.code, other.ownerToken, { buffer: await pngBuffer(300, 300) })).id;
+  const saved = await service.update(card.code, ownerToken, input({ content: { album: [ids[0], ids[0], foreign, 'not-an-id', ...ids.slice(1)] } }));
+  assert.deepEqual(saved.content.album, ids.slice(0, 5), 'duplicates, other cards\' photos and junk are dropped, then capped at six');
+  assert.equal((await service.getForOwner(card.code, ownerToken)).content.album.length, 5);
+});
+
+test('the wish wall shows recent wishes on published cards only, and updates when a wish arrives', async () => {
+  const t = await start();
+  try {
+    const { card, ownerToken } = await t.service.create(input());
+    assert.deepEqual(await t.service.publicWall(card.code), []);
+    await t.service.adminComp(card.code);
+    await (await t.service.submitWish(card.code, { name: 'Lan', message: 'Chúc mừng!', attending: 'no' })).delivery;
+    const res = await t.call(`/api/thiep/cards/${card.code}/wall`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('cache-control'), /max-age=15/);
+    const { wishes } = await res.json();
+    assert.deepEqual(wishes.map(w => [w.name, w.message]), [['Lan', 'Chúc mừng!']]);
+    assert.equal(wishes[0].attending, undefined, 'whether someone comes stays private to the owner');
+    await (await t.service.submitWish(card.code, { name: 'Hùng', message: 'Hay quá', attending: 'yes' })).delivery;
+    assert.deepEqual((await t.service.publicWall(card.code)).map(w => w.name), ['Hùng', 'Lan']);
+    const [newest] = await t.service.listWishes(card.code, ownerToken);
+    await t.service.removeWish(card.code, ownerToken, newest.id);
+    assert.deepEqual((await t.service.publicWall(card.code)).map(w => w.name), ['Lan']);
+    await t.service.update(card.code, ownerToken, input({ look: { modules: { wall: false } } }));
+    assert.deepEqual(await t.service.publicWall(card.code), []);
+  } finally { t.close(); }
+});
+
+test('a published card offers its QR code as SVG and PNG; drafts do not', async () => {
+  const t = await start();
+  try {
+    const { card } = await t.service.create(input());
+    assert.equal((await t.call(`/thiep/${card.code}/qr.svg`)).status, 404);
+    await t.service.adminComp(card.code);
+    const svg = await t.call(`/thiep/${card.code}/qr.svg`);
+    assert.equal(svg.status, 200);
+    assert.match(svg.headers.get('content-type'), /image\/svg\+xml/);
+    assert.match(await svg.text(), /^<svg/);
+    const png = await t.call(`/thiep/${card.code}/qr.png?tai=1`);
+    assert.equal(png.headers.get('content-type'), 'image/png');
+    assert.match(png.headers.get('content-disposition'), /attachment; filename="thiep-[A-Z2-9]{8}\.png"/);
+    assert.equal((await sharp(Buffer.from(await png.arrayBuffer())).metadata()).width, 1024);
+    const page = await (await t.call(`/thiep/${card.code}`)).text();
+    assert.ok(page.includes('id="envelope"') && page.includes('id="album"') && page.includes('id="wall"'));
+  } finally { t.close(); }
+});
+
 test('photos upload over HTTP and are served as images with safe headers', async () => {
   const t = await start();
   try {

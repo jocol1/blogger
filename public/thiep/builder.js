@@ -14,7 +14,9 @@
       yellow: { bg: '#fff4d6', card: '#fffdf5', accent: '#c47f00', ink: '#3f2f0c' }, mono: { bg: '#efefef', card: '#ffffff', accent: '#222222', ink: '#151515' },
     },
   };
-  const MODULES = ['info', 'countdown', 'calendar', 'wishes', 'music', 'cap'];
+  const MODULES = ['envelope', 'info', 'album', 'countdown', 'calendar', 'wishes', 'wall', 'music', 'cap'];
+  const ALBUM_MAX = 6;
+  let album = [];
   let look = { palette: 'green', colors: { ...config.palettes.green }, font: 'cute', portrait: { type: 'icon', icon: 'cap' }, modules: Object.fromEntries(MODULES.map(m => [m, true])) };
   let venuePhotoId = null;
   let editing = null; // { code, token }
@@ -49,6 +51,7 @@
       nickname: value('nickname'), fullName: value('fullName'), school: value('school'), major: value('major'),
       headline: value('headline'), invite: value('invite'), date: value('date'), start: value('start'), end: value('end'),
       venue: { name: value('venue.name'), address: value('venue.address'), mapUrl: value('venue.mapUrl'), photoId: venuePhotoId },
+      album: [...album],
       parking: { name: value('parking.name'), address: value('parking.address'), mapUrl: value('parking.mapUrl') },
       contacts: [0, 1].map(i => ({ name: value(`contacts.${i}.name`), note: value(`contacts.${i}.note`), phone: value(`contacts.${i}.phone`) })),
     };
@@ -59,6 +62,7 @@
     ['name', 'address', 'mapUrl'].forEach(k => { set(`venue.${k}`, c.venue?.[k]); set(`parking.${k}`, c.parking?.[k]); });
     [0, 1].forEach(i => ['name', 'note', 'phone'].forEach(k => set(`contacts.${i}.${k}`, c.contacts?.[i]?.[k])));
     venuePhotoId = c.venue?.photoId || null;
+    album = Array.isArray(c.album) ? c.album.slice(0, ALBUM_MAX) : [];
   }
   function fillLook(l) {
     look = { palette: l.palette || 'custom', colors: { ...l.colors }, font: l.font || 'cute', portrait: l.portrait || { type: 'icon', icon: 'cap' }, modules: { ...look.modules, ...(l.modules || {}) } };
@@ -168,6 +172,7 @@
     document.querySelectorAll('#icons input').forEach(i => { i.checked = look.portrait.type === 'icon' && i.value === look.portrait.icon; });
     $('venue-clear').hidden = !venuePhotoId;
     $('venue-name').textContent = venuePhotoId ? 'Đã có ảnh địa điểm' : '';
+    renderAlbum();
   }
   function syncLookControls() {
     renderSwatches(); syncColorInputs(); renderPortrait();
@@ -265,6 +270,38 @@
   }
   $('portrait-file').addEventListener('change', e => uploadFrom(e.target, imageId => { look.portrait = { type: 'photo', photoId: imageId }; }));
   $('venue-file').addEventListener('change', e => uploadFrom(e.target, imageId => { venuePhotoId = imageId; }));
+
+  /* ---------- album ---------- */
+  function renderAlbum() {
+    $('album-pick').replaceChildren(...album.map((photoId, i) => {
+      const item = document.createElement('div'); item.className = 'album-thumb';
+      const img = document.createElement('img'); img.src = `/thiep/anh/${photoId}.webp`; img.alt = `Ảnh album ${i + 1}`; img.loading = 'lazy';
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'album-remove'; remove.textContent = '×';
+      remove.setAttribute('aria-label', `Bỏ ảnh ${i + 1} khỏi album`);
+      remove.addEventListener('click', () => { album = album.filter(id => id !== photoId); renderAlbum(); changed(); });
+      item.append(img, remove);
+      return item;
+    }));
+    $('album-count').textContent = album.length ? `${album.length}/${ALBUM_MAX} ảnh` : '';
+    $('album-add').hidden = album.length >= ALBUM_MAX;
+  }
+  $('album-file').addEventListener('change', async e => {
+    const files = [...(e.target.files || [])].slice(0, ALBUM_MAX - album.length);
+    e.target.value = '';
+    if (!files.length) return;
+    try {
+      await ensureSaved();
+      for (const [i, file] of files.entries()) {
+        if (file.size > 5 * 1024 * 1024) { say(`Ảnh "${file.name}" quá 5 MB, mình bỏ qua nhé.`, true); continue; }
+        say(`Đang tải ảnh ${i + 1}/${files.length}…`);
+        const data = new FormData(); data.append('image', file);
+        const body = await api(`/api/thiep/cards/${editing.code}/images`, { method: 'POST', body: data });
+        album.push(body.id);
+        renderAlbum(); changed();
+      }
+      say('Đã thêm ảnh vào album. Nhớ bấm Lưu thay đổi nhé.');
+    } catch (error) { say(error.message, true); }
+  });
 
   /* ---------- my cards ---------- */
   function renderMine() {

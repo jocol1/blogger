@@ -83,6 +83,33 @@
           <a class="btn btn-soft btn-sm" id="open-card" target="_blank" rel="noopener">Mở thiệp</a>
           <button class="btn btn-soft btn-sm" type="button" id="native-share" hidden>Chia sẻ…</button>
         </div>
+
+        <div class="extra">
+          <h4>Link mời riêng từng người</h4>
+          <p class="hint">Gõ tên khách, thiệp sẽ mở bằng phong bì "Gửi …" đúng tên người đó và điền sẵn tên khi họ gửi lời chúc.</p>
+          <form class="share" id="guest-form" novalidate>
+            <label class="sr-only" for="guest-name">Tên khách</label>
+            <input id="guest-name" maxlength="40" placeholder="Ví dụ: Minh Anh" autocomplete="off">
+            <button class="btn btn-sm" type="submit">Tạo link</button>
+          </form>
+          <div class="share" id="guest-out" hidden>
+            <label class="sr-only" for="guest-url">Link mời riêng</label>
+            <input id="guest-url" readonly>
+            <button class="btn btn-soft btn-sm" type="button" id="guest-copy">Sao chép</button>
+          </div>
+        </div>
+
+        <div class="extra qr-share">
+          <img id="qr-card" alt="Mã QR mở thiệp" width="150" height="150">
+          <div>
+            <h4>Mã QR của thiệp</h4>
+            <p class="hint">In lên thiệp giấy hoặc gửi ảnh, ai quét cũng mở được thiệp.</p>
+            <div class="row mt">
+              <a class="btn btn-soft btn-sm" id="qr-png">Tải ảnh PNG</a>
+              <a class="btn btn-soft btn-sm" id="qr-svg">Tải bản in (SVG)</a>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="panel" aria-labelledby="wish-title">

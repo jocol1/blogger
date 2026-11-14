@@ -16,7 +16,8 @@ const priceOf = card => (card.hardship ? HARDSHIP_PRICE : CARD_PRICE);
 const DEFAULT_SUPPORT_URL = 'https://www.facebook.com/loc.ly.336717';
 const DRAFT_TTL_MS = 14 * 24 * 3600 * 1000;
 const NEVER = Number.MAX_SAFE_INTEGER;
-const MAX_IMAGES_PER_CARD = 12;
+const MAX_IMAGES_PER_CARD = 24;
+const WALL_SIZE = 30;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const MAX_STORED_IMAGE_BYTES = 300 * 1024;
 const IMAGE_MAX_SIDE = 1200;
@@ -140,6 +141,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
   const raw = createCardStore({ db, dir });
   const cardCache = createLru({ maxEntries: 2000, ttlMs: 60_000 });
   const imageCache = createLru({ maxEntries: 600, maxBytes: 48 * 1024 * 1024, ttlMs: 3600_000, sizeOf: v => v.data.length });
+  const wallCache = createLru({ maxEntries: 500, ttlMs: 30_000 });
   const jpegCache = createLru({ maxEntries: 200, maxBytes: 16 * 1024 * 1024, ttlMs: 3600_000, sizeOf: v => v.length });
   const store = {
     ...raw,
@@ -259,6 +261,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
       const known = new Set(card.imageIds || []);
       if (content.venue.photoId && !known.has(content.venue.photoId)) content.venue.photoId = null;
       if (look.portrait.type === 'photo' && !known.has(look.portrait.photoId)) look.portrait = { type: 'icon', icon: 'cap' };
+      content.album = content.album.filter(photoId => known.has(photoId));
       const patch = { content, look, updatedMs: now() };
       await store.patchCard(card.code, patch);
       return ownerCard({ ...card, ...patch });
@@ -276,7 +279,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
     async uploadImage(code, token, file) {
       const card = await owned(code, token);
       if (card.status === 'disabled') throw new CardError('Thiệp này đã bị gỡ.', 403);
-      if ((card.imageIds || []).length >= MAX_IMAGES_PER_CARD) throw new CardError('Mỗi thiệp tải tối đa 12 ảnh.', 409);
+      if ((card.imageIds || []).length >= MAX_IMAGES_PER_CARD) throw new CardError(`Mỗi thiệp tải tối đa ${MAX_IMAGES_PER_CARD} ảnh.`, 409);
       const data = await encodeImage(file);
       const imageId = id();
       await store.putImage({ id: imageId, cardCode: card.code, data, mime: 'image/webp', bytes: data.length, createdMs: now() });
@@ -353,9 +356,24 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
       if (!Object.hasOwn(ATTENDING, attending)) throw new CardError('Bạn chọn đến, không đến hay chưa chắc nhé.');
       const wish = { id: id(), name, message, attending, createdMs: now() };
       await store.wishes(card.code).add(wish);
+      wallCache.delete(card.code);
       const manage = base ? `${base}/thiep/${card.code}/quanly` : '';
       const delivery = mailOwner(card, wishEmail(wish, manage, card.content.nickname));
       return { wish, delivery };
+    },
+
+    // A few recent wishes for the card's public wall. Many guests load the same card at once,
+    // so the list is kept for half a minute and dropped whenever a wish is added or removed.
+    async publicWall(code) {
+      const card = await load(code);
+      const modules = card.look?.modules || {};
+      if (card.status !== 'published' || modules.wall === false || modules.wishes === false) return [];
+      let wall = wallCache.get(card.code);
+      if (!wall) {
+        wall = (await store.wishes(card.code).list()).slice(0, WALL_SIZE).map(w => ({ name: w.name, message: w.message, createdMs: w.createdMs }));
+        wallCache.set(card.code, wall);
+      }
+      return wall;
     },
 
     async listWishes(code, token) { const card = await owned(code, token); return store.wishes(card.code).list(); },
@@ -364,6 +382,7 @@ function createCardService({ db = null, dir, mailer = createMailer(), publicUrl 
       const card = await owned(code, token);
       if (!/^[\w-]{8,64}$/.test(String(wishId))) throw new CardError('Mã lời chúc không hợp lệ.');
       await store.wishes(card.code).remove(String(wishId));
+      wallCache.delete(card.code);
     },
 
     // The owner tells us which bank transfer pays for this card, and later that they sent it.

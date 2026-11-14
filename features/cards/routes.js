@@ -3,6 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const multer = require('multer');
+const QRCode = require('qrcode');
+const sharp = require('sharp');
 const { createCardService, CardError, MAX_UPLOAD_BYTES } = require('./service');
 const { PALETTES, ICONS } = require('./validate');
 const { ATTENDING } = require('../graduation/service');
@@ -133,6 +135,16 @@ function createCardsRouter(options = {}) {
         : 'Link thiệp không đúng hoặc thiệp đã bị gỡ.'), draft ? 200 : 404);
     }
   }));
+  // A QR code of the card link, to print on paper invitations or send as a picture.
+  router.get('/thiep/:code([A-Za-z2-9]{8})/qr.:ext(svg|png)', asyncRoute(async (req, res) => {
+    const card = await service.getPublic(req.params.code).catch(() => null);
+    if (!card) return res.status(404).type('text/plain').send('Thiệp chưa được xuất bản.');
+    const svg = await QRCode.toString(`${originOf(req)}/thiep/${card.code}`, { type: 'svg', margin: 2, errorCorrectionLevel: 'M', color: { dark: '#1d332aff', light: '#ffffffff' } });
+    const download = req.query.tai ? { 'Content-Disposition': `attachment; filename="thiep-${card.code}.${req.params.ext}"` } : {};
+    res.set({ 'Cache-Control': 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', ...download });
+    if (req.params.ext === 'svg') return res.type('image/svg+xml').send(svg);
+    res.type('image/png').send(await sharp(Buffer.from(svg), { density: 600 }).resize(1024, 1024).png().toBuffer());
+  }));
   router.get('/thiep/:code([A-Za-z2-9]{8})/quanly', (req, res) => sendPage(res, template('manage.html')));
 
   /* ---------- API ---------- */
@@ -158,6 +170,10 @@ function createCardsRouter(options = {}) {
     if (req.body?.website) return res.status(201).json({ ok: true });
     await service.submitWish(req.params.code, req.body);
     res.status(201).json({ ok: true });
+  }));
+  router.get('/api/thiep/cards/:code/wall', asyncRoute(async (req, res) => {
+    const wishes = await service.publicWall(req.params.code);
+    res.set('Cache-Control', 'public, max-age=15').json({ wishes });
   }));
   router.get('/api/thiep/cards/:code/wishes', editLimiter, asyncRoute(async (req, res) => res.json({ wishes: await service.listWishes(req.params.code, cardToken(req)) })));
   router.delete('/api/thiep/cards/:code/wishes/:id', editLimiter, asyncRoute(async (req, res) => { await service.removeWish(req.params.code, cardToken(req), req.params.id); res.json({ ok: true }); }));

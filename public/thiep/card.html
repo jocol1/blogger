@@ -30,6 +30,23 @@
 </head>
 <body>
   <noscript><p class="noscript">Bạn bật JavaScript để xem thiệp nhé.</p></noscript>
+  <div class="envelope-stage" id="envelope" hidden>
+    <p class="env-guest" id="env-guest" hidden></p>
+    <div class="envelope" id="envelope-box">
+      <div class="env-back"></div>
+      <div class="env-letter">
+        <p class="env-to" id="env-to"></p>
+        <p class="env-title" id="env-title"></p>
+        <p class="env-date" id="env-date"></p>
+      </div>
+      <div class="env-front"></div>
+      <div class="env-flap"></div>
+      <button class="env-seal" id="env-open" type="button" aria-label="Mở thiệp">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><path fill="currentColor" d="M30 58v20c0 10 13 16 30 16s30-6 30-16V58L60 68z"/><path fill="currentColor" d="M60 22l52 22-52 22L8 44z"/></svg>
+      </button>
+    </div>
+    <p class="env-hint" id="env-hint">Chạm vào con dấu để mở thiệp</p>
+  </div>
   <div id="app" hidden>
     <header class="hero">
       <div class="deco" id="deco" aria-hidden="true"></div>
@@ -47,6 +64,7 @@
             </g></svg>
           </button>
         </div>
+        <p class="for-guest" id="for-guest" hidden></p>
         <h1 class="title"><span class="script" data-text="headline"></span><span class="name" id="name" data-text="nickname"></span></h1>
         <p class="school" data-text="school"></p>
         <p class="major" data-text="major"></p>
@@ -94,7 +112,12 @@
         </div>
       </section>
 
-      <section class="sec sec-b" id="dem-nguoc" aria-labelledby="cd-title">
+      <section class="sec sec-b" id="album" aria-labelledby="album-title">
+        <h2 class="sec-title" id="album-title">Kỷ niệm</h2>
+        <div class="album" id="album-grid"></div>
+      </section>
+
+      <section class="sec sec-a" id="dem-nguoc" aria-labelledby="cd-title">
         <h2 class="sec-title" id="cd-title">Đếm ngược đến buổi lễ</h2>
         <div class="tiles" id="tiles">
           <div class="tile"><b data-u="d">0</b><span>ngày</span></div>
@@ -105,7 +128,7 @@
         <p class="sec-sub" id="tiles-note"></p>
       </section>
 
-      <section class="sec sec-a" id="lich" aria-labelledby="cal-title">
+      <section class="sec sec-b" id="lich" aria-labelledby="cal-title">
         <div class="cal-wrap">
           <div class="cal" role="img" id="cal">
             <div class="cal-head"><i></i><i></i><span id="cal-month"></span></div>
@@ -120,6 +143,10 @@
       </section>
 
       <section class="wishes" id="loi-chuc" aria-labelledby="wish-title">
+        <div class="wall" id="wall" hidden>
+          <h2 class="sec-title">Lời chúc từ mọi người</h2>
+          <div class="notes" id="notes"></div>
+        </div>
         <form class="wish-card" id="wish" novalidate>
           <h2 id="wish-title">Gửi lời chúc mừng tốt nghiệp</h2>
           <p class="wish-sub" id="wish-sub"></p>
@@ -147,5 +174,9 @@
       <p class="foot-brand"><a href="/taothiep">Tạo thiệp tốt nghiệp của bạn</a></p>
     </footer>
   </div>
+  <dialog class="lightbox" id="lightbox" aria-label="Xem ảnh">
+    <img id="lightbox-img" alt="">
+    <button class="lightbox-close" id="lightbox-close" type="button" aria-label="Đóng">×</button>
+  </dialog>
 </body>
 </html>
