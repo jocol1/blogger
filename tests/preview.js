@@ -9,6 +9,7 @@ const { createChatRouter } = require('../features/chat/routes');
 const { createPartyRouter } = require('../features/party/routes');
 const { createTeaService } = require('../features/tea/service');
 const { createTeaRouter, attachTeaSockets } = require('../features/tea/routes');
+const { createCotuongRouter } = require('../features/cotuong/routes');
 const { createGroceryPrices } = require('../features/tea/grocery-prices');
 const { Server: SocketServer } = require('socket.io');
 const { MemoryFirestore } = require('./helpers/memory-firestore');
@@ -47,6 +48,7 @@ const priceStore = { load: async () => savedPrices, save: async data => { savedP
 const groceryPrices = createGroceryPrices(process.env.TEA_PRICES_LIVE === '1' ? { store: priceStore } : { delayMs: 0, store: priceStore, fetchers: { winmart: fakePrices(0, 'muối tinh'), coop: fakePrices(1500) } });
 if (process.env.TEA_PRICES_LIVE !== '1') createGroceryPrices({ now: () => Date.now() - 86_400_000, delayMs: 0, store: priceStore, log: {}, fetchers: { winmart: fakePrices(600, 'muối tinh'), coop: fakePrices(1900) } }).getPrices().then(() => groceryPrices.start());
 app.use(createTeaRouter({ service: teaService, groceryPrices, isAdmin: req => req.session.user === 'admin' }));
+app.use(createCotuongRouter());
 app.use(createDonationRouter({ db, config, teaService }));
 app.use(createChatRouter({ db, bucket, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));
 app.use(createPartyRouter({ db, secret: 'local-party-secret', isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => password === 'local-admin' }));

@@ -21,6 +21,8 @@ const { createTeaService } = require('./features/tea/service');
 const { createGroceryPrices, firestorePriceStore } = require('./features/tea/grocery-prices');
 const { createBhxCollector } = require('./features/tea/bhx-collector');
 const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
+const { createCotuongRouter } = require('./features/cotuong/routes');
+const cotuong = createCotuongRouter();
 const { Server: SocketServer } = require('socket.io');
 
 const app = express();
@@ -106,6 +108,7 @@ app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === '
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createGraduationRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createCardsRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+app.use(cotuong);
 // Keep the former blog in place while exposing the current public product routes mounted above.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.
 if (process.env.PAYMENT_PAGE_ONLY !== 'false') {
@@ -140,6 +143,7 @@ async function start() {
   try { await loadRemote(); } catch (error) { console.error('Không thể đọc Firestore, dùng dữ liệu local:', error.message); }
   if (firestore) { try { await teaService.recoverAfterRestart(); } catch (error) { console.error('Tea restart recovery failed:', error.message); } teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)); setInterval(() => teaService.maintenance().catch(error => console.error('Tea maintenance failed:', error.message)), 60_000).unref(); }
   groceryPrices.start();
+  cotuong.warm().catch((error) => console.error('Pikafish failed to start:', error.message));
   httpServer.listen(PORT,()=>console.log(`Blogger chạy tại http://localhost:${PORT}${firestore ? ' · Firestore' : ''}`));
 }
 start();
