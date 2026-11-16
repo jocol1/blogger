@@ -27,6 +27,29 @@ window.TeaScene = (() => {
     c.save();c.translate(x,y);c.scale(scale,scale);p(c,'#715844',-21,10,44,6);p(c,'#91a68e',-24,0,48,12);p(c,'#e9e4b9',-20,-2,40,10);
     for(const [bx,by] of [[-12,-10],[3,-10],[-4,-20]]){p(c,'#97532e',bx-7,by,16,10);p(c,'#d9984a',bx-7,by-2,14,8);p(c,'#f1bd6e',bx-5,by-4,10,6);p(c,'#aa6435',bx,by,3,2)}c.restore();
   }
+  // The big chalkboard on the shopfront. `board` is {title, sub, rows:[{id,name,total,best}], hint, empty}; null shows the title only.
+  let board=null;const logos={};
+  const logo=id=>{if(!logos[id]){const img=new Image();img.onload=()=>buildGround();img.src=`/assets/tea/logos/${id}.png`;logos[id]=img}return logos[id]};
+  const dong=n=>Math.round(n).toLocaleString('vi-VN')+'đ',FONT='"Segoe UI",sans-serif';
+  function drawBoard(){
+    const X=26,Y=6,W=358,H=136;
+    p(c,'#3f2b1b',X-2,Y,W+4,H+4);p(c,'#6b4a2f',X,Y,W,H);p(c,'#8a6340',X+3,Y+3,W-6,H-6);p(c,'#26372f',X+8,Y+8,W-16,H-16);p(c,'#33493f',X+8,Y+8,W-16,6);p(c,'#5a3f27',X+8,Y+H-2,W-16,4);
+    c.textAlign='left';c.fillStyle='#f1ecd8';c.font=`bold 15px ${FONT}`;c.fillText(board?.title||'BẢNG GIÁ SIÊU THỊ',X+18,Y+30);
+    if(board?.sub){c.textAlign='right';c.fillStyle='#e8d8ae';c.font=`bold 10px ${FONT}`;c.fillText(board.sub,X+W-18,Y+30)}
+    p(c,'#e8d8ae',X+18,Y+36,W-36,2);
+    const rows=(board?.rows||[]).slice(0,4),max=Math.max(1,...rows.map(r=>r.total));
+    if(!rows.length){c.textAlign='center';c.fillStyle='#d9e3d2';c.font=`bold 13px ${FONT}`;c.fillText(board?.empty||'…',X+W/2,Y+82)}
+    rows.forEach((row,i)=>{
+      const y=Y+42+i*18,img=logo(row.id);
+      p(c,'#f4efdc',X+17,y-1,18,18);
+      if(img.complete&&img.naturalWidth){c.imageSmoothingEnabled=true;c.drawImage(img,X+18,y,16,16);c.imageSmoothingEnabled=false}
+      c.textAlign='left';c.font=`bold 11px ${FONT}`;c.fillStyle=row.best?'#c8f2b0':'#f1ecd8';c.fillText(row.name,X+42,y+12);
+      p(c,'#1a2822',X+136,y+3,140,10);p(c,row.best?'#8fd18a':'#d7b76b',X+136,y+3,Math.max(8,row.total/max*140),10);
+      c.textAlign='right';c.fillText(dong(row.total),X+W-18,y+12);
+    });
+    if(board?.hint){c.textAlign='left';c.fillStyle='#aebdb0';c.font=`9px ${FONT}`;c.fillText(board.hint,X+18,Y+H-12)}
+    c.textAlign='left';
+  }
   function buildGround(){
     // A modest sidewalk café right beside a Vietnamese neighborhood street.
     p(c,'#898173',0,0,960,640);
@@ -43,23 +66,23 @@ window.TeaScene = (() => {
     p(c,'#e8d8ae',102,596,116,4);p(c,'#e8d8ae',390,596,116,4);p(c,'#e8d8ae',678,596,116,4);
     // A low painted shopfront and a few pots replace the garden border.
     for(let x=20;x<960;x+=40){p(c,'#8d6650',x,0,36,54);p(c,'#b4805c',x+2,0,32,46);p(c,'#c69a70',x+4,5,24,34);p(c,'#705545',x+14,8,3,30);p(c,'#e1c39a',x+6,42,24,3)}
-    for(const x of [38,922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
-    // Chalkboard price list on the shopfront, left of the tea stall.
-    p(c,'#6b4a2f',222,6,92,50);p(c,'#8a6340',224,8,88,46);p(c,'#26372f',228,12,80,38);p(c,'#33493f',228,12,80,4);c.fillStyle='#f1ecd8';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('BẢNG GIÁ',268,26);c.textAlign='left';
-    p(c,'#e8d8ae',236,31,36,2);p(c,'#e8d8ae',276,31,24,2);p(c,'#e8d8ae',236,37,28,2);p(c,'#e8d8ae',268,37,32,2);p(c,'#e8d8ae',236,43,40,2);p(c,'#e8d8ae',282,43,18,2);
-    for(const x of [190,786]){p(c,'#5a4532',x,56,6,58);p(c,'#7a583b',x-8,106,22,6);p(c,'#4d4030',x-12,48,28,6);p(c,'#be8e45',x-8,54,20,26);p(c,'#fae49b',x-4,56,12,20);p(c,'#fff5bf',x,60,4,10)}
-    // Tea stall: shelves, tile roof, wooden boards, checkered awning.
+    for(const x of [922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
+    drawBoard();
+    for(const x of [786]){p(c,'#5a4532',x,56,6,58);p(c,'#7a583b',x-8,106,22,6);p(c,'#4d4030',x-12,48,28,6);p(c,'#be8e45',x-8,54,20,26);p(c,'#fae49b',x-4,56,12,20);p(c,'#fff5bf',x,60,4,10)}
+    // Tea stall: shelves, tile roof, wooden boards, checkered awning (drawn at 80% so the price board gets the wall).
+    c.save();c.translate(624,0);c.scale(.8,.8);c.translate(-624,0);
     p(c,'#836347',342,22,280,124);p(c,'#583f30',350,30,264,102);p(c,'#bd905f',358,36,248,88);
     for(let x=364;x<604;x+=22){p(c,'#ad7b4e',x,38,2,82);p(c,'#d5a96e',x+2,40,2,76)}
     p(c,'#5e4734',366,60,236,6);p(c,'#5e4734',366,86,236,6);
     for(const x of [372,398,556,578]){p(c,'#466d63',x,68,14,18);p(c,'#c3d4ae',x+2,70,10,12);p(c,'#f3dfa4',x,66,14,4)}
-    p(c,'#41362a',434,68,104,18);p(c,'#fbdf98',438,70,96,14);c.fillStyle='#704c30';c.font='bold 10px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('LOC LY • TEA',486,81);c.textAlign='left';
+    p(c,'#41362a',434,68,104,18);p(c,'#fbdf98',438,70,96,14);c.fillStyle='#704c30';c.font='bold 12px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('LOC LY • TEA',486,81);c.textAlign='left';
     p(c,'#4d3b2d',340,22,286,8);for(let row=0;row<3;row++)for(let x=340;x<622;x+=24){p(c,'#764832',x,row*6+4,26,8);p(c,row%2?'#bc764b':'#d08953',x+2,row*6+4,22,4)}
     for(let x=342;x<622;x+=28){p(c,(x-342)%56?'#ead5a3':'#729164',x,92,28,18);p(c,(x-342)%56?'#cfb785':'#506d46',x,110,28,4)}
     p(c,'#523c2d',350,114,264,24);p(c,'#996d44',356,114,252,20);p(c,'#bc8e57',358,116,248,4);for(let x=360;x<608;x+=32)p(c,'#785334',x,122,2,12);
     glass(c,380,110,.6);snack(c,566,105,.62);p(c,'#557261',406,94,18,20);p(c,'#a6c6aa',408,96,14,14);p(c,'#3e544b',408,90,14,6);p(c,'#7c8d6b',424,98,6,4);
     // A striped plastic awning over the sidewalk tea stall.
     p(c,'#f1d6a8',340,140,284,8);for(let x=342;x<620;x+=28){p(c,(x-342)%56?'#d45d42':'#e8c980',x,148,26,14);p(c,'#a24b37',x,160,26,3)}
+    c.restore();
     p(c,'#665444',188,509,108,26);p(c,'#ead8b6',192,513,100,18);c.fillStyle='#654b39';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('TRÀ ĐÁ • VỈA HÈ',242,525);c.textAlign='left';
     for(const x of [314,644,802]){p(c,'#74905e',x,526,8,10);p(c,'#9baf70',x-4,522,14,4)}
   }
@@ -141,5 +164,5 @@ window.TeaScene = (() => {
     c.restore();
   }
   function menu(canvas,kind){if(!canvas)return;const c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.clearRect(0,0,80,80);dish(c,40,48,kind,window.TeaMenu?.[kind]?.drink?1.8:1.35)}
-  return {ground:layer,table,avatar,glass,snack,dish,enjoy,menu};
+  return {ground:layer,table,avatar,glass,snack,dish,enjoy,menu,setBoard(model){board=model;buildGround()}};
 })();

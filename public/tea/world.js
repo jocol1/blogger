@@ -9,7 +9,7 @@
     return {id,x,y,capacity,size:capacity===2?'small':capacity===4?'medium':'large',width:capacity===8?88:capacity===4?66:50,height:capacity===8?54:capacity===4?46:38,seats:offsets.map(([dx,dy],i)=>({id:`${id}-${i+1}`,x:x+dx,y:y+dy}))};
   });
   function blocked(x,y,tables=TABLES) {
-    return x<26||x>934||y<76||y>606||(x>350&&x<610&&y<135)||tables.some(t=>Math.abs(x-t.x)<t.width/2+19&&Math.abs(y-t.y)<t.height/2+17);
+    return x<26||x>934||y<76||y>606||(x<626&&y<142)||tables.some(t=>Math.abs(x-t.x)<t.width/2+19&&Math.abs(y-t.y)<t.height/2+17);
   }
   function clearLine(a,b,tables) {
     const steps=Math.ceil(Math.hypot(b.x-a.x,b.y-a.y)/6);
