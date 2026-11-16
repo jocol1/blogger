@@ -16,7 +16,7 @@ test('lighting smoothly changes at dawn and dusk without changing the clock spee
 });
 test('traffic moves both ways only on the road with quiet gaps and no reduced-motion animation',()=>{
   let east=false,west=false,quiet=false;
-  for(let time=0;time<120000;time+=100){const cars=trafficAt(time);assert.ok(cars.length<=2);if(!cars.length)quiet=true;for(const car of cars){assert.ok(car.y>=578&&car.y<=622);assert.ok(car.x>=-90&&car.x<=1050);if(car.direction===1)east=true;else west=true}}
+  for(let time=0;time<120000;time+=100){const cars=trafficAt(time);assert.ok(cars.length<=2);if(!cars.length)quiet=true;for(const car of cars){assert.ok(car.y>=609&&car.y<=630);assert.ok(car.x>=-90&&car.x<=1050);if(car.direction===1)east=true;else west=true}}
   assert.ok(east&&west&&quiet);assert.ok(trafficAt(100)[0].x>trafficAt(0)[0].x);
   assert.deepEqual(trafficAt(at('12:00:00'),true),[]);assert.deepEqual(trafficAt(0),trafficAt(0));
 });

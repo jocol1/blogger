@@ -17,7 +17,7 @@
       const cycle=lane?37000:29000,shift=lane?13500:0,t=now+shift,slot=Math.floor(t/cycle),elapsed=((t%cycle)+cycle)%cycle,duration=lane?8500:7500;
       if(elapsed>=duration)continue;
       const fraction=elapsed/duration,direction=lane?-1:1;
-      cars.push({x:direction===1?-90+fraction*1140:1050-fraction*1140,y:lane?622:578,direction,color:['#bb6049','#67979a','#d3b157','#6b85b2'][((slot+lane)%4+4)%4],scooter:slot%3!==0});
+      cars.push({x:direction===1?-90+fraction*1140:1050-fraction*1140,y:lane?630:609,direction,color:['#bb6049','#67979a','#d3b157','#6b85b2'][((slot+lane)%4+4)%4],scooter:slot%3!==0});
     }
     return cars;
   }
@@ -51,7 +51,7 @@
     c.save();c.globalAlpha=night*.64;c.drawImage(shade,0,0);c.globalAlpha=night;
     for(const [x,y] of [[196,65],[792,65],[390,155],[474,155],[558,155]]){rect(c,'#ffe2a0',x-4,y-4,8,10);rect(c,'#fff5cb',x-2,y-2,4,5)}
     // Warm strings of lanterns along the pavement, steady rather than flashing.
-    for(const x of [70,250,430,610,790,910]){rect(c,'#5e4c3c',x,515,2,25);rect(c,'#d8ac65',x-4,510,10,10);rect(c,'#ffedb0',x-2,510,6,7)}
+    for(const x of [70,250,430,610,790,910]){rect(c,'#5e4c3c',x,563,2,25);rect(c,'#d8ac65',x-4,558,10,10);rect(c,'#ffedb0',x-2,558,6,7)}
     c.restore();
   }
   const api={timeAt,trafficAt,vehicles,lighting};

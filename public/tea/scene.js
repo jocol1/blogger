@@ -54,16 +54,16 @@ window.TeaScene = (() => {
     // A modest sidewalk café right beside a Vietnamese neighborhood street.
     p(c,'#898173',0,0,960,640);
     for(let i=0;i<1000;i++){const x=rng(i,1)*960,y=rng(i,2)*640;p(c,i%3?'#938b7d':'#7d776d',x,y,4,2)}
-    p(c,'#776451',12,66,936,492);p(c,'#c6b59a',18,68,924,482);p(c,'#b9a88e',24,74,912,470);
-    for(let y=78;y<538;y+=28)for(let x=28;x<934;x+=44){const offset=(Math.floor(y/28)%2)*22;p(c,'#9d8b72',x-offset,y,42,26);p(c,rng(x,y)>.35?'#c7b59a':'#c0ae93',x-offset+2,y+2,38,22);p(c,'#d4c2a5',x-offset+4,y+2,32,2);if(rng(y,x)>.72)p(c,'#ad9a80',x-offset+10,y+17,12,2)}
+    p(c,'#776451',12,66,936,540);p(c,'#c6b59a',18,68,924,530);p(c,'#b9a88e',24,74,912,518);
+    for(let y=78;y<586;y+=28)for(let x=28;x<934;x+=44){const offset=(Math.floor(y/28)%2)*22;p(c,'#9d8b72',x-offset,y,42,26);p(c,rng(x,y)>.35?'#c7b59a':'#c0ae93',x-offset+2,y+2,38,22);p(c,'#d4c2a5',x-offset+4,y+2,32,2);if(rng(y,x)>.72)p(c,'#ad9a80',x-offset+10,y+17,12,2)}
     // The shop's awning shades the first row; the open pavement stays walkable.
     p(c,'#ad7654',26,303,908,10);p(c,'#e7d7bb',26,313,908,5);
     for(let x=34;x<936;x+=48){p(c,'#f0e1c7',x,315,28,2)}
     // Curb, gutter and road: tables sit on the pavement, feet almost at the street.
-    p(c,'#61594f',0,544,960,16);p(c,'#ded2bb',0,544,960,6);p(c,'#a89a82',0,550,960,6);
-    for(let x=8;x<960;x+=36){p(c,'#796f62',x,552,30,3);p(c,'#c3b8a3',x+2,553,24,1)}
-    p(c,'#55534e',0,560,960,80);for(let i=0;i<700;i++){const x=rng(i,17)*960,y=560+rng(i,23)*80;p(c,i%4?'#5d5b55':'#66635d',x,y,4,2)}
-    p(c,'#e8d8ae',102,596,116,4);p(c,'#e8d8ae',390,596,116,4);p(c,'#e8d8ae',678,596,116,4);
+    p(c,'#61594f',0,592,960,8);p(c,'#ded2bb',0,592,960,3);p(c,'#a89a82',0,595,960,3);
+    for(let x=8;x<960;x+=36){p(c,'#796f62',x,596,30,2);p(c,'#c3b8a3',x+2,596,24,1)}
+    p(c,'#55534e',0,600,960,40);for(let i=0;i<350;i++){const x=rng(i,17)*960,y=600+rng(i,23)*40;p(c,i%4?'#5d5b55':'#66635d',x,y,4,2)}
+    p(c,'#e8d8ae',102,618,116,4);p(c,'#e8d8ae',390,618,116,4);p(c,'#e8d8ae',678,618,116,4);
     // A low painted shopfront and a few pots replace the garden border.
     for(let x=20;x<960;x+=40){p(c,'#8d6650',x,0,36,54);p(c,'#b4805c',x+2,0,32,46);p(c,'#c69a70',x+4,5,24,34);p(c,'#705545',x+14,8,3,30);p(c,'#e1c39a',x+6,42,24,3)}
     for(const x of [922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
@@ -83,8 +83,8 @@ window.TeaScene = (() => {
     // A striped plastic awning over the sidewalk tea stall.
     p(c,'#f1d6a8',340,140,284,8);for(let x=342;x<620;x+=28){p(c,(x-342)%56?'#d45d42':'#e8c980',x,148,26,14);p(c,'#a24b37',x,160,26,3)}
     c.restore();
-    p(c,'#665444',188,509,108,26);p(c,'#ead8b6',192,513,100,18);c.fillStyle='#654b39';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('TRÀ ĐÁ • VỈA HÈ',242,525);c.textAlign='left';
-    for(const x of [314,644,802]){p(c,'#74905e',x,526,8,10);p(c,'#9baf70',x-4,522,14,4)}
+    p(c,'#665444',188,557,108,26);p(c,'#ead8b6',192,561,100,18);c.fillStyle='#654b39';c.font='bold 9px "Segoe UI",sans-serif';c.textAlign='center';c.fillText('TRÀ ĐÁ • VỈA HÈ',242,573);c.textAlign='left';
+    for(const x of [314,644,802]){p(c,'#74905e',x,574,8,10);p(c,'#9baf70',x-4,570,14,4)}
   }
   buildGround();
   function chair(c,seat,table,highlight=false){
