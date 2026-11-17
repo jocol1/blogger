@@ -57,6 +57,27 @@ test('/co-tuong is a standalone page, not the tea café', async () => {
     const client = await call(script[0]);
     assert.equal(client.status, 200);
     assert.equal((await client.text()).includes('http://localhost:3001'), false);
+    const gzipped = await new Promise((resolve, reject) => {
+      http.get(
+        { hostname: '127.0.0.1', port: server.address().port, path: script[0], headers: { 'Accept-Encoding': 'gzip' } },
+        (res) => {
+          const chunks = [];
+          res.on('data', (c) => chunks.push(c));
+          res.on('end', () =>
+            resolve({
+              status: res.statusCode,
+              enc: res.headers['content-encoding'],
+              cache: res.headers['cache-control'],
+              bytes: Buffer.concat(chunks).length,
+            }),
+          );
+        },
+      ).on('error', reject);
+    });
+    assert.equal(gzipped.status, 200);
+    assert.equal(gzipped.enc, 'gzip');
+    assert.match(gzipped.cache, /immutable/);
+    assert.ok(gzipped.bytes < 800_000, `gzipped JS should be well under 800KB, got ${gzipped.bytes}`);
     const bot = await call('/api/bot/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const zlib = require('node:zlib');
 const express = require('express');
 
 const { INITIAL_FEN, newGame, play } = require('./xq-rules');
@@ -9,6 +10,14 @@ const BASE = '/co-tuong';
 const CSP =
   "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 const DEFAULT_ENGINE = 'D:/engines/pikafish/Pikafish-Windows-x86-64-universal.exe';
+const GZIP_TYPES = {
+  '.js': 'application/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.html': 'text/html; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.json': 'application/json',
+};
+const HASHED = /[.-][a-f0-9]{8,}\.(?:js|css)$/i;
 
 function positive(value, fallback) {
   const n = Number(value);
@@ -38,28 +47,65 @@ function fail(res, status, code, message) {
   return res.status(status).json({ error: { code, message } });
 }
 
+function walkFiles(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
+  for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+    const abs = path.join(dir, ent.name);
+    if (ent.isDirectory()) walkFiles(abs, out);
+    else out.push(abs);
+  }
+  return out;
+}
+
+/** Patch the Expo export so API calls hit this site, then gzip once at boot. */
+function loadTextAssets(dir) {
+  const assets = new Map();
+  for (const abs of walkFiles(dir)) {
+    const ext = path.extname(abs);
+    const type = GZIP_TYPES[ext];
+    if (!type) continue;
+    let buf = fs.readFileSync(abs);
+    if (ext === '.js') {
+      const text = buf.toString('utf8');
+      if (text.includes('http://localhost:3001')) buf = Buffer.from(text.replaceAll('http://localhost:3001', ''));
+    }
+    const rel = `/${path.relative(dir, abs).replaceAll('\\', '/')}`;
+    assets.set(rel, { type, raw: buf, gzip: zlib.gzipSync(buf, { level: 6 }) });
+  }
+  return assets;
+}
+
+function sendAsset(req, res, asset, cache) {
+  const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+  res.set({
+    'Content-Type': asset.type,
+    'Cache-Control': cache,
+    Vary: 'Accept-Encoding',
+    ...(gzip ? { 'Content-Encoding': 'gzip' } : {}),
+  });
+  res.send(gzip ? asset.gzip : asset.raw);
+}
+
 function createCotuongRouter({ engine, movetimeMs } = {}) {
   const bot = engine !== undefined ? engine : openPikafish();
-  const think = movetimeMs ?? positive(process.env.PIKAFISH_MOVETIME_MS, 1500);
+  const think = movetimeMs ?? positive(process.env.PIKAFISH_MOVETIME_MS, 400);
   const router = express.Router();
   const dir = path.join(__dirname, '../../public/co-tuong');
-  const index = path.join(dir, 'index.html');
+  const assets = loadTextAssets(dir);
   const page = (req, res, next) => {
     if (path.extname(req.path)) return next();
-    if (!fs.existsSync(index)) {
+    const asset = assets.get('/index.html');
+    if (!asset) {
       return res.status(503).type('text/plain').send('Cờ tướng chưa được xuất lên máy chủ.');
     }
-    res.set({ 'Content-Security-Policy': CSP, 'Cache-Control': 'no-cache' });
-    res.sendFile(index);
+    res.set({ 'Content-Security-Policy': CSP });
+    sendAsset(req, res, asset, 'no-cache');
   };
-  // The exported client calls http://localhost:3001. Serve it from this site instead.
+
   router.use(BASE, (req, res, next) => {
-    if (!req.path.endsWith('.js')) return next();
-    const file = path.resolve(dir, req.path.replace(/^[/\\]+/, ''));
-    if (!file.startsWith(path.resolve(dir) + path.sep) || !fs.existsSync(file)) return next();
-    const text = fs.readFileSync(file, 'utf8');
-    if (!text.includes('http://localhost:3001')) return next();
-    res.type('js').set('Cache-Control', 'no-cache').send(text.replaceAll('http://localhost:3001', ''));
+    const asset = assets.get(req.path);
+    if (!asset) return next();
+    sendAsset(req, res, asset, HASHED.test(req.path) ? 'public, max-age=31536000, immutable' : 'public, max-age=86400');
   });
 
   router.get('/api/bot/status', (req, res) => {
@@ -97,11 +143,11 @@ function createCotuongRouter({ engine, movetimeMs } = {}) {
     }
   });
 
-  router.use(BASE, express.static(dir, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
+  router.use(BASE, express.static(dir, { index: false, maxAge: '7d' }));
   router.get('/canvaskit.wasm', (req, res) => {
     const file = path.join(dir, 'canvaskit.wasm');
     if (!fs.existsSync(file)) return res.sendStatus(404);
-    res.type('application/wasm').sendFile(file);
+    res.type('application/wasm').set('Cache-Control', 'public, max-age=604800').sendFile(file);
   });
   router.get(BASE, page);
   router.get(`${BASE}/*`, page);
