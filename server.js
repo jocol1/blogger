@@ -22,7 +22,6 @@ const { createGroceryPrices, firestorePriceStore } = require('./features/tea/gro
 const { createBhxCollector } = require('./features/tea/bhx-collector');
 const { createTeaRouter, attachTeaSockets } = require('./features/tea/routes');
 const { createCotuongRouter } = require('./features/cotuong/routes');
-const cotuong = createCotuongRouter();
 const { Server: SocketServer } = require('socket.io');
 
 const app = express();
@@ -108,6 +107,7 @@ app.use(createChatRouter({ db: firestore, isAdmin: req => req.session.user === '
 app.use(createPartyRouter({ db: firestore, secret: process.env.SESSION_SECRET, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createGraduationRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
 app.use(createCardsRouter({ db: firestore, publicUrl: process.env.PUBLIC_URL, isAdmin: req => req.session.user === 'admin', authenticateAdmin: password => Boolean(adminPasswordHash && bcrypt.compareSync(password, adminPasswordHash)) }));
+const cotuong = createCotuongRouter({ db: firestore, secret: process.env.SESSION_SECRET });
 app.use(cotuong);
 // Keep the former blog in place while exposing the current public product routes mounted above.
 // PAYMENT_PAGE_ONLY defaults to true and is deliberately separate from older deployment variables.

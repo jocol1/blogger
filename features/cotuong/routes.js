@@ -1,10 +1,12 @@
 const fs = require('node:fs');
+const http = require('node:http');
 const path = require('node:path');
 const zlib = require('node:zlib');
 const express = require('express');
 
 const { INITIAL_FEN, newGame, play } = require('./xq-rules');
 const { UciEngine } = require('./uci');
+const { mountAccounts } = require('./accounts');
 
 const BASE = '/co-tuong';
 const CSP =
@@ -47,6 +49,39 @@ function fail(res, status, code, message) {
   return res.status(status).json({ error: { code, message } });
 }
 
+const ACCOUNT_PREFIXES = ['/api/auth', '/api/me', '/api/matches', '/api/players'];
+
+/** The chess page only talks to this site. Account routes are answered by the xiangqi API. */
+function accountProxy(accountApi) {
+  return (req, res, next) => {
+    const pathOnly = req.originalUrl.split('?')[0];
+    const matched = ACCOUNT_PREFIXES.some((prefix) => pathOnly === prefix || pathOnly.startsWith(`${prefix}/`));
+    if (!matched) return next();
+    let target;
+    try {
+      target = new URL(req.originalUrl, accountApi);
+    } catch {
+      return fail(res, 503, 'INTERNAL', 'Account server is not configured');
+    }
+    const headers = { ...req.headers, host: target.host };
+    delete headers.connection;
+    const upstream = http.request(target, { method: req.method, headers, timeout: 15_000 }, (incoming) => {
+      res.status(incoming.statusCode || 502);
+      for (const [key, value] of Object.entries(incoming.headers)) {
+        if (value === undefined || key === 'transfer-encoding' || key === 'connection') continue;
+        res.setHeader(key, value);
+      }
+      incoming.pipe(res);
+    });
+    const down = () => {
+      if (!res.headersSent) fail(res, 503, 'INTERNAL', 'Account server is down');
+    };
+    upstream.on('timeout', () => upstream.destroy());
+    upstream.on('error', down);
+    req.pipe(upstream);
+  };
+}
+
 function walkFiles(dir, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -86,10 +121,12 @@ function sendAsset(req, res, asset, cache) {
   res.send(gzip ? asset.gzip : asset.raw);
 }
 
-function createCotuongRouter({ engine, movetimeMs } = {}) {
+function createCotuongRouter({ engine, movetimeMs, accountApi, db, secret } = {}) {
   const bot = engine !== undefined ? engine : openPikafish();
   const think = movetimeMs ?? positive(process.env.PIKAFISH_MOVETIME_MS, 400);
   const router = express.Router();
+  if (typeof accountApi === 'string' && accountApi) router.use(accountProxy(accountApi));
+  else mountAccounts(router, { db, secret });
   const dir = path.join(__dirname, '../../public/co-tuong');
   const assets = loadTextAssets(dir);
   const page = (req, res, next) => {

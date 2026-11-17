@@ -5,6 +5,7 @@ const path = require('node:path');
 const http = require('node:http');
 const express = require('express');
 const { createCotuongRouter, pikafishOptions, INITIAL_FEN } = require('../features/cotuong/routes');
+const { MemoryFirestore } = require('./helpers/memory-firestore');
 const { parseFen, perft } = require('../features/cotuong/xq-rules');
 const { parseInfoLine } = require('../features/cotuong/uci');
 
@@ -104,6 +105,106 @@ test('/co-tuong is a standalone page, not the tea café', async () => {
     assert.equal(missing.status, 404);
     const cafe = await call('/tra-da');
     assert.equal(cafe.status, 404);
+  } finally {
+    router.close();
+    server.close();
+  }
+});
+
+test('login is answered by the xiangqi account server, not this site', async () => {
+  const upstream = http.createServer((req, res) => {
+    res.writeHead(401, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error: { code: 'INVALID_CREDENTIALS', message: 'Wrong username or password' }, path: req.url }));
+  });
+  await new Promise((resolve) => upstream.listen(0, '127.0.0.1', resolve));
+  const { port } = upstream.address();
+  const { server, call, router } = await start({
+    accountApi: `http://127.0.0.1:${port}`,
+    engine: { analyse: async () => ({ candidates: [], depth: 0 }), close() {} },
+  });
+  try {
+    const login = await call('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'lytan', password: 'secret-secret' }),
+    });
+    const body = await login.json();
+    assert.equal(login.status, 401);
+    assert.equal(body.error.code, 'INVALID_CREDENTIALS');
+    assert.equal(body.path, '/api/auth/login');
+    const down = await start({
+      accountApi: 'http://127.0.0.1:9',
+      engine: { analyse: async () => ({ candidates: [], depth: 0 }), close() {} },
+    });
+    try {
+      const missed = await down.call('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: 'lytan', password: 'secret-secret' }),
+      });
+      assert.equal(missed.status, 503);
+    } finally {
+      down.router.close();
+      down.server.close();
+    }
+  } finally {
+    router.close();
+    server.close();
+    upstream.close();
+  }
+});
+
+test('xiangqi accounts are stored in the site database', async () => {
+  const { server, call, router } = await start({
+    db: new MemoryFirestore(),
+    secret: 'test-secret-at-least-32-characters',
+    engine: { analyse: async () => ({ candidates: [], depth: 0 }), close() {} },
+  });
+  try {
+    const registered = await call('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'LocLy', password: 'secret-secret' }),
+    });
+    const tokens = await registered.json();
+    assert.equal(registered.status, 201);
+    assert.equal(tokens.user.username, 'locly');
+    assert.equal(JSON.stringify(tokens).includes('secret-secret'), false);
+    const me = await call('/api/me', { headers: { Authorization: `Bearer ${tokens.accessToken}` } });
+    const profile = await me.json();
+    assert.equal(me.status, 200);
+    assert.equal(profile.username, 'locly');
+    assert.equal(profile.ratings.casual, 1200);
+    const again = await call('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'locly', password: 'secret-secret' }),
+    });
+    assert.equal(again.status, 409);
+    const wrong = await call('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'locly', password: 'wrong-pass-1' }),
+    });
+    assert.equal(wrong.status, 401);
+    const login = await call('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: 'locly', password: 'secret-secret' }),
+    });
+    assert.equal(login.status, 200);
+    const refreshed = await call('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    });
+    assert.equal(refreshed.status, 200);
+    const stale = await call('/api/auth/refresh', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: tokens.refreshToken }),
+    });
+    assert.equal(stale.status, 401);
   } finally {
     router.close();
     server.close();
