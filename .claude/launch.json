@@ -1,6 +1,22 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "blogger", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000 }
+    {
+      "name": "blogger",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "tea-fixture",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "tests/preview.js"
+      ],
+      "port": 3101
+    }
   ]
 }

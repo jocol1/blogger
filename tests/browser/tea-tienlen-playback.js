@@ -11,7 +11,7 @@ async (page)=>{
     await (async()=>{
       const viewport=entry.page.viewportSize();await entry.page.setViewportSize({width:1440,height:1000});await entry.page.waitForTimeout(250);
       const seat=await entry.page.evaluate(async index=>{const state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':localStorage.getItem('locly-game-wallet')}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},4);
-      if(!seat)throw Error('No free test chair');const bounds=await entry.page.locator('#cafe-canvas').boundingBox(),view=JSON.parse(await entry.page.locator('#cafe-canvas').getAttribute('data-view'));await entry.page.locator('#cafe-canvas').click({position:{x:seat.x*view.scale+view.tx,y:seat.y*view.scale+view.ty}});
+      if(!seat)throw Error('No free test chair');const bounds=await entry.page.locator('#cafe-canvas').boundingBox(),point=await entry.page.evaluate(([x,y])=>teaWorldToScreen(x,y),[seat.x,seat.y]);await entry.page.locator('#cafe-canvas').click({position:point});
       await entry.page.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');await entry.page.setViewportSize(viewport);
     })();await entry.page.waitForFunction(()=>document.querySelector('#interact-button').dataset.seat?.startsWith('t5-'));
     const seat=await entry.page.locator('#interact-button').getAttribute('data-seat');await context.request.post(base+'/api/tea/seats/'+seat,{headers,data:{}});

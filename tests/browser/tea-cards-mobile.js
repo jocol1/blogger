@@ -20,7 +20,7 @@ async(page)=>{
       stage='chair';const seat=await live.evaluate(async index=>{const token=localStorage.getItem('locly-game-wallet'),state=await(await fetch('/api/tea/state',{headers:{'X-Wallet-Token':token}})).json();return state.room.tables[index].seats.find(seat=>!seat.walletId)},mode.table);
       if(!seat)throw Error(mode.key+' no free seat');
       await live.waitForTimeout(250);
-      const bounds=await live.locator('#cafe-canvas').boundingBox(),view=JSON.parse(await live.locator('#cafe-canvas').getAttribute('data-view'));if(!bounds)throw Error(mode.key+' canvas hidden');await live.locator('#cafe-canvas').click({position:{x:seat.x*view.scale+view.tx,y:seat.y*view.scale+view.ty}});
+      const bounds=await live.locator('#cafe-canvas').boundingBox(),point=await live.evaluate(([x,y])=>teaWorldToScreen(x,y),[seat.x,seat.y]);if(!bounds)throw Error(mode.key+' canvas hidden');await live.locator('#cafe-canvas').click({position:point});
       await live.waitForFunction(prefix=>document.querySelector('#interact-button').dataset.seat?.startsWith(prefix),seat.id.split('-')[0]+'-');
       const chair=await live.locator('#interact-button').getAttribute('data-seat');
       const seated=await context.request.post(base+'/api/tea/seats/'+chair,{headers,data:{}});if(!seated.ok())throw Error(mode.key+' could not sit');

@@ -11,9 +11,9 @@
   <link rel="manifest" href="/tra-da.webmanifest">
   <link rel="icon" href="/assets/tea/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/assets/tea/icons/icon-192.png">
-  <title>Locly Pixel Tea Café</title>
+  <title>Locly Street Tea Café</title>
   <link rel="stylesheet" href="/assets/tea/style.css?v=board2">
-  <link rel="stylesheet" href="/assets/tea/courtyard.css?v=courtyard3">
+  <link rel="stylesheet" href="/assets/tea/courtyard.css?v=3d1">
   <link rel="stylesheet" href="/assets/tea/games.css?v=triple-memory1">
   <link rel="stylesheet" href="/assets/tea/brawl.css?v=arena2">
   <link rel="stylesheet" href="/assets/tea/cards-controls.css?v=cards6">
@@ -37,7 +37,7 @@
 </head>
 <body class="cafe-context landscape-panel-closed">
   <header class="topbar">
-    <a class="brand" href="/tra-da"><span class="brand-cup">▰</span><span>LOC<span>LY</span></span><small data-i18n="brandSub">PIXEL TEA CAFÉ</small></a>
+    <a class="brand" href="/tra-da"><span class="brand-cup">▰</span><span>LOC<span>LY</span></span><small data-i18n="brandSub">STREET TEA CAFÉ</small></a>
     <div class="online-pill"><i></i><b id="online-count">0</b> <span data-i18n="online">online</span></div>
     <div class="top-actions">
       <a class="language-button" id="farm-link" href="/tra-da/farm">Map 2 · My farm</a>
@@ -49,7 +49,7 @@
   </header>
 
    <main class="cafe-shell" id="cafe-shell">
-    <section class="world-card" aria-label="Pixel tea café">
+    <section class="world-card" aria-label="Street tea café">
       <div class="world-status"><span id="connection-dot"></span><span id="connection-text" data-i18n="connecting">Entering the café…</span></div>
        <div class="world-clock" id="world-clock"><span id="cafe-day-phase" aria-hidden="true">☀</span><div><time id="cafe-time">--:--:--</time><small id="cafe-time-label">Vietnam time</small></div></div>
        <canvas id="cafe-canvas" width="960" height="640" aria-label="Walk around the café and find a free chair"></canvas>
@@ -90,7 +90,7 @@
 
       <section class="panel-view active" data-view="cafe">
         <div class="panel-heading"><div><small data-i18n="todayMenu">TODAY'S MENU</small><h1 data-i18n="whatOrder">What can we get you?</h1></div><span class="pixel-steam">⌁</span></div>
-        <p class="panel-copy" data-i18n="sitFirst">Find an empty chair and sit down before ordering. Everything here is pixel art, made for fun.</p>
+        <p class="panel-copy" data-i18n="sitFirst">Find an empty chair and sit down before ordering. Everything here is just for fun.</p>
         <div id="order-empty" class="empty-state"><span>↳</span><p data-i18n="orderHint">Your order and payment status will appear here.</p></div>
         <div id="order-card" class="order-card" hidden></div>
         <div id="item-card" class="item-card" hidden></div>
@@ -231,11 +231,11 @@
     </aside>
   </main>
 
-  <footer class="ticker"><span data-i18n="tickerOne">OPEN ALL DAY IN PIXEL TIME</span><i>✦</i><span data-i18n="tickerTwo">SIT ANYWHERE WITH AN EMPTY CHAIR</span><i>✦</i><span data-i18n="tickerThree">TEA 5K · SNACKS 10K · GOOD CHAT FREE</span></footer>
+  <footer class="ticker"><span data-i18n="tickerOne">OPEN ALL DAY, VIETNAM TIME</span><i>✦</i><span data-i18n="tickerTwo">SIT ANYWHERE WITH AN EMPTY CHAIR</span><i>✦</i><span data-i18n="tickerThree">TEA 5K · SNACKS 10K · GOOD CHAT FREE</span></footer>
 
   <dialog id="profile-dialog" class="modal profile-modal">
     <form method="dialog" id="profile-form">
-      <button class="close-modal" value="cancel" aria-label="Close">×</button><small data-i18n="newRegular">A NEW REGULAR</small><h2 data-i18n="makeCharacter">Make your pixel character</h2><p data-i18n="profileCopy">No account needed. Your wallet backup code keeps this character and anything you buy.</p>
+      <button class="close-modal" value="cancel" aria-label="Close">×</button><small data-i18n="newRegular">A NEW REGULAR</small><h2 data-i18n="makeCharacter">Make your character</h2><p data-i18n="profileCopy">No account needed. Your wallet backup code keeps this character and anything you buy.</p>
       <label><span data-i18n="nickname">Nickname</span><input id="nickname" maxlength="24" minlength="2" required placeholder="Your café name"></label>
       <div class="avatar-preview"><canvas id="avatar-preview" width="120" height="140"></canvas></div>
       <fieldset><legend data-i18n="hair">Hair</legend><div class="swatches" data-style="hair"></div></fieldset>
@@ -260,7 +260,9 @@
   <script src="/assets/tea/world.js?v=street2"></script>
   <script src="/assets/tea/menu.js?v=menu1"></script>
   <script src="/assets/tea/ambience.js?v=street-time2"></script>
-  <script src="/assets/tea/scene.js?v=road1"></script>
+  <script src="/assets/tea/scene.js?v=board3d1"></script>
+  <script src="/assets/tea/vendor/three.min.js?v=r159"></script>
+  <script src="/assets/tea/scene3d.js?v=1"></script>
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
   <script src="/assets/tea/drawing-ui.js?v=2"></script><script src="/assets/tea/barista-ui.js?v=1"></script><script src="/assets/tea/xiangqi-rules.js?v=1"></script><script src="/assets/tea/xiangqi-fx.js?v=1"></script><script src="/assets/tea/xiangqi-ui.js?v=4"></script><script src="/assets/tea/games-ui.js?v=xiangqi1"></script>
   <script src="/assets/tea/game-words.js?v=triple-memory1"></script><script src="/assets/tea/drawing-words.js?v=1"></script><script src="/assets/tea/barista-words.js?v=1"></script><script src="/assets/tea/xiangqi-words.js?v=2"></script><script src="/assets/tea/hub-words.js?v=2"></script>
@@ -279,7 +281,7 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/prediction.js"></script><script src="/assets/tea/cafe-walker.js?v=fit1"></script><script src="/assets/tea/app.js?v=board1"></script>
+  <script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/prediction.js"></script><script src="/assets/tea/cafe-walker.js?v=fit1"></script><script src="/assets/tea/app.js?v=3d1"></script>
   <script src="/assets/tea/pwa.js?v=pwa1"></script>
 </body>
 </html>

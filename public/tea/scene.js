@@ -31,8 +31,8 @@ window.TeaScene = (() => {
   let board=null;const logos={};
   const logo=id=>{if(!logos[id]){const img=new Image();img.onload=()=>buildGround();img.src=`/assets/tea/logos/${id}.png`;logos[id]=img}return logos[id]};
   const dong=n=>Math.round(n).toLocaleString('vi-VN')+'đ',FONT='"Segoe UI",sans-serif';
-  function drawBoard(){
-    const X=26,Y=6,W=358,H=136;
+  function drawBoard(c,X=26,Y=6){
+    const W=358,H=136;
     p(c,'#3f2b1b',X-2,Y,W+4,H+4);p(c,'#6b4a2f',X,Y,W,H);p(c,'#8a6340',X+3,Y+3,W-6,H-6);p(c,'#26372f',X+8,Y+8,W-16,H-16);p(c,'#33493f',X+8,Y+8,W-16,6);p(c,'#5a3f27',X+8,Y+H-2,W-16,4);
     c.textAlign='left';c.fillStyle='#f1ecd8';c.font=`bold 15px ${FONT}`;c.fillText(board?.title||'BẢNG GIÁ SIÊU THỊ',X+18,Y+30);
     if(board?.sub){c.textAlign='right';c.fillStyle='#e8d8ae';c.font=`bold 10px ${FONT}`;c.fillText(board.sub,X+W-18,Y+30)}
@@ -50,6 +50,9 @@ window.TeaScene = (() => {
     if(board?.hint){c.textAlign='left';c.fillStyle='#aebdb0';c.font=`9px ${FONT}`;c.fillText(board.hint,X+18,Y+H-12)}
     c.textAlign='left';
   }
+  // The same chalkboard at 3× on its own canvas: the texture of the 3D café's price board.
+  const boardLayer=document.createElement('canvas');boardLayer.width=362*3;boardLayer.height=140*3;let boardVersion=0;
+  function buildBoard(){const b=boardLayer.getContext('2d');b.setTransform(1,0,0,1,0,0);b.clearRect(0,0,boardLayer.width,boardLayer.height);b.setTransform(3,0,0,3,0,0);b.imageSmoothingEnabled=false;drawBoard(b,2,0);b.setTransform(1,0,0,1,0,0);boardVersion++}
   function buildGround(){
     // A modest sidewalk café right beside a Vietnamese neighborhood street.
     p(c,'#898173',0,0,960,640);
@@ -67,7 +70,7 @@ window.TeaScene = (() => {
     // A low painted shopfront and a few pots replace the garden border.
     for(let x=20;x<960;x+=40){p(c,'#8d6650',x,0,36,54);p(c,'#b4805c',x+2,0,32,46);p(c,'#c69a70',x+4,5,24,34);p(c,'#705545',x+14,8,3,30);p(c,'#e1c39a',x+6,42,24,3)}
     for(const x of [922]){pot(c,x,104);p(c,'#6c7d70',x-8,86,18,14);p(c,'#aab89b',x-6,88,14,10)}
-    drawBoard();
+    drawBoard(c);buildBoard();
     for(const x of [786]){p(c,'#5a4532',x,56,6,58);p(c,'#7a583b',x-8,106,22,6);p(c,'#4d4030',x-12,48,28,6);p(c,'#be8e45',x-8,54,20,26);p(c,'#fae49b',x-4,56,12,20);p(c,'#fff5bf',x,60,4,10)}
     // Tea stall: shelves, tile roof, wooden boards, checkered awning (drawn at 80% so the price board gets the wall).
     c.save();c.translate(624,0);c.scale(.8,.8);c.translate(-624,0);
@@ -164,5 +167,5 @@ window.TeaScene = (() => {
     c.restore();
   }
   function menu(canvas,kind){if(!canvas)return;const c=canvas.getContext('2d');c.imageSmoothingEnabled=false;c.clearRect(0,0,80,80);dish(c,40,48,kind,window.TeaMenu?.[kind]?.drink?1.8:1.35)}
-  return {ground:layer,table,avatar,glass,snack,dish,enjoy,menu,setBoard(model){board=model;buildGround()}};
+  return {ground:layer,board:boardLayer,get boardVersion(){return boardVersion},table,avatar,glass,snack,dish,enjoy,menu,setBoard(model){board=model;buildGround()}};
 })();

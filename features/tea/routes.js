@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
+const zlib = require('node:zlib');
 const express = require('express');
 const { TeaError } = require('./service');
 const MENU = require('../../public/tea/menu');
@@ -25,6 +26,16 @@ function createTeaRouter({ service, isAdmin, groceryPrices, imageFetch = fetch, 
   };
   const page = body => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pixel Tea Café admin</title><style>body{margin:0;background:#201914;color:#f7ead0;font:15px/1.5 system-ui,sans-serif}.wrap{max-width:1080px;margin:32px auto;padding:0 18px}.card{background:#34271e;border:2px solid #6d4c31;border-radius:12px;padding:18px;margin:14px 0}a{color:#ffd166}button,input{font:inherit;padding:10px 13px;border-radius:7px;border:1px solid #946d48}button{background:#e76f51;color:white;font-weight:800}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px}.muted{color:#cdbb9a}.paid{color:#8bd450}</style></head><body><main class="wrap">${body}</main></body></html>`;
 
+  // Three.js powers the 3D café. It comes from node_modules (CSP allows only 'self') and is gzipped once, on first request.
+  let three = null;
+  router.get('/assets/tea/vendor/three.min.js', (req, res, next) => {
+    try {
+      if (!three) { const raw = fs.readFileSync(path.join(path.dirname(require.resolve('three')), 'three.min.js')); three = { raw, gzip: zlib.gzipSync(raw, { level: 9 }) }; }
+    } catch (error) { return next(error); }
+    const gzip = /\bgzip\b/.test(String(req.headers['accept-encoding'] || ''));
+    res.set({ 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'public, max-age=604800', Vary: 'Accept-Encoding', ...(gzip ? { 'Content-Encoding': 'gzip' } : {}) });
+    res.send(gzip ? three.gzip : three.raw);
+  });
   router.use('/assets/tea', express.static(assets, { index: false, maxAge: process.env.NODE_ENV === 'production' ? '1h' : 0 }));
   router.get('/', (req, res) => res.redirect(302, '/tra-da'));
   router.get('/.well-known/assetlinks.json', (req, res) => {
