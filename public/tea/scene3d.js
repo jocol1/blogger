@@ -137,7 +137,7 @@ window.TeaScene3D=(()=>{
     scene.add(sun,sun.target);
     if(shadows)for(const [x,y,z] of [[X(511),2.1,Z(150)],[X(786),2.6,Z(120)],[X(205),3.4,Z(170)]]){const l=new THREE.PointLight('#ffcf8a',0,9,1.6);l.position.set(x,y,z);scene.add(l);points.push(l)}
     scene.add(world,tableGroup,people);
-    buildStatic();buildVehicles();
+    buildStatic();buildVehicles();buildAmbient();
     labelLayer=document.createElement('div');labelLayer.className='scene3d-labels';labelLayer.setAttribute('aria-hidden','true');canvas.after(labelLayer);
     document.body.classList.add('scene-3d');
     api.supported=true;return true;
@@ -296,6 +296,42 @@ window.TeaScene3D=(()=>{
     if(boardMat)boardMat.color.setScalar(1-night*.42);
   }
 
+  // ---------- ambient life: a wandering cat, falling leaves, night fireflies ----------
+  const ambient={cat:null,leaves:[],flies:[],tree:{x:X(880),z:Z(74)}};
+  function buildAmbient(){
+    const fur=toon('#e59a4e'),belly=toon('#f6e3c4'),cat=new THREE.Group(),body=new THREE.Group();cat.add(body);world.add(cat);
+    mesh(cap(.12,.2),fur,0,.2,0,body).rotation.z=PI/2;
+    mesh(sph(.115,12),fur,.27,.3,0,body);mesh(sph(.05,8),belly,.37,.27,0,body,false);
+    for(const z of [-.07,.07]){const e=mesh(cyl(0,.045,.1,4),fur,.27,.43,z,body,false);e.rotation.x=z*3}
+    for(const [x,z] of [[-.18,-.08],[-.18,.08],[.17,-.08],[.17,.08]])mesh(cyl(.035,.035,.14,6),belly,x,.07,z,body,false);
+    const tail=new THREE.Group();tail.position.set(-.3,.25,0);body.add(tail);const t=mesh(cyl(.025,.03,.3,6),fur,0,.14,0,tail,false);t.rotation.z=-.3;
+    cat.visible=false;Object.assign(ambient,{cat,catBody:body,catTail:tail,pos:{x:300,y:520},goal:null,rest:2,until:0,angle:0});
+    const leafMats=['#d9a441','#c9743f','#8fb85a'].map(c=>new THREE.MeshLambertMaterial({color:c,side:THREE.DoubleSide}));
+    for(let i=0;i<7;i++){const m=mesh(plane(.16,.1),leafMats[i%3],0,-9,0,world,false);ambient.leaves.push({m,t:i*1.7,seed:i+1})}
+    const flyMat=new THREE.MeshBasicMaterial({color:'#e8ff8a'});
+    for(let i=0;i<12;i++){const m=mesh(sph(.055,6),flyMat,0,-9,0,world,false);ambient.flies.push({m,seed:i+1,x:rng(i,3)*20-10,z:rng(3,i)*10-3})}
+  }
+  function updateAmbient(time,dt,night,reduced,tables){
+    const a=ambient,W=window.TeaWorld;
+    // Cat: sits, picks an open spot on the pavement, trots there, sits again.
+    if(W&&a.cat){a.cat.visible=true;const p=a.pos;
+      if(a.goal){const dx=a.goal.x-p.x,dy=a.goal.y-p.y,d=Math.hypot(dx,dy),step=Math.min(d,dt*(reduced?0:54));
+        const nx=p.x+dx/(d||1)*step,ny=p.y+dy/(d||1)*step;
+        if(W.blocked(nx,ny,tables)){a.goal=null;a.rest=.5}else{p.x=nx;p.y=ny;a.angle+=turn(a.angle,Math.atan2(dx,dy)-PI/2)*Math.min(1,dt*8)}
+        if(d<2)a.goal=null,a.rest=2.5+rng(time|0,7)*6;
+      }else{a.rest-=dt;if(a.rest<=0){const g={x:60+Math.random()*840,y:110+Math.random()*440};if(!W.blocked(g.x,g.y,tables)&&W.clearLine(p,g,tables))a.goal=g;else a.rest=.3}}
+      const moving=Boolean(a.goal);a.cat.position.set(X(p.x),0,Z(p.y));a.cat.rotation.y=-a.angle;
+      a.catBody.position.y=moving?Math.abs(Math.sin(time/90))*.03:0;a.catBody.scale.y=moving?1:.88;
+      a.catTail.rotation.x=Math.sin(time/(moving?160:520))*.5;
+    }
+    // Leaves drift down from the tree.
+    for(const l of a.leaves){l.t+=reduced?0:dt;const k=(l.t%7)/7,sway=Math.sin(l.t*1.6+l.seed);
+      l.m.visible=!reduced;l.m.position.set(a.tree.x-.6-k*2.6+sway*.3,3.2*(1-k)+.03,a.tree.z+.8+k*1.4+Math.cos(l.t+l.seed)*.2);l.m.rotation.set(k*5+sway,l.seed,sway*.8)}
+    // Fireflies only after dark.
+    for(const f of a.flies){f.m.visible=night>.45&&!reduced;if(!f.m.visible)continue;const s=time/1000+f.seed*9;
+      f.m.position.set(f.x+Math.sin(s*.7)*1.2,.9+Math.sin(s*1.3)*.5,f.z+Math.cos(s*.5)*1.2);f.m.scale.setScalar(.6+.4*Math.sin(s*3))}
+  }
+
   // ---------- HTML labels over the canvas ----------
   const labels=new Map(),v3=new THREE.Vector3();let labelFrame=0,layerRect='';
   function label(key,cls,update){let l=labels.get(key);if(!l){const el=document.createElement('div');el.className='s3-label '+cls;labelLayer.append(el);l={el,sig:null,frame:0};labels.set(key,l)}l.frame=labelFrame;update(l);return l}
@@ -329,7 +365,7 @@ window.TeaScene3D=(()=>{
     const lr=`${canvasEl.offsetLeft},${canvasEl.offsetTop},${w},${h}`;if(lr!==layerRect){layerRect=lr;Object.assign(labelLayer.style,{left:canvasEl.offsetLeft+'px',top:canvasEl.offsetTop+'px',width:w+'px',height:h+'px'})}
     buildTables(state?.room?.tables||window.TeaWorld?.TABLES||[]);
     if(window.TeaScene&&TeaScene.boardVersion!==boardVersion){boardVersion=TeaScene.boardVersion;boardTex.needsUpdate=true}
-    updateLighting(now);updateTraffic(now,reduced);
+    updateLighting(now);updateTraffic(now,reduced);updateAmbient(time,dt,TeaAmbience.timeAt(now).night,reduced,state?.room?.tables||window.TeaWorld?.TABLES||[]);
     for(const [id,ring] of seatRings){ring.visible=id===nearSeatId;if(ring.visible)ring.scale.setScalar(1+Math.sin(time/180)*.08)}
     labelFrame++;
     // Tables: occupancy chip in front, activity tag above.
