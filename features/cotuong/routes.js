@@ -15,7 +15,7 @@ const DEFAULT_ENGINE = 'D:/engines/pikafish/Pikafish-Windows-x86-64-universal.ex
 /** Where `npm run install-engine` puts Pikafish on the host (Linux). */
 const BUNDLED_ENGINE = path.join(__dirname, '../../engine/pikafish');
 /** Search budget per bot move; tune with PIKAFISH_NODES for the host's speed. */
-const DEFAULT_NODES = 400_000;
+const DEFAULT_NODES = 200_000;
 const GZIP_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
