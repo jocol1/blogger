@@ -6,6 +6,15 @@ class MemoryFirestore {
     const db = this;
     return {
       doc(id) { return { path: `${name}/${id}`, async get() { return db.snapshot(this.path); }, async set(data, options) { const current = db.rows.get(this.path); db.rows.set(this.path, structuredClone(options?.merge && current ? { ...current, ...data } : data)); db.version++; }, async delete() { db.rows.delete(this.path); db.version++; } }; },
+      // Whole-collection reads, enough for the admin pages: get(), count(), orderBy(...).limit(n).get().
+      async get() { return db.list(name); },
+      count() { return { async get() { return { data: () => ({ count: db.list(name).docs.length }) }; } }; },
+      orderBy(field, direction = 'asc') {
+        return { limit: count => ({ async get() {
+          const docs = db.list(name).docs.sort((a, b) => (direction === 'desc' ? b.data()[field] - a.data()[field] : a.data()[field] - b.data()[field])).slice(0, count);
+          return { docs };
+        } }) };
+      },
       where(field, operator, value) {
         if (!['>', '<'].includes(operator)) throw new Error('Unsupported query');
         const result = (count, order = field) => ({ async get() {
@@ -18,7 +27,10 @@ class MemoryFirestore {
   }
   snapshot(path) {
     const value = structuredClone(this.rows.get(path));
-    return { exists: value !== undefined, data: () => structuredClone(value) };
+    return { id: path.split('/').slice(1).join('/'), exists: value !== undefined, data: () => structuredClone(value) };
+  }
+  list(name) {
+    return { docs: [...this.rows.keys()].filter(key => key.startsWith(`${name}/`)).map(key => this.snapshot(key)) };
   }
   async runTransaction(fn) {
     for (let attempt = 0; attempt < 100; attempt++) {

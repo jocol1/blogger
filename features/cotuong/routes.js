@@ -7,6 +7,8 @@ const express = require('express');
 const { INITIAL_FEN, newGame, play } = require('./xq-rules');
 const { UciEngine } = require('./uci');
 const { mountAccounts } = require('./accounts');
+const { mountAdmin } = require('./admin');
+const { createStatsService, readGame } = require('./stats');
 
 const BASE = '/co-tuong';
 const CSP =
@@ -126,7 +128,25 @@ function sendAsset(req, res, asset, cache) {
   res.send(gzip ? asset.gzip : asset.raw);
 }
 
-function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret } = {}) {
+/** Per-IP request cap kept in memory: the bot is open to guests, so one visitor must not hog the engine. */
+function rateLimit(max, windowMs, onLimited) {
+  const hits = new Map();
+  setInterval(() => hits.clear(), windowMs * 4).unref();
+  return (req, res, next) => {
+    const now = Date.now();
+    const recent = (hits.get(req.ip) || []).filter((at) => now - at < windowMs);
+    if (recent.length >= max) {
+      onLimited?.();
+      res.set('Retry-After', String(Math.ceil(windowMs / 1000)));
+      return fail(res, 429, 'RATE_LIMITED', 'Too many requests');
+    }
+    recent.push(now);
+    hits.set(req.ip, recent);
+    next();
+  };
+}
+
+function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret, isAdmin, authenticateAdmin } = {}) {
   const bot = engine !== undefined ? engine : openPikafish();
   // Strength is a fixed amount of search (nodes), identical for every player however busy the server is.
   // Time-based thinking is only the fallback when no node budget is configured.
@@ -135,7 +155,10 @@ function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret
   const limit = budget ? { nodes: budget } : { movetimeMs: think };
   const router = express.Router();
   if (typeof accountApi === 'string' && accountApi) router.use(accountProxy(accountApi));
-  else mountAccounts(router, { db, secret });
+  const accounts = typeof accountApi === 'string' && accountApi ? null : mountAccounts(router, { db, secret });
+  const stats = db ? createStatsService({ db }) : null;
+  // Counters since the server started, for the admin page.
+  const used = { since: Date.now(), moves: 0, failed: 0, limited: 0, waitTotalMs: 0, waitMaxMs: 0 };
   const dir = path.join(__dirname, '../../public/co-tuong');
   const assets = loadTextAssets(dir);
   const page = (req, res, next) => {
@@ -158,7 +181,7 @@ function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret
     res.json({ available: Boolean(bot), ...(budget ? { nodes: budget } : { movetimeMs: think }), ...(bot?.lastError ? { lastError: bot.lastError } : {}) });
   });
 
-  router.post('/api/bot/move', express.json({ limit: '8kb' }), async (req, res) => {
+  router.post('/api/bot/move', rateLimit(90, 60_000, () => (used.limited += 1)), express.json({ limit: '8kb' }), async (req, res) => {
     const fen = req.body?.startFen;
     const moves = req.body?.moves ?? [];
     const ok = typeof fen === 'string' && fen.length >= 10 && fen.length <= 120
@@ -180,13 +203,48 @@ function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret
     }
     if (game.result) return fail(res, 400, 'VALIDATION_FAILED', 'The game is over');
 
+    const startedAt = Date.now();
     try {
       const answer = await bot.analyse({ startFen: fen, moves, ...limit });
+      const waited = Date.now() - startedAt;
+      used.moves += 1;
+      used.waitTotalMs += waited;
+      used.waitMaxMs = Math.max(used.waitMaxMs, waited);
       res.json(answer);
     } catch (error) {
+      used.failed += 1;
       console.error('Pikafish failed:', error.message);
       fail(res, 503, 'ENGINE_UNAVAILABLE', 'The engine could not answer');
     }
+  });
+
+  // A finished game against the machine, sent once by the app. Guests count too; a signed-in player is named.
+  router.post('/api/bot/result', rateLimit(30, 60_000), express.json({ limit: '2kb' }), async (req, res) => {
+    const game = readGame(req.body);
+    if (!game) return fail(res, 400, 'VALIDATION_FAILED', 'Not a finished game');
+    if (!stats) return res.status(202).json({ stored: false });
+    try {
+      const player = accounts ? await accounts.playerFromAccess(req.get('authorization')) : null;
+      const stored = await stats.record(game, player?.username);
+      res.status(stored ? 201 : 200).json({ stored });
+    } catch (error) {
+      console.error('Saving a bot game failed:', error.message);
+      fail(res, 503, 'INTERNAL', 'Could not save the result');
+    }
+  });
+
+  mountAdmin(router, {
+    accounts,
+    stats,
+    isAdmin,
+    authenticateAdmin,
+    engine: () => ({
+      available: Boolean(bot),
+      nodes: budget || 0,
+      queue: bot?.waiting ?? 0,
+      lastError: bot?.lastError || '',
+      ...used,
+    }),
   });
 
   router.use(BASE, express.static(dir, { index: false, maxAge: '7d' }));

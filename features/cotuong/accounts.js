@@ -125,6 +125,7 @@ function createAccountService({ db, secret, rounds = 10 }) {
       const user = snap.exists ? snap.data() : null;
       const ok = await bcrypt.compare(password, user?.passwordHash || DUMMY_HASH);
       if (!user || !ok) return { error: [401, 'INVALID_CREDENTIALS', 'Wrong username or password'] };
+      if (user.disabled) return { error: [403, 'ACCOUNT_DISABLED', 'This account has been suspended'] };
       return { status: 200, body: await issue(user) };
     },
 
@@ -140,7 +141,7 @@ function createAccountService({ db, secret, rounds = 10 }) {
       }
       await ref.delete();
       const userSnap = await users().doc(session.username).get();
-      if (!userSnap.exists) return { error: [401, 'INVALID_REFRESH_TOKEN', 'Refresh token is invalid or expired'] };
+      if (!userSnap.exists || userSnap.data().disabled) return { error: [401, 'INVALID_REFRESH_TOKEN', 'Refresh token is invalid or expired'] };
       return { status: 200, body: await issue(userSnap.data()) };
     },
 
@@ -155,8 +156,52 @@ function createAccountService({ db, secret, rounds = 10 }) {
       const idSnap = await ids().doc(claims.sub).get();
       const username = idSnap.exists ? idSnap.data().username : claims.username;
       const userSnap = await users().doc(username).get();
-      if (!userSnap.exists || userSnap.data().id !== claims.sub) return null;
+      if (!userSnap.exists || userSnap.data().id !== claims.sub || userSnap.data().disabled) return null;
       return profileOf(userSnap.data());
+    },
+
+    /** Newest accounts first, without password hashes, for the admin page. */
+    async list(limit = 200) {
+      const snap = await users().orderBy('createdAt', 'desc').limit(limit).get();
+      return snap.docs.map((doc) => {
+        const user = doc.data();
+        return {
+          username: user.username,
+          createdAt: user.createdAt || 0,
+          gamesPlayed: user.gamesPlayed || 0,
+          wins: user.wins || 0,
+          losses: user.losses || 0,
+          draws: user.draws || 0,
+          disabled: Boolean(user.disabled),
+        };
+      });
+    },
+
+    async count() {
+      const aggregate = users().count?.();
+      if (aggregate) return (await aggregate.get()).data().count;
+      return (await users().get()).docs.length;
+    },
+
+    /** Suspend or restore an account. A suspended player cannot sign in, refresh, or use an old token. */
+    async setDisabled(username, disabled) {
+      const name = String(username || '').trim().toLowerCase();
+      if (!USERNAME.test(name)) return false;
+      const ref = users().doc(name);
+      if (!(await ref.get()).exists) return false;
+      await ref.set({ disabled: Boolean(disabled) }, { merge: true });
+      return true;
+    },
+
+    /** Delete an account for good. Its tokens stop working because the account no longer exists. */
+    async remove(username) {
+      const name = String(username || '').trim().toLowerCase();
+      if (!USERNAME.test(name)) return false;
+      const snap = await users().doc(name).get();
+      if (!snap.exists) return false;
+      await ids().doc(snap.data().id).delete();
+      await users().doc(name).delete();
+      return true;
     },
 
     async playerByName(username) {
@@ -229,6 +274,7 @@ function mountAccounts(router, { db, secret } = {}) {
     const result = await accounts.playerByName(req.params.username);
     send(res, result);
   });
+  return accounts;
 }
 
 module.exports = { createAccountService, mountAccounts };
