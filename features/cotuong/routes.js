@@ -13,7 +13,7 @@ const CSP =
   "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 const DEFAULT_ENGINE = 'D:/engines/pikafish/Pikafish-Windows-x86-64-universal.exe';
 /** Where `npm run install-engine` puts Pikafish on the host (Linux). */
-const BUNDLED_ENGINE = path.join(__dirname, '../../engine/Pikafish-Linux-x86-64-universal');
+const BUNDLED_ENGINE = path.join(__dirname, '../../engine/pikafish');
 const GZIP_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
