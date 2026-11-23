@@ -17,3 +17,6 @@ android/*.apk
 android/*.aab
 
 android/*.idsig
+
+# Pikafish engine downloaded by `npm run install-engine`
+engine/

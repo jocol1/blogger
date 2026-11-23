@@ -12,6 +12,8 @@ const BASE = '/co-tuong';
 const CSP =
   "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'";
 const DEFAULT_ENGINE = 'D:/engines/pikafish/Pikafish-Windows-x86-64-universal.exe';
+/** Where `npm run install-engine` puts Pikafish on the host (Linux). */
+const BUNDLED_ENGINE = path.join(__dirname, '../../engine/Pikafish-Linux-x86-64-universal');
 const GZIP_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -26,10 +28,10 @@ function positive(value, fallback) {
   return Number.isFinite(n) && n > 0 ? n : fallback;
 }
 
-/** Pikafish on this machine. `PIKAFISH_PATH` overrides the known install. */
+/** Pikafish on this machine: `PIKAFISH_PATH`, else the one installed by `npm run install-engine`, else the local dev copy. */
 function pikafishOptions() {
-  const command = process.env.PIKAFISH_PATH || DEFAULT_ENGINE;
-  if (!command || !fs.existsSync(command)) return null;
+  const command = [process.env.PIKAFISH_PATH, BUNDLED_ENGINE, DEFAULT_ENGINE].find((c) => c && fs.existsSync(c));
+  if (!command) return null;
   const nnue = process.env.PIKAFISH_NNUE || path.join(path.dirname(command), 'pikafish.nnue');
   return {
     command,
