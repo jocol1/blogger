@@ -15,8 +15,9 @@
     let fight=null,fightId=null,offset=0,seq=0,lastSent=-Infinity,lastHeartbeat=-Infinity,lastRender=performance.now();
     let axis={x:0,y:0},stickPointer=null,queued=[],mustStop=false,lastVector={x:0,y:0},focused=true,camera=null;
     let resizeWidth=0,resizeHeight=0,animationFrame=0,wasPlayable=false;
-    const background=document.createElement('canvas');background.width=800;background.height=520;
-    paintFloor(background.getContext('2d'));
+    // The floor is a cached bitmap painted at 1-3x so it stays crisp when the camera zooms and on dense screens.
+    const background=document.createElement('canvas');let floorScale=0;
+    function floorFor(need){const k=clamp(Math.ceil(need-.05),1,3);if(k===floorScale)return;floorScale=k;background.width=800*k;background.height=520*k;const c=background.getContext('2d');c.setTransform(k,0,0,k,0,0);paintFloor(c)}
     const words=(key,fallback,params={})=>{const value=t(key,params);return value&&value!==key?value:fallback};
     const serverTime=()=>Date.now()+offset;
     const players=()=>fight?.players||fight?.fighters||[];
@@ -172,7 +173,7 @@
       const scale=Math.min(width/target.spanX,height/target.spanY),targetScale=Math.min(1.8,scale);const dt=Math.min(50,time-lastRender);lastRender=time;
       if(!camera||reduced.matches)camera={x:target.x,y:target.y,scale:targetScale};else{const ease=1-Math.exp(-dt/115);camera.x+=(target.x-camera.x)*ease;camera.y+=(target.y-camera.y)*ease;camera.scale+=(targetScale-camera.scale)*ease}
       camera.scale=Math.min(camera.scale,width/(2*Math.max(camera.x-left+115,right+115-camera.x)),height/(2*Math.max(camera.y-top+180,bottom+64-camera.y)));
-      ctx.save();ctx.translate(width/2-camera.x*camera.scale,height/2-camera.y*camera.scale);ctx.scale(camera.scale,camera.scale);ctx.drawImage(background,0,0);
+      ctx.save();ctx.translate(width/2-camera.x*camera.scale,height/2-camera.y*camera.scale);ctx.scale(camera.scale,camera.scale);floorFor(camera.scale*dpr);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(background,0,0,800,520);ctx.imageSmoothingEnabled=false;
       points.sort((a,b)=>a.y-b.y).forEach(point=>drawFighter(point.player,point,time));for(const effect of effects)drawEffect(effect,time);ctx.restore();
       while(effects.length&&time-effects[0].created>700)effects.shift();
       const now=serverTime();if(!connected())drawMessage(words('brawlOffline','Reconnecting…'),' ',width,height);

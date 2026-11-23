@@ -67,3 +67,6 @@ body.mini-game-fullscreen .games-view .back-hub{min-height:32px;padding:4px 8px;
 .game-chat-fab{position:fixed;z-index:80;top:50%;transform:translateY(-50%);right:max(6px,env(safe-area-inset-right));display:none;width:40px;height:40px;padding:0;align-items:center;justify-content:center;border:2px solid #b78d55;border-radius:50%;background:rgba(246,235,207,.94);color:#3b2a18;font-size:19px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)}
 .game-chat-fab em{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#d94f3d;color:#fff;font-style:normal;font-size:10px;line-height:18px;text-align:center}.game-chat-fab em[hidden]{display:none}
 body:has(#cafe-shell.play-mode):not(.hub-open):not(.prices-open):not(.chat-open) .game-chat-fab{display:flex}
+/* A fight starts by opening the table tab, which sets hub-open; the arena lives in the world card, so keep that visible. */
+body.hub-open.brawl-fullscreen .world-card{display:block!important}
+body.hub-open.brawl-fullscreen .side-panel{display:none!important}
