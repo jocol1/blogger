@@ -14,6 +14,7 @@ const { getFirestore } = require('firebase-admin/firestore');
 const { createDonationRouter } = require('./features/donations/routes');
 const { readConfig } = require('./features/donations/service');
 const { createChatRouter } = require('./features/chat/routes');
+const { createSeoRouter } = require('./features/seo/routes');
 const { createPartyRouter } = require('./features/party/routes');
 const { createGraduationRouter } = require('./features/graduation/routes');
 const { createCardsRouter } = require('./features/cards/routes');
@@ -95,6 +96,7 @@ app.set('trust proxy', 1);
 // Cheap liveness check for uptime pings that keep the free Render instance awake. Runs before
 // sessions so a ping never creates one.
 app.get('/healthz', (req, res) => res.set('Cache-Control', 'no-store').type('text/plain').send('ok'));
+app.use(createSeoRouter()); // robots.txt + sitemap.xml, also before sessions
 app.use(session({ secret: process.env.SESSION_SECRET || 'dev-only-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 } }));
 const donationConfig = readConfig();
 const teaService = createTeaService({ db: firestore, config: donationConfig });

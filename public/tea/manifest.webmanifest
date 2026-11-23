@@ -2,7 +2,7 @@
   "id": "/tra-da",
   "name": "Locly Tea",
   "short_name": "Locly Tea",
-  "description": "A little Vietnamese pixel tea café for chatting and table games.",
+  "description": "Quán trà đá vỉa hè 3D để tám chuyện và chơi cờ, đánh bài cùng bạn bè.",
   "start_url": "/tra-da",
   "scope": "/tra-da",
   "display": "standalone",
