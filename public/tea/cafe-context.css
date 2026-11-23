@@ -40,3 +40,6 @@
 .cafe-context .panel-view{overflow-x:hidden!important}
 @media(max-width:900px){.cafe-context{--cafe-bar:58px;--cafe-panel:min(330px,44vw)}}
 @media(max-width:900px) and (orientation:landscape){.cafe-context{--cafe-bar:48px}.cafe-context .cafe-shell:not(.play-mode) .panel-view{padding:10px!important}.cafe-context .cafe-shell:not(.play-mode) .panel-heading h1{font-size:19px}.cafe-context .cafe-shell:not(.play-mode) .panel-tabs button span{font-size:14px!important}.cafe-context .cafe-shell:not(.play-mode) .menu-grid{grid-template-columns:1fr}.cafe-context .controls-hint{display:none}}
+.cafe-context .context-button.is-invite{background:#ffe08a;border-color:#a8742a;box-shadow:0 3px #7a5420;color:#4a3410;animation:invite-pulse 1.6s ease-in-out infinite}
+@keyframes invite-pulse{50%{transform:scale(1.07)!important}}
+@media(prefers-reduced-motion:reduce){.cafe-context .context-button.is-invite{animation:none}}
