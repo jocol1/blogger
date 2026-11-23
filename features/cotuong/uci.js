@@ -52,6 +52,9 @@ class UciEngine {
     this.tail = Promise.resolve();
     this.waiting = 0;
     this.closed = false;
+    /** Why the engine last stopped (exit code or signal plus its last words), for diagnosing a host. */
+    this.lastError = null;
+    this.stderrTail = '';
   }
 
   analyse(input) {
@@ -63,6 +66,11 @@ class UciEngine {
     return run.finally(() => {
       this.waiting -= 1;
     });
+  }
+
+  remember(message) {
+    this.lastError = message.replaceAll(process.cwd(), '.').slice(0, 400);
+    return message;
   }
 
   warm() {
@@ -134,13 +142,19 @@ class UciEngine {
         if (line) for (const handler of [...this.onLine]) handler(line);
       }
     });
-    proc.stderr.resume();
+    this.stderrTail = '';
+    proc.stderr.setEncoding('utf8');
+    proc.stderr.on('data', (chunk) => {
+      this.stderrTail = (this.stderrTail + chunk).slice(-300);
+    });
     proc.stdin.on('error', () => undefined);
     proc.on('error', (error) => {
-      if (this.proc === proc) this.kill(new EngineUnavailableError(`Engine failed to start: ${error.message}`));
+      if (this.proc === proc) this.kill(new EngineUnavailableError(this.remember(`Engine failed to start: ${error.message}`)));
     });
-    proc.on('exit', () => {
-      if (this.proc === proc) this.kill(new EngineUnavailableError('Engine exited'));
+    proc.on('exit', (code, signal) => {
+      if (this.proc !== proc) return;
+      const words = this.stderrTail.trim().replace(/s+/g, ' ');
+      this.kill(new EngineUnavailableError(this.remember(`Engine exited (${signal ? `signal ${signal}` : `code ${code}`})${words ? `: ${words}` : ''}`)));
     });
 
     const uciok = this.waitFor((line) => line === 'uciok', startupTimeoutMs, 'uci');
