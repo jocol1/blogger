@@ -79,6 +79,9 @@ test('/co-tuong is a standalone page, not the tea café', async () => {
     assert.equal(gzipped.enc, 'gzip');
     assert.match(gzipped.cache, /immutable/);
     assert.ok(gzipped.bytes < 800_000, `gzipped JS should be well under 800KB, got ${gzipped.bytes}`);
+    const status = await (await call('/api/bot/status')).json();
+    assert.equal(status.available, true);
+    assert.ok(status.movetimeMs > 0, 'status tells the client how long the engine thinks');
     const bot = await call('/api/bot/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -146,7 +146,7 @@ function createCotuongRouter({ engine, movetimeMs, accountApi, db, secret } = {}
   });
 
   router.get('/api/bot/status', (req, res) => {
-    res.json({ available: Boolean(bot) });
+    res.json({ available: Boolean(bot), movetimeMs: think });
   });
 
   router.post('/api/bot/move', express.json({ limit: '8kb' }), async (req, res) => {
