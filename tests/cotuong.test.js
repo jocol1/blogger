@@ -81,7 +81,8 @@ test('/co-tuong is a standalone page, not the tea café', async () => {
     assert.ok(gzipped.bytes < 800_000, `gzipped JS should be well under 800KB, got ${gzipped.bytes}`);
     const status = await (await call('/api/bot/status')).json();
     assert.equal(status.available, true);
-    assert.ok(status.movetimeMs > 0, 'status tells the client how long the engine thinks');
+    assert.ok(status.nodes > 0, 'status tells the client the fixed search budget');
+    assert.equal(status.movetimeMs, undefined, 'strength is not a clock');
     const bot = await call('/api/bot/move', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -214,8 +215,40 @@ test('xiangqi accounts are stored in the site database', async () => {
   }
 });
 
+test('every bot move gets the same fixed node budget, not a time slice', async () => {
+  const asked = [];
+  const { server, call, router } = await start({
+    nodes: 123_456,
+    engine: {
+      analyse: async (input) => {
+        asked.push(input);
+        return { candidates: [{ uci: 'h2e2', cp: 40 }], depth: 8 };
+      },
+      close() {},
+    },
+  });
+  try {
+    const post = () =>
+      call('/api/bot/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startFen: INITIAL_FEN, moves: [] }),
+      });
+    assert.equal((await Promise.all([post(), post(), post()])).every((res) => res.status === 200), true);
+    assert.equal(asked.length, 3);
+    for (const input of asked) {
+      assert.equal(input.nodes, 123_456);
+      assert.equal(input.movetimeMs, undefined);
+    }
+    assert.equal((await (await call('/api/bot/status')).json()).nodes, 123_456);
+  } finally {
+    router.close();
+    server.close();
+  }
+});
+
 test('Pikafish plays a legal opening for the web client', { timeout: 30_000, skip: !pikafishOptions() }, async () => {
-  const { server, call, router } = await start({ movetimeMs: 400 });
+  const { server, call, router } = await start({ nodes: 50_000 });
   try {
     const bot = await call('/api/bot/move', {
       method: 'POST',
@@ -227,6 +260,7 @@ test('Pikafish plays a legal opening for the web client', { timeout: 30_000, ski
     assert.match(body.candidates[0].uci, /^[a-i][0-9][a-i][0-9]$/);
     assert.notEqual(body.candidates[0].uci, 'b2b9');
     assert.ok(body.depth >= 1);
+    assert.ok(body.nodes >= 50_000 && body.nodes < 150_000, `searched about the budget, got ${body.nodes}`);
   } finally {
     router.close();
     server.close();

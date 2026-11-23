@@ -1,6 +1,8 @@
 const { spawn } = require('node:child_process');
 
 const MATE_CP = 10_000;
+/** Upper bound for one search that has no time limit of its own (a fixed node budget on a busy host). */
+const SEARCH_TIMEOUT_MS = 60_000;
 
 function scoreOf(tokens) {
   const i = tokens.indexOf('score');
@@ -27,6 +29,7 @@ function parseInfoLine(line) {
     depth: depthAt >= 0 ? Number(tokens[depthAt + 1]) || 0 : 0,
     cp,
     uci: tokens[pv + 1],
+    nodes: tokens.indexOf('nodes') >= 0 ? Number(tokens[tokens.indexOf('nodes') + 1]) || 0 : 0,
   };
 }
 
@@ -59,7 +62,7 @@ class UciEngine {
 
   analyse(input) {
     if (this.closed) return Promise.reject(new EngineUnavailableError('Engine is closed'));
-    if (this.waiting >= (this.options.maxQueue ?? 8)) return Promise.reject(new EngineUnavailableError('Engine is busy'));
+    if (this.waiting >= (this.options.maxQueue ?? 32)) return Promise.reject(new EngineUnavailableError('Engine is busy'));
     this.waiting += 1;
     const run = this.tail.then(() => this.search(input));
     this.tail = run.then(() => undefined, () => undefined);
@@ -169,7 +172,7 @@ class UciEngine {
     await ready;
   }
 
-  async search({ startFen, moves, movetimeMs }) {
+  async search({ startFen, moves, nodes, movetimeMs }) {
     await this.start();
     const lines = new Map();
     const finished = this.waitFor(
@@ -181,11 +184,12 @@ class UciEngine {
         }
         return line.startsWith('bestmove');
       },
-      movetimeMs + 4_000,
+      // A fixed node budget has no clock to measure against; only a genuinely hung engine should trip this.
+      nodes ? SEARCH_TIMEOUT_MS : movetimeMs + 4_000,
       'go',
     );
     this.send(`position fen ${startFen}${moves.length ? ` moves ${moves.join(' ')}` : ''}`);
-    this.send(`go movetime ${movetimeMs}`);
+    this.send(nodes ? `go nodes ${nodes}` : `go movetime ${movetimeMs}`);
     let best;
     try {
       best = await finished;
@@ -201,7 +205,11 @@ class UciEngine {
     const at = candidates.findIndex((candidate) => candidate.uci === bestMove);
     if (at > 0) candidates.unshift(...candidates.splice(at, 1));
     if (at < 0) candidates.unshift({ uci: bestMove, cp: ranked[0]?.cp ?? 0 });
-    return { candidates, depth: Math.max(0, ...ranked.map((line) => line.depth)) };
+    return {
+      candidates,
+      depth: Math.max(0, ...ranked.map((line) => line.depth)),
+      nodes: Math.max(0, ...ranked.map((line) => line.nodes)),
+    };
   }
 }
 

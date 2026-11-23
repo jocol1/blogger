@@ -14,6 +14,8 @@ const CSP =
 const DEFAULT_ENGINE = 'D:/engines/pikafish/Pikafish-Windows-x86-64-universal.exe';
 /** Where `npm run install-engine` puts Pikafish on the host (Linux). */
 const BUNDLED_ENGINE = path.join(__dirname, '../../engine/pikafish');
+/** Search budget per bot move; tune with PIKAFISH_NODES for the host's speed. */
+const DEFAULT_NODES = 400_000;
 const GZIP_TYPES = {
   '.js': 'application/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
@@ -37,7 +39,8 @@ function pikafishOptions() {
     command,
     cwd: path.dirname(command),
     evalFile: fs.existsSync(nnue) ? nnue : undefined,
-    threads: positive(process.env.PIKAFISH_THREADS, 2),
+    // One thread: the same node budget then always walks the same search tree, whatever else the host is doing.
+    threads: positive(process.env.PIKAFISH_THREADS, 1),
     hashMb: positive(process.env.PIKAFISH_HASH_MB, 128),
   };
 }
@@ -123,9 +126,13 @@ function sendAsset(req, res, asset, cache) {
   res.send(gzip ? asset.gzip : asset.raw);
 }
 
-function createCotuongRouter({ engine, movetimeMs, accountApi, db, secret } = {}) {
+function createCotuongRouter({ engine, nodes, movetimeMs, accountApi, db, secret } = {}) {
   const bot = engine !== undefined ? engine : openPikafish();
+  // Strength is a fixed amount of search (nodes), identical for every player however busy the server is.
+  // Time-based thinking is only the fallback when no node budget is configured.
+  const budget = nodes ?? positive(process.env.PIKAFISH_NODES, DEFAULT_NODES);
   const think = movetimeMs ?? positive(process.env.PIKAFISH_MOVETIME_MS, 400);
+  const limit = budget ? { nodes: budget } : { movetimeMs: think };
   const router = express.Router();
   if (typeof accountApi === 'string' && accountApi) router.use(accountProxy(accountApi));
   else mountAccounts(router, { db, secret });
@@ -148,7 +155,7 @@ function createCotuongRouter({ engine, movetimeMs, accountApi, db, secret } = {}
   });
 
   router.get('/api/bot/status', (req, res) => {
-    res.json({ available: Boolean(bot), movetimeMs: think, ...(bot?.lastError ? { lastError: bot.lastError } : {}) });
+    res.json({ available: Boolean(bot), ...(budget ? { nodes: budget } : { movetimeMs: think }), ...(bot?.lastError ? { lastError: bot.lastError } : {}) });
   });
 
   router.post('/api/bot/move', express.json({ limit: '8kb' }), async (req, res) => {
@@ -174,7 +181,7 @@ function createCotuongRouter({ engine, movetimeMs, accountApi, db, secret } = {}
     if (game.result) return fail(res, 400, 'VALIDATION_FAILED', 'The game is over');
 
     try {
-      const answer = await bot.analyse({ startFen: fen, moves, movetimeMs: think });
+      const answer = await bot.analyse({ startFen: fen, moves, ...limit });
       res.json(answer);
     } catch (error) {
       console.error('Pikafish failed:', error.message);
