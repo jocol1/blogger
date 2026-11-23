@@ -29,3 +29,11 @@ test('tea client keeps wallet authentication out of URLs and renders chat as tex
 test('mobile café follows the player view and keeps the activity panel usable', () => {
   assert.match(css, /@media\(max-width:900px\)/); assert.match(css, /position:fixed/); assert.match(css, /touch-action:none/); assert.match(css, /image-rendering:pixelated/);
 });
+
+test('table chat drawer sits at page level so every table game can open it', () => {
+  const room = html.slice(html.indexOf('id="table-room"'), html.indexOf('</section>', html.indexOf('id="table-room"')));
+  assert.doesNotMatch(room, /id="hub-chat"/, 'the drawer must not live inside the lobby, which games hide');
+  assert.match(html, /<aside class="hub-chat" id="hub-chat"/); assert.match(html, /id="game-chat-fab"[^>]*data-open-chat/);
+  const hub = fs.readFileSync(path.join(__dirname, '../public/tea/hub-ui.js'), 'utf8');
+  assert.match(hub, /querySelectorAll\('\[data-open-chat\]'\)/); assert.match(hub, /classList\.toggle\('chat-open'/);
+});

@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="/assets/tea/drawing.css?v=2">
   <link rel="stylesheet" href="/assets/tea/barista.css?v=1">
   <link rel="stylesheet" href="/assets/tea/xiangqi.css?v=3">
-  <link rel="stylesheet" href="/assets/tea/hub.css?v=3">
+  <link rel="stylesheet" href="/assets/tea/hub.css?v=6">
   <link rel="stylesheet" href="/assets/tea/prices.css?v=7">
 </head>
 <body class="cafe-context landscape-panel-closed">
@@ -107,20 +107,13 @@
             <div class="hub-people" id="hub-people" aria-label="People at this table"></div>
             <div class="hub-actions">
               <button type="button" id="hub-quick" class="primary"><i aria-hidden="true">⚡</i><span class="lbl" data-i18n="hubQuick">Quick play</span></button>
-              <button type="button" id="hub-chat-open"><i aria-hidden="true">💬</i><span class="lbl" data-i18n="hubChat">Chat</span><em id="hub-chat-badge" hidden></em></button>
+              <button type="button" id="hub-chat-open"><i aria-hidden="true">💬</i><span class="lbl" data-i18n="hubChat">Chat</span><em id="hub-chat-badge" data-chat-badge hidden></em></button>
               <button type="button" id="hub-menu"><i aria-hidden="true">☕</i><span class="lbl" data-i18n="hubMenu">Order</span></button>
               <button type="button" data-invite-players><i aria-hidden="true">🔗</i><span class="lbl" data-i18n="hubInvite">Invite</span></button>
               <button type="button" class="back-cafe" data-i18n="backCafe">Back to café</button>
             </div>
           </header>
           <div class="hub-body" id="hub-body"></div>
-          <aside class="hub-chat" id="hub-chat" hidden aria-label="Table chat">
-            <div class="hub-chat-head"><b data-i18n="hubChatTitle">Table chat</b><button type="button" id="hub-chat-close" aria-label="Close" data-i18n="hubClose">Close</button></div>
-            <details class="brawl-details"><summary data-i18n="pixelBrawl">Pixel brawl</summary><section class="brawl-box"><div><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section></details>
-            <div class="chat-list" id="chat-list" aria-live="polite"></div>
-            <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
-            <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>
-          </aside>
         </div>
       </section>
 
@@ -255,6 +248,14 @@
   <section id="rotate-overlay" class="rotate-overlay" hidden aria-live="polite"><div class="rotate-card"><div class="rotate-phone"></div><h1 data-pwa-i18n="rotateTitle">Turn your phone sideways</h1><p data-pwa-i18n="rotateCopy">Locly Tea plays in landscape.</p><div class="rotate-actions"><button type="button" data-open-wallet data-pwa-i18n="restoreWallet">Restore wallet</button><button type="button" data-install-cafe data-pwa-i18n="installCafe">Install café</button></div></div></section>
   <aside id="offline-banner" class="offline-banner" hidden><p><b data-pwa-i18n="offlineTitle">You are offline</b><br><span data-pwa-i18n="offlineCopy">Reconnect to keep playing.</span></p><button type="button" id="offline-retry" data-pwa-i18n="retry">Try again</button></aside>
   <aside id="update-banner" class="update-banner" hidden><p><b data-pwa-i18n="updateReady">A new café version is ready.</b><small id="update-status" class="update-status" hidden></small></p><button type="button" id="update-button" data-pwa-i18n="updateWhenDone">Update when finished</button></aside>
+  <aside class="hub-chat" id="hub-chat" hidden aria-label="Table chat">
+            <div class="hub-chat-head"><b data-i18n="hubChatTitle">Table chat</b><button type="button" id="hub-chat-close" aria-label="Close" data-i18n="hubClose">Close</button></div>
+            <details class="brawl-details"><summary data-i18n="pixelBrawl">Pixel brawl</summary><section class="brawl-box"><div><small data-i18n="brawlCopy">Challenge someone at your table. 12 seconds, no prizes, just BONK.</small></div><select id="fight-opponent" aria-label="Opponent"></select><button id="challenge-fight" class="bonk-small" data-i18n="challenge">Challenge</button></section></details>
+            <div class="chat-list" id="chat-list" aria-live="polite"></div>
+            <div class="emoji-row"><button>👋</button><button>😂</button><button>🥤</button><button>🫶</button><button>😎</button><button>🤝</button></div>
+            <form id="chat-form" class="chat-form"><input id="chat-input" maxlength="500" autocomplete="off" data-i18n-placeholder="saySomething" placeholder="Say something…"><button data-i18n="send">Send</button></form>
+          </aside>
+  <button type="button" id="game-chat-fab" class="game-chat-fab" data-open-chat aria-label="Chat"><i aria-hidden="true">💬</i><em data-chat-badge hidden></em></button>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="/socket.io/socket.io.js"></script>
   <script src="/assets/tea/world.js?v=street2"></script>
@@ -266,7 +267,7 @@
   <script src="/assets/tea/touch-controls.js?v=touch1"></script>
   <script src="/assets/tea/drawing-ui.js?v=2"></script><script src="/assets/tea/barista-ui.js?v=1"></script><script src="/assets/tea/xiangqi-rules.js?v=1"></script><script src="/assets/tea/xiangqi-fx.js?v=1"></script><script src="/assets/tea/xiangqi-ui.js?v=4"></script><script src="/assets/tea/games-ui.js?v=xiangqi1"></script>
   <script src="/assets/tea/game-words.js?v=triple-memory1"></script><script src="/assets/tea/drawing-words.js?v=1"></script><script src="/assets/tea/barista-words.js?v=1"></script><script src="/assets/tea/xiangqi-words.js?v=2"></script><script src="/assets/tea/hub-words.js?v=2"></script>
-  <script src="/assets/tea/hub-ui.js?v=2"></script>
+  <script src="/assets/tea/hub-ui.js?v=4"></script>
   <script src="/assets/tea/prices-words.js?v=7"></script><script src="/assets/tea/prices-cart.js?v=2"></script><script src="/assets/tea/prices-ui.js?v=11"></script>
   <script src="/assets/tea/pwa-words.js?v=pwa1"></script>
   <script src="/assets/tea/brawl-words.js?v=arena1"></script>
@@ -281,7 +282,7 @@
   <script src="/assets/tea/tienlen-view.js?v=tienlen1"></script>
   <script src="/assets/tea/tienlen-ui.js?v=mobile1"></script>
   <script src="/assets/tea/classic-cards-ui.js?v=mobile1"></script>
-  <script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/prediction.js"></script><script src="/assets/tea/cafe-walker.js?v=fit1"></script><script src="/assets/tea/app.js?v=3d2"></script>
+  <script src="/assets/tea/movement.js"></script><script src="/assets/tea/walk-controls.js"></script><script src="/assets/tea/farm-motion.js"></script><script src="/assets/tea/farm-avatar.js"></script><script src="/assets/tea/prediction.js"></script><script src="/assets/tea/cafe-walker.js?v=fit1"></script><script src="/assets/tea/app.js?v=3d3"></script>
   <script src="/assets/tea/pwa.js?v=pwa1"></script>
 </body>
 </html>

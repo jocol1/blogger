@@ -35,7 +35,7 @@ body.hub-open #table-empty{margin:auto}
 .hub-tile.live{border-color:#e0a73e;box-shadow:0 0 0 3px rgba(255,208,106,.55),0 3px #8f6a1f}.hub-live-tag{position:absolute;top:6px;right:9px;font-style:normal;font-size:12px;color:#d94f3d;animation:hub-pulse 1.1s infinite}
 @keyframes hub-pulse{50%{opacity:.35}}@keyframes hub-slide{from{transform:translateX(24px);opacity:0}}
 
-.hub-chat{position:absolute;z-index:8;top:0;right:0;bottom:0;width:min(380px,92%);display:flex;flex-direction:column;gap:8px;padding:10px;background:#fff6dc;color:#3b2a18;border-left:3px solid #b78d55;box-shadow:-12px 0 30px rgba(0,0,0,.45);animation:hub-slide .18s ease-out}
+.hub-chat{position:fixed;z-index:90;top:0;right:0;height:var(--tea-visible-bottom,100dvh);width:min(380px,92vw);display:flex;flex-direction:column;gap:8px;padding:10px;background:#fff6dc;color:#3b2a18;border-left:3px solid #b78d55;box-shadow:-12px 0 30px rgba(0,0,0,.45);animation:hub-slide .18s ease-out}
 .hub-chat-head{display:flex;align-items:center;justify-content:space-between}.hub-chat-head b{font-size:15px}.hub-chat-head button{min-height:32px;padding:3px 12px;border-radius:9px;border:2px solid #b78d55;background:#f6ebcf;color:#3b2a18;font-weight:700;font-size:12px}
 .hub-chat .brawl-details{flex:none}.hub-chat .chat-list{flex:1;min-height:0;overflow:auto}.hub-chat .emoji-row{flex:none}.hub-chat .chat-form{flex:none}
 
@@ -62,3 +62,8 @@ body.mini-game-fullscreen .games-view .back-hub{min-height:32px;padding:4px 8px;
  .hub-grid{grid-template-columns:repeat(auto-fill,minmax(236px,1fr));gap:12px}.hub-tile{grid-template-columns:60px minmax(0,1fr);min-height:104px;padding:14px 16px;border-radius:16px}
  .hub-icon{width:60px;height:60px;border-radius:16px;font-size:32px}.hub-icon.cjk{font-size:36px}.hub-tile b{font-size:16px}.hub-tile small{font-size:12px}.hub-group h3{font-size:12px;margin-bottom:9px}.hub-body{gap:20px;padding-top:22px}
 }
+
+/* The chat drawer lives at page level so every table game can open it; the round button shows only while a game screen is up. */
+.game-chat-fab{position:fixed;z-index:80;top:50%;transform:translateY(-50%);right:max(6px,env(safe-area-inset-right));display:none;width:40px;height:40px;padding:0;align-items:center;justify-content:center;border:2px solid #b78d55;border-radius:50%;background:rgba(246,235,207,.94);color:#3b2a18;font-size:19px;line-height:1;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.game-chat-fab em{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#d94f3d;color:#fff;font-style:normal;font-size:10px;line-height:18px;text-align:center}.game-chat-fab em[hidden]{display:none}
+body:has(#cafe-shell.play-mode):not(.hub-open):not(.prices-open):not(.chat-open) .game-chat-fab{display:flex}

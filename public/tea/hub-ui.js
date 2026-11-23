@@ -71,10 +71,10 @@ window.TeaHubUI=function({t,state,myId,myTable,open,challengeBusy=()=>false}){
   }
  }
  function openChat(show,brawl=false){
-  const drawer=$('#hub-chat');if(!drawer)return;drawer.hidden=!show;
+  const drawer=$('#hub-chat');if(!drawer)return;drawer.hidden=!show;document.body.classList.toggle('chat-open',show);
   if(show){unread=0;paintBadge();const list=$('#chat-list');if(list)list.scrollTop=list.scrollHeight;if(brawl){const details=drawer.querySelector('.brawl-details');if(details)details.open=true;}}
  }
- function paintBadge(){const badge=$('#hub-chat-badge');if(!badge)return;badge.hidden=unread===0;badge.textContent=unread>9?'9+':String(unread);}
+ function paintBadge(){for(const badge of document.querySelectorAll('[data-chat-badge]')){badge.hidden=unread===0;badge.textContent=unread>9?'9+':String(unread);}}
  function noteChat(){const drawer=$('#hub-chat');if(drawer?.hidden){unread++;paintBadge();}}
  function render(){
   if(!myTable()){return;}
@@ -84,7 +84,7 @@ window.TeaHubUI=function({t,state,myId,myTable,open,challengeBusy=()=>false}){
  }
  function bind(){
   $('#hub-quick').onclick=()=>launch(tileOf(last())||tileOf('xiangqi'));
-  $('#hub-chat-open').onclick=()=>openChat($('#hub-chat').hidden);
+  $('#hub-chat-open').onclick=()=>openChat($('#hub-chat').hidden);document.querySelectorAll('[data-open-chat]').forEach(button=>button.onclick=()=>openChat($('#hub-chat').hidden));
   $('#hub-chat-close').onclick=()=>openChat(false);
   $('#hub-menu').onclick=()=>open.menu();
  }
